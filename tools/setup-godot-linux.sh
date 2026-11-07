@@ -14,6 +14,9 @@ if [[ ! -x "$engine_dir/$engine_name" ]]; then
   curl --fail --location --retry 3 \
     "https://github.com/godotengine/godot-builds/releases/download/${release_tag}/${engine_name}.zip" \
     --output "$engine_dir/engine-linux.zip"
+  printf '%s  %s\n' \
+    '9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65' \
+    "$engine_dir/engine-linux.zip" | sha512sum --check
   python3 -m zipfile -e "$engine_dir/engine-linux.zip" "$engine_dir"
   chmod +x "$engine_dir/$engine_name"
 fi

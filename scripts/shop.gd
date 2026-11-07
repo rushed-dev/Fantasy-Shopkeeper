@@ -400,8 +400,7 @@ func _process(delta: float) -> void:
 	if smoke_frames > 0:
 		smoke_frames -= 1
 		if smoke_frames == 0:
-			print("SCENE SMOKE PASS: room, player, 14 slots, 6 products and HUD loaded")
-			get_tree().quit()
+			_finish_smoke_test()
 	if capture_frames > 0:
 		capture_frames -= 1
 		if capture_frames == 0:
@@ -449,3 +448,21 @@ func _capture() -> void:
 	var error := snapshot.save_png(capture_path)
 	print("SCREENSHOT: %s (result %d)" % [capture_path, error])
 	get_tree().quit(0 if error == OK else 1)
+
+
+func _finish_smoke_test() -> void:
+	var valid := is_instance_valid(player) and is_instance_valid(player.camera) and is_instance_valid(player.carry_anchor)
+	if valid:
+		valid = player.camera.current and player.carry_anchor.get_parent() == player.camera
+		valid = valid and player.carry_anchor.position.is_equal_approx(Vector3(0.38, -0.38, -0.72))
+	var items := 0
+	for slot in slots:
+		if is_instance_valid(slot.item):
+			items += 1
+	valid = valid and slots.size() == 14 and shelf_slots.size() == 6 and items == 6 and is_instance_valid(hud)
+	if not valid:
+		push_error("SCENE SMOKE FAIL: player, carry anchor, stock or HUD invariant failed")
+		get_tree().quit(1)
+		return
+	print("SCENE SMOKE PASS: player camera and carry anchor, 14 slots, 6 items and HUD verified")
+	get_tree().quit(0)

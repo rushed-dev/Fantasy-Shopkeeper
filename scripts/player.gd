@@ -7,6 +7,7 @@ var mouse_sensitivity: float = 0.0022
 
 
 func _init() -> void:
+	super()
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	collision_layer = 4
 	collision_mask = 1
@@ -23,7 +24,10 @@ func _init() -> void:
 	camera.fov = 75.0
 	camera.near = 0.05
 	add_child(camera)
-	carry_anchor.reparent(camera, false)
+	# Construction happens before entering the scene tree. Reattach locally:
+	# reparent() can query a global transform that does not exist yet.
+	remove_child(carry_anchor)
+	camera.add_child(carry_anchor)
 	carry_anchor.position = Vector3(0.38, -0.38, -0.72)
 	carry_anchor.rotation_degrees = Vector3(-8, 0, 12)
 

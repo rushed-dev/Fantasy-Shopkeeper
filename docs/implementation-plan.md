@@ -4,15 +4,15 @@ The approved experiment has five focused sessions. These are playable milestones
 
 ## 1. Physical shop and shared actions (current)
 
-Paused for cloud handoff on 2026-11-07. Scene and controls are drafted, but a player-constructor error blocks acceptance. See cloud-handoff.md for exact results and next steps; the milestone is not complete.
+Cloud validation on 2026-11-07 fixed the player constructor and false smoke success. Shared actions pass 30 assertions; the graphical route passes 74, including continuous walking, aiming, all six transfers, collision and pause/resume. Windows/Linux release archives are packaged; the extracted Linux release passes smoke validation. See validation.md. Technical implementation is ready for playtesting; native Windows and subjective usability acceptance remain outstanding.
 
-- [ ] Set up Godot and a Windows launch path.
-- [ ] Build a navigable, modest fantasy shop with a delivery area and labelled shelves.
-- [ ] Pick up and place actual products, one at a time, with clear prompts and occupied/incompatible feedback.
+- [x] Set up Godot and a Windows launch path (Windows engine launcher not re-executed on Linux).
+- [x] Build a navigable, modest fantasy shop with a delivery area and labelled shelves.
+- [x] Pick up and place actual products, one at a time, with clear prompts and occupied/incompatible feedback.
 - [x] Centralise item actions so future workers use the same reach, visibility, carry, slot, and stock checks.
-- [ ] Show at least one glowing item.
-- [x] Verify successful transfers and failure cases through the public action interface using two actors (30 assertions; clean cloud rerun still required).
-- [ ] Run a visual smoke test and package a playable first milestone.
+- [x] Show at least one glowing item.
+- [x] Verify successful transfers and failure cases through the public action interface using two actors (30 assertions; clean cloud rerun passed).
+- [x] Run a visual smoke test and package a playable first milestone (native Windows playtest pending).
 
 ## 2. Customer and checkout
 
