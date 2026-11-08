@@ -23,6 +23,7 @@ A checkpoint is created at the start of the first morning and after day-two deli
 
 ## Project documents
 
+- [Story strategy and connected examples](docs/story-strategy.md)
 - [Prototype specification](docs/prototype-spec.md)
 - [Implementation checklist](docs/implementation-plan.md)
 - [Validation evidence and limitations](docs/validation.md)

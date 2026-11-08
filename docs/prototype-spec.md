@@ -4,7 +4,9 @@ Status: scope approved in the grilling session on 2026-11-07. The recovery loan 
 
 ## Purpose and decision to make
 
-Test whether a cosy first-person magical shop is enjoyable to operate manually and whether delegating work creates a satisfying sense of progress. Ordinary trading must be a complete, viable playstyle. Optional customer stories offer bonus opportunities, including future magical automation. Decide whether to continue only after playing the retail loop and its first automation transition.
+Build on the enjoyable retail foundation to explore a cosy fantasy shop with memorable returning customers and optional stories. Ordinary trading must remain a complete, viable playstyle. Story consequences and bonus opportunities should grow from shopkeeping. Delegation remains a planned progression step, with mundane workers economically useful.
+
+The user playtested and enjoyed stocking, checkout and the two-day loop on 2026-11-08. The next priority is the shop's story identity: recurring customers, voluntary opportunities and consequences that return through ordinary trade. See [story-strategy.md](story-strategy.md) for the working direction and connected examples. A representative story slice now precedes the restocker; delegation remains planned. This changes the iteration order without authorising a larger campaign or making story engagement necessary for ordinary progression.
 
 The first experiment is capped at five focused development sessions, followed by a review. This is an effort limit, not a delivery guarantee. Target roughly ten minutes of active trading across two days; preparation, arithmetic, pauses, and evening decisions may take as long as the player needs.
 
@@ -58,7 +60,7 @@ Customers may comment on queue length but do not abandon purchases, reduce payme
 
 ## Optional encounter
 
-One customer makes an optional request on day one and returns on day two. Fulfilling it produces a short story consequence and a small merchandise reward, potentially glowing stock. Declining preserves viable ordinary progression. Failed accepted requests may have clearly understood, bounded consequences.
+The recommended first slice is Fen’s optional day-one request and day-two return, described in story-strategy.md. It is not implemented yet. One customer makes an optional request on day one and returns on day two. Fulfilling it produces a short story consequence and a small merchandise reward, potentially glowing stock. Declining preserves viable ordinary progression. Failed accepted requests may have clearly understood, bounded consequences.
 
 Magical automation rewards, branching quest systems, and additional encounter content are later work. The prototype's helper is mundane and affordable through ordinary trading alone.
 
