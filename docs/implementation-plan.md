@@ -14,25 +14,27 @@ Cloud validation on 2026-11-07 fixed the player constructor and false smoke succ
 - [x] Verify successful transfers and failure cases through the public action interface using two actors (30 assertions; clean cloud rerun passed).
 - [x] Run a visual smoke test and package a playable first milestone (native Windows playtest pending).
 
-## 2. Customer and checkout (current)
+## 2. Customer and checkout
 
-First playable slice added on 2026-11-08: three explicitly invited visits, one customer at a time, with baskets of one/two/three physical items. Fixed shelf prices are visible; the ledger requires manual totals and change. Stock races retry another matching shelf; missing shelf stock receives explicit feedback. No timeouts or penalties for waiting. This is not yet the full queue/price-rejection milestone.
+First playable slice added on 2026-11-08: three explicitly invited visits, one customer at a time, with baskets of one/two/three physical items. Fixed shelf prices are visible; the ledger requires manual totals and change. Stock races retry another matching shelf; missing shelf stock receives explicit feedback. No timeouts or penalties for waiting. Price rejection is now included in milestone 3; general queueing remains outstanding.
 
 - [ ] Customer browses, obtains one to three available products, queues, and visits the counter. (Browsing/baskets/counter implemented; queue deferred.)
-- [ ] Missing stock and unreasonable prices cause explicit lost sales; waiting causes no penalty. (Missing stock/waiting implemented; adjustable prices and rejection deferred.)
+- [x] Missing stock and unreasonable prices cause explicit lost sales; waiting causes no penalty. (Missing stock, adjustable prices, rejection and waiting implemented.)
 - [x] Enter basket total, receive payment, count change using 1/10/100 pouches.
 - [x] Click/hold repeat, tray removal, keyboard equivalents, confirmation and correction.
 - [x] Leaving and returning to the counter preserves the pending transaction.
 - [x] Verify no duplicate charges or stock loss on retries.
 
-## 3. Days, stock, finances, persistence
+## 3. Days, stock, finances, persistence (current)
 
-- [ ] Unlimited preparation/evening with explicit open/advance actions.
-- [ ] Fixed customer allocation and safe closing after remaining service.
-- [ ] Supplier ordering, morning delivery, shelf pricing and disclosed daily costs.
-- [ ] Basic recovery loan with explicit debt and repayment; tune recovery through one or two days of stock.
-- [ ] Morning save/resume, fresh start, and unrestricted pause.
-- [ ] Verify daily transitions and saves do not duplicate stock, charges, wages, or debt.
+Added on 2026-11-08. Two explicit preparation/trading/closing/evening cycles; three fixed opportunities per day; closing waits for the active customer. Supplier ordering, shelf prices, single-charge expenses, a bounded recovery loan, voluntary repayment and morning snapshots are implemented. Ordinary manual trading ends with 224 bits from 24 starting cash after paying for day-two stock and both daily expenses. A recovery scenario can clear the 118-bit loan and retain 78 cash plus six bottles after day two. These are tuning values. The restocker remains the next milestone.
+
+- [x] Unlimited preparation/evening with explicit open/advance actions.
+- [x] Fixed customer allocation and safe closing after remaining service.
+- [x] Supplier ordering, morning delivery, shelf pricing and disclosed daily costs.
+- [x] Basic recovery loan with explicit debt and repayment; tune recovery through one or two days of stock.
+- [x] Morning save/resume, fresh start, and unrestricted pause.
+- [x] Verify daily transitions and saves do not duplicate stock, charges, wages, or debt.
 
 ## 4. Delegation
 

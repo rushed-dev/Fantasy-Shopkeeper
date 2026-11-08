@@ -2,19 +2,24 @@
 
 A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
 
-**Current checkpoint: first customers.** Movement and stocking have been playtested. Customers now browse shelf stock, carry baskets to the counter, and pay through a manual total/change interaction. This is a one-customer-at-a-time slice, with three explicitly invited visits. Days, expenses, loans, workers, saves and the optional encounter remain future milestones.
+**Current checkpoint: two trading days.** Stocking and manual checkout now sit inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Customers remain one at a time; queues, workers and the optional encounter are future work.
 
 ## Play this checkpoint
 
-1. Stock the six delivery bottles on their matching shelves. Prices are printed on the shelf labels.
-2. Approach the counter, aim at the ledger, and press **E**.
-3. Choose **Invite a customer**, then watch them browse and return to the counter. Only items on shelves are available for sale; they can miss items even when delivery stock exists.
-4. Open the ledger again. Add the listed prices yourself, enter the basket total, and choose **Agree total**.
-5. Read the customer's payment and dispense change. Click or hold a coin pouch, or hold **1 / 2 / 3** for bits (1), marks (10), and crowns (100). Click a tray stack or press **Shift + 1 / 2 / 3** to take back one coin.
-6. Choose **Confirm sale**. Incorrect totals or change allow correction. Any correct combination of coins works. Leave the counter and return whenever you like; the pending sale and tray remain intact.
-7. After the customer leaves, invite the next one. There are three visits, with baskets of one, two, and three items. Waiting never penalises the player. Reset from the pause menu to try again.
+1. Continue the saved morning, or confirm **Start a fresh two-day experiment** from the opening/pause menu. A fresh shop starts with 24 bits and six already-paid delivery bottles. The menu says **TWO DAYS**.
+2. Stock shelves at your pace. Approach the counter, aim at the ledger and press **E**. During preparation you can set shelf prices, then explicitly **Open the shop**. Prices lock while trading; unreasonable prices can lose purchases.
+3. Invite each of the three customers. Only shelf stock is available. Add the displayed basket prices yourself, agree the total, and count change from the customer's payment. Click/hold pouches or keys **1 / 2 / 3** for 1/10/100; click tray stacks or **Shift + 1 / 2 / 3** to take coins back. Confirm the sale when ready. Corrections and leaving/returning preserve the transaction; waiting has no penalty.
+4. **Close shop** from the ledger after the visits, or close early and forgo unstarted visits. An existing customer finishes before the evening starts. The 12-bit shop expense is charged once.
+5. Review cash, takings, expenses and debt. Change tomorrow's prices and order bottles at supplier costs of 5/9/14 bits for tonic/ink/starlight. Pay the order once, including an explicit zero-bottle order if desired. Unsold stock stays and occupies its existing spaces. The order must fit the delivery tray.
+6. Put down any carried bottle, then sleep. The paid shipment arrives once on day two and a morning checkpoint is saved. Stock, open, serve and close again, then finish the two-day experiment.
 
-WASD/arrows move, mouse looks, **E** handles stock or the ledger, and **Escape** returns from the ledger or pauses the shop. Look sensitivity is in the opening/pause menu. The opening menu says **FIRST CUSTOMERS**, which distinguishes this checkpoint from the earlier delivery-only build.
+If funds are low on evening one, a **one-time recovery loan** provides 112 bits with 118 bits total debt. Repayment is voluntary, with no compounding or late fee. Terms are visible before accepting. This funds roughly two ordinary six-bottle deliveries; the values are prototype tuning, not a finished economy.
+
+WASD/arrows move, mouse looks, **E** handles stock or the ledger, and **Escape** returns from a ledger/planning screen or pauses the shop. Look sensitivity is in the opening/pause menu.
+
+## Morning saves
+
+A checkpoint is created at the start of the first morning and after day-two deliveries, under Godot's per-project `user://morning.json`. Reopening the game or choosing **Restart saved morning** restores that morning's starting stock, prices, cash and debt. Preparation changes and mid-day transactions are deliberately not saved. Loading replaces the world; it does not repeat deliveries or loan payments. Invalid saves are reported and preserved until you explicitly choose a fresh experiment. Starting fresh replaces the checkpoint after confirmation.
 
 ## Project documents
 
@@ -48,7 +53,7 @@ bash tools/setup-godot-linux.sh
 bash tools/check-godot-linux.sh
 ```
 
-The check runner imports the project, runs shared item actions, the physical scene regression, checkout regression, and scene smoke. It rejects engine errors even when Godot exits zero. Logs are generated under ignored `test-results/`.
+The check runner imports the project, runs shared item actions, the physical scene regression, checkout regression, day-loop/save/recovery regression, and scene smoke. It rejects engine errors even when Godot exits zero. Logs are generated under ignored `test-results/`.
 
 With a graphical display available, use the pinned engine to launch the editor or game:
 
@@ -71,6 +76,14 @@ This saves ledger/customer screenshots under `builds/screenshots/`. Headless che
 
 Remove `--disable-render-loop` to watch the route; add `--capture-final=/absolute/path/shop.png` only with rendering enabled. The default scene test relocates between stations for quicker geometry checks; headless runs explicitly skip walking.
 
+Run the complete day-loop regression with screenshots:
+
+```bash
+.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --audio-driver Dummy --fixed-fps 60 --path . --script res://tests/day_loop_test.gd -- --capture-days
+```
+
+Tests use isolated checkpoint files and do not modify the player's saved morning.
+
 ## Export
 
-`bash tools/build-linux.sh` runs validation, installs checksum-verified official templates, exports Windows/Linux, checks the Linux release, and packages ZIPs with licence notices and SHA256 sidecars under ignored `builds/`. Native Windows execution and human usability of the new checkout remain unverified here. No additional services or credentials are required.
+`bash tools/build-linux.sh` runs validation, installs checksum-verified official templates, exports Windows/Linux, checks the Linux release, and packages ZIPs with licence notices and SHA256 sidecars under ignored `builds/`. Native Windows execution and human usability of the new day/economy screens remain unverified here. No additional services or credentials are required.

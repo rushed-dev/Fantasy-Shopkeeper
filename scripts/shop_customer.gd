@@ -10,6 +10,7 @@ var sale: CounterSale
 var shelves: Array[StockSlot] = []
 var requests: Array[String] = []
 var prices: Dictionary
+var max_prices: Dictionary = {}
 var basket: Node3D
 var current_product: String
 var destination: StockSlot
@@ -54,10 +55,11 @@ func _visual(mesh: Mesh, at: Vector3, tint: Color) -> void:
 	visual.material_override = material
 	add_child(visual)
 
-func begin(wanted: Array[String], stock: Array[StockSlot], catalogue: Dictionary, amount: int) -> void:
+func begin(wanted: Array[String], stock: Array[StockSlot], catalogue: Dictionary, amount: int, limits: Dictionary = {}) -> void:
 	requests = wanted.duplicate()
 	shelves = stock
-	prices = catalogue
+	prices = catalogue.duplicate()
+	max_prices = limits.duplicate()
 	sale = CounterSale.new(amount)
 	position = Vector3(0, 0, 3.75)
 	route = [Vector3(0, 0, -1.65)]
@@ -92,6 +94,8 @@ func _next_product() -> void:
 			remarked.emit("Nothing I wanted was on the shelves today. I'll try another time.")
 			leave()
 		else:
+			if sale.payment < sale.total():
+				sale.payment = int(ceil(sale.total() / 100.0)) * 100
 			state = "to_counter"
 			route = [Vector3(0, 0, -1.65), Vector3(0, 0, 0.1), Vector3(2.8, 0, 0.1)]
 		return
@@ -105,6 +109,11 @@ func _next_product() -> void:
 		if slot.accepted_product == product and is_instance_valid(slot.item):
 			destination = slot
 			break
+	if max_prices.has(product) and prices[product] > max_prices[product]:
+		missing += 1
+		remarked.emit("That %s price is more than I can pay today." % title)
+		state = "entering"
+		return
 	if destination == null:
 		missing += 1
 		remarked.emit("No %s on the shelves? I'll go without it today." % title)

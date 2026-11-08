@@ -18,21 +18,27 @@ if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-smoke.log; then exit 1; fi
 "$engine" --headless --fixed-fps 60 --main-pack "$PWD/builds/linux/FantasyShopkeeper.x86_64" \
   --script "$PWD/tests/checkout_test.gd" 2>&1 | tee test-results/export-checkout.log
 if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-checkout.log; then exit 1; fi
+"$engine" --headless --fixed-fps 60 --main-pack "$PWD/builds/linux/FantasyShopkeeper.x86_64" \
+  --script "$PWD/tests/day_loop_test.gd" 2>&1 | tee test-results/export-day-loop.log
+if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-day-loop.log; then exit 1; fi
 python3 - <<'PY'
 import hashlib, zipfile
 from pathlib import Path
 for platform in ('windows', 'linux'):
     directory = Path('builds') / platform
     (directory / 'README.txt').write_text(
-        'Fantasy Shopkeeper - First Customers prototype\n\n'
+        'Fantasy Shopkeeper - Two Days prototype\n\n'
         'WASD/arrows: move. Mouse: look. E: handle stock or open ledger. Escape: return/pause.\n'
         'Stock all six bottles on their labelled shelves.\n'
-        'At the counter, aim at the ledger and press E. Invite each of three customers.\n'
+        'At the counter, press E to set prices and explicitly open. Invite three customers each day.\n'
         'Enter their basket total, then count change with 1/10/100 pouches.\n'
         'Click or hold pouches, or use keys 1/2/3. Click tray stacks to take one back.\n'
         'Shift+1/2/3 removes coins. Confirm when ready; mistakes allow correction.\n'
         'Leaving the counter preserves the sale. Nobody times out.\n'
-        'Days, finances, workers and saves are not implemented yet.\n'
+        'Close the shop for evening orders and finances. Shop expense is 12 bits daily.\n'
+        'Pay an order, then sleep to receive it on day two. Recovery loan: 112 received, 118 due.\n'
+        'Morning checkpoints save automatically; restarting restores the morning start.\n'
+        'Workers and the optional encounter are not implemented yet.\n'
         'Windows export has not been tested on Windows.\n'
         'Engine licence and third-party notices: https://godotengine.org/license/\n')
     for name in ('GODOT-LICENSE.txt', 'GODOT-COPYRIGHT.txt'):

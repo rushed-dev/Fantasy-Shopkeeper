@@ -1,3 +1,23 @@
+# Two-day loop validation — 2026-11-08
+
+The day-loop regression covers both full trading days, cash reconciliation, explicit opening, safe closing, supplier orders, retained stock, price rejection, customer payment adjustment, recovery credit, repayments and morning persistence.
+
+- Headless day-loop regression: **115 assertions, 0 failures**. It exercises duplicate close/order/advance requests, changing tray capacity after ordering, carried bottles at sleep, restore into a fresh scene, repeated restores, invalid startup saves, invalid stock data, failed writes, and preservation of an existing checkpoint.
+- Default manual path: 24 starting cash + 280 takings − 24 daily expenses − 56 ordered stock = **224 cash**, no debt.
+- Recovery path: after a no-sales first day, the 112-bit loan permits a paid delivery and day-two trading. Repaying the full 118-bit debt leaves **78 cash and six retained bottles**, proving recovery without forced reset.
+- Graphical day-loop regression: **120 assertions, 0 failures**, including five screenshots inspected for the planning, loan and resume screens.
+- Windows/Linux exports pass. Checkout (107) and day-loop (115) checks also pass against the exported Linux resource pack. The standalone Linux release creates a morning checkpoint on first launch and resumes it without rewriting it on the second launch.
+- Existing shared item actions (30), checkout (107), and scene checks (36 headless; walking is a separate graphical check) remain required by the runner.
+- Test scenes disable ordinary player persistence. Save regression files use a separate test path and are removed after the run. Smoke/capture startup also disables persistence, keeping builds from touching player saves.
+
+The checkpoint saves only the morning's starting state, after deliveries; restarting intentionally discards the current day's later actions. Stored stock is validated completely before application. Orders are consumed before saving the new world, so restoring does not replay them. Existing corrupt saves are preserved for an explicit fresh-start decision.
+
+One visitor at a time remains a deliberate limit. Supplier costs 5/9/14, daily expense 12, starting cash 24, and loan terms 112 received/118 due are tuning values. The initial six bottles are already paid for. Customers reject shelf prices above twice the initial price; this is a simple prototype rule, not a demand simulation. Negative cash after a poor final day is shown as a deficit, without forced bankruptcy. Workers, wages, queues and encounters are not implemented.
+
+Native Windows execution and the feel of the new planning screens still require human playtesting. See README.md for controls and reproduction commands.
+
+---
+
 # First customers validation — 2026-11-08
 
 The user confirmed delivery movement and stocking work well. The new customer/checkout slice is tested separately from that physical-shop checkpoint.
@@ -9,7 +29,7 @@ The user confirmed delivery movement and stocking work well. The new customer/ch
 
 Customer paths follow the room's clear aisles; they are a single-visitor prototype rather than general navigation or queueing. Prices are fixed (12/23/35 bits). Missing products produce immediate remarks; no persistent missing-stock report is added. Customers buy the available portion of a requested basket and leave without a sale if nothing is available. Physical sold items remain with the customer until departure. Takings are recorded once at confirmation; full daily accounting is not implemented.
 
-For play instructions and reproduction commands, see README.md. New checkout audio and mouse feel still need human validation; automated graphical runs use dummy audio. Native Windows and PowerShell execution remain unverified on this Linux host. Days, queues, adjustable prices, price rejection, recovery loans, workers, saves, and encounters remain outstanding.
+For play instructions and reproduction commands, see README.md. New checkout audio and mouse feel still need human validation; automated graphical runs use dummy audio. Native Windows and PowerShell execution remain unverified on this Linux host. This historical checkpoint predates the two-day loop above. Queues, workers and encounters remain outstanding.
 
 ---
 

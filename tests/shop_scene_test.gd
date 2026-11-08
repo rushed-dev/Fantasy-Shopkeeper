@@ -27,6 +27,7 @@ func _run() -> void:
 	_check(detached.carry_anchor.position.is_equal_approx(Vector3(0.38, -0.38, -0.72)), "Detached carry anchor has local offset")
 	detached.free()
 	var shop = load("res://scenes/shop.tscn").instantiate()
+	shop.persistence_enabled = false
 	root.add_child(shop)
 	_check(shop.overlay.visible and not shop.started, "Opening menu explains delivery before play")
 	shop.resume_button.pressed.emit()
@@ -59,7 +60,7 @@ func _run() -> void:
 		_check(player.held_item == item and source.item == null, "Picked up delivery %s" % source.name)
 		await _interact(shop, destination, Vector3(destination.position.x, 0.05, -1.9))
 		_check(destination.item == item and player.held_item == null, "Stocked shelf %s" % destination.name)
-	_check(shop.completed and shop.progress_label.text == "6 / 6 bottles stocked", "Six bottles complete delivery and update HUD")
+	_check(shop.completed and "Day 1" in shop.progress_label.text, "Six bottles complete delivery and update HUD")
 	if walk_route:
 		player.rotation = Vector3.ZERO
 		Input.action_press("move_forward")

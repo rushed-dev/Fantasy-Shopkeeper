@@ -81,8 +81,10 @@ func _wait_for_departure(shop: Node) -> void:
 
 func _shop_flow() -> void:
 	var shop = load("res://scenes/shop.tscn").instantiate()
+	shop.persistence_enabled = false
 	root.add_child(shop)
 	shop._start()
+	shop.open_trading()
 	_stock(shop)
 	# Verify the real counter can be aimed at from the customer-facing side.
 	shop.player.position = Vector3(2.75, 0.05, 2.6)
@@ -174,8 +176,10 @@ func _shop_flow() -> void:
 
 func _empty_shelves() -> void:
 	var shop = load("res://scenes/shop.tscn").instantiate()
+	shop.persistence_enabled = false
 	root.add_child(shop)
 	shop._start()
+	shop.open_trading()
 	var remarks: Array[String] = []
 	shop.invite_customer()
 	shop.customer.remarked.connect(func(message: String) -> void: remarks.append(message))
@@ -204,8 +208,10 @@ func _snapshot(name: String) -> void:
 
 func _competing_pickup() -> void:
 	var shop = load("res://scenes/shop.tscn").instantiate()
+	shop.persistence_enabled = false
 	root.add_child(shop)
 	shop._start()
+	shop.open_trading()
 	_stock(shop)
 	shop.invite_customer()
 	shop.customer.speed = 1000

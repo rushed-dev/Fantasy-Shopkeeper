@@ -3,6 +3,7 @@ extends ColorRect
 
 signal close_requested
 signal invite_requested
+signal close_day_requested
 signal confirm_requested
 
 var sale: CounterSale
@@ -14,6 +15,7 @@ var total_entry: LineEdit
 var agree: Button
 var invite: Button
 var confirm: Button
+var close_day: Button
 var pouches: Array[Button] = []
 var tray_coins: Array[Button] = []
 var held_value := 0
@@ -73,6 +75,7 @@ func _ready() -> void:
 	feedback = _label(column, "", 17)
 	feedback.custom_minimum_size = Vector2(680, 52)
 	feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	close_day = _button(column, "Close shop — remaining visits will not arrive", func() -> void: close_day_requested.emit())
 	_button(column, "Return to the shop", func() -> void: close_requested.emit())
 	coin_sound = AudioStreamPlayer.new()
 	coin_sound.volume_db = -22

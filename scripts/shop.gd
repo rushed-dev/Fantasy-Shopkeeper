@@ -11,6 +11,15 @@ const VISITS := [
 	{"wanted": ["ink", "light"], "payment": 100},
 	{"wanted": ["tonic", "ink", "light"], "payment": 200},
 ]
+var run := ShopRun.new()
+var day_panel: DayPanel
+var price_labels: Array[Label3D] = []
+var persistence_enabled := true
+var save_path := "user://morning.json"
+var save_status := ""
+var save_blocked := false
+var planning_before_pause := false
+var fresh_confirmation: ConfirmationDialog
 var customer: ShopCustomer
 var checkout: CheckoutPanel
 var counter_body: StaticBody3D
@@ -43,6 +52,9 @@ var capture_frames: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--smoke-test" or arg.begins_with("--capture="):
+			persistence_enabled = false
 	_configure_input()
 	_build_room()
 	_build_stock()
@@ -54,6 +66,21 @@ func _ready() -> void:
 	player.camera.current = true
 	_build_hud()
 	_build_checkout()
+	day_panel = DayPanel.new()
+	day_panel.process_mode = Node.PROCESS_MODE_PAUSABLE
+	hud.add_child(day_panel)
+	day_panel.close_requested.connect(_close_checkout)
+	day_panel.action_requested.connect(_day_action)
+	day_panel.price_changed.connect(_set_shelf_price)
+	if persistence_enabled:
+		if FileAccess.file_exists(save_path):
+			_load_morning()
+		else:
+			_save_morning()
+	_refresh_prices()
+	menu_title.text = "Day %d — morning checkpoint" % run.day
+	resume_button.text = "Continue day %d morning" % run.day
+	menu_copy.text = "Day %d. Prepare, open, serve and close at your pace.\n\nUse the ledger for prices and evening orders.\nOnly morning checkpoints are saved; restarting\nreturns to the start of that morning.\n\n%s" % [run.day, save_status]
 	_update_stock_count()
 	for argument in OS.get_cmdline_user_args():
 		if argument == "--smoke-test":
@@ -159,7 +186,7 @@ func _build_stock() -> void:
 	for product_index in range(PRODUCTS.size()):
 		var product: Dictionary = PRODUCTS[product_index]
 		var center_x: float = -1.8 + product_index * 1.8
-		_label_3d("%s  /  %d bits" % [product.title.to_upper(), product.price], Vector3(center_x, 0.81, -2.92), 27, Color("f7dfac"), 0.004)
+		price_labels.append(_label_3d("%s  /  %d bits" % [product.title.to_upper(), product.price], Vector3(center_x, 0.81, -2.92), 27, Color("f7dfac"), 0.004))
 		for position_index in range(2):
 			var slot := StockSlot.new()
 			slot.name = "Shelf_%s_%d" % [product.id, position_index]
@@ -224,7 +251,7 @@ func _mesh(mesh: Mesh, at: Vector3, color: Color) -> MeshInstance3D:
 	return visual
 
 
-func _label_3d(text: String, at: Vector3, size: int, color: Color, pixel_size: float) -> void:
+func _label_3d(text: String, at: Vector3, size: int, color: Color, pixel_size: float) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
 	label.position = at
@@ -234,6 +261,7 @@ func _label_3d(text: String, at: Vector3, size: int, color: Color, pixel_size: f
 	label.outline_size = 0
 	label.no_depth_test = false
 	add_child(label)
+	return label
 
 
 func _build_hud() -> void:
@@ -306,7 +334,7 @@ func _build_menu(frame: Control) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	panel.add_child(column)
-	column.add_child(_text("FANTASY SHOPKEEPER  /  FIRST CUSTOMERS", 14, Color("c4a771")))
+	column.add_child(_text("FANTASY SHOPKEEPER  /  TWO DAYS", 14, Color("c4a771")))
 	menu_title = _text("Your first delivery", 36, Color("f2dfb6"))
 	column.add_child(menu_title)
 	menu_copy = _text("A quiet morning. Six bottles. An empty display.\n\nCarry each bottle from the delivery tray to its labelled\nshelf. Starlight will brighten the shop as you move it.\n\nThen visit the counter and invite your first customer.\nCount totals and change yourself. Nobody is in a rush.", 19, Color("ced5c5"))
@@ -332,9 +360,17 @@ func _build_menu(frame: Control) -> void:
 	resume_button.pressed.connect(_start)
 	column.add_child(resume_button)
 	var reset := Button.new()
-	reset.text = "Reset this delivery"
+	reset.text = "Restart saved morning"
 	reset.pressed.connect(_reset)
 	column.add_child(reset)
+	var fresh := Button.new()
+	fresh.text = "Start a fresh two-day experiment…"
+	fresh.pressed.connect(func() -> void: fresh_confirmation.popup_centered())
+	column.add_child(fresh)
+	fresh_confirmation = ConfirmationDialog.new()
+	fresh_confirmation.dialog_text = "Replace the saved morning and start day one with a fresh shop?"
+	fresh_confirmation.confirmed.connect(_fresh_run)
+	frame.add_child(fresh_confirmation)
 	var quit_button := Button.new()
 	quit_button.text = "Leave the shop"
 	quit_button.pressed.connect(func() -> void: get_tree().quit())
@@ -371,7 +407,10 @@ func _start() -> void:
 	started = true
 	get_tree().paused = false
 	overlay.hide()
-	if checkout_before_pause:
+	if planning_before_pause:
+		planning_before_pause = false
+		_open_checkout()
+	elif checkout_before_pause:
 		checkout_before_pause = false
 		_open_checkout()
 	else:
@@ -387,11 +426,13 @@ func _reset() -> void:
 
 func _pause() -> void:
 	checkout_before_pause = checkout.visible
+	planning_before_pause = day_panel.visible
 	checkout.hide()
+	day_panel.hide()
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	menu_title.text = "A moment to yourself"
-	menu_copy.text = "The shop can wait.\n\nYour stock stays exactly where you left it.\nResume when you are ready, or reset the delivery\nto try the handling again."
+	menu_copy.text = "The shop can wait.\n\nYour stock stays exactly where you left it.\nResume when ready. Restarting returns to the saved\nmorning; a fresh experiment replaces that save."
 	resume_button.text = "Return to the shop"
 	overlay.show()
 	reticle.hide()
@@ -402,12 +443,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause_shop") and not event.is_echo():
 		if overlay.visible:
 			_start()
-		elif checkout.visible:
+		elif checkout.visible or day_panel.visible:
 			_close_checkout()
 		else:
 			_pause()
 		get_viewport().set_input_as_handled()
-	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused and not checkout.visible:
+	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused and not checkout.visible and not day_panel.visible:
 		if player.aimed_body() == counter_body:
 			_open_checkout()
 			get_viewport().set_input_as_handled()
@@ -431,7 +472,7 @@ func _process(delta: float) -> void:
 		capture_frames -= 1
 		if capture_frames == 0:
 			_capture()
-	if not started or get_tree().paused or checkout.visible:
+	if not started or get_tree().paused or checkout.visible or day_panel.visible:
 		return
 	var target := player.aimed_slot()
 	if focused != target:
@@ -461,7 +502,7 @@ func _update_stock_count() -> void:
 	for slot in shelf_slots:
 		if is_instance_valid(slot.item):
 			count += 1
-	progress_label.text = "%d / 6 bottles stocked" % count if visits_invited == 0 else "Sales: %d   /   Till: %d bits" % [sales_completed, till]
+	progress_label.text = "Day %d • %s • Cash %d" % [run.day, run.phase.capitalize(), run.cash]
 	if count == 6 and not completed:
 		completed = true
 		toast.text = "Ready for business. Your first delivery is stocked! Visit the counter."
@@ -513,28 +554,38 @@ func _build_checkout() -> void:
 	checkout.close_requested.connect(_close_checkout)
 	checkout.invite_requested.connect(invite_customer)
 	checkout.confirm_requested.connect(complete_sale)
+	checkout.close_day_requested.connect(func() -> void: _day_action("close"))
 
 func _open_checkout() -> void:
+	if run.phase in ["preparation", "evening", "complete"]:
+		checkout.hide()
+		day_panel.present(run, _delivery_capacity(), save_status)
+		reticle.hide()
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
+	day_panel.hide()
 	var sale: CounterSale
-	var description := "Stock the shelves, then invite a customer.\nThree visits, at your pace. Only shelf stock is available."
+	var description := "The shop is open. Three visits, at your pace.\nOnly shelf stock is available. Closing skips unstarted visits."
 	if is_instance_valid(customer):
 		if customer.state == "waiting":
 			sale = customer.sale
 		else:
 			description = "Your customer is browsing or leaving. Take your time."
 	elif visits_invited >= VISITS.size():
-		description = "All three visits are finished.\nSales: %d   /   Takings: %d bits\nReset from the pause menu to try again." % [sales_completed, till]
-	checkout.present(sale, description, not is_instance_valid(customer) and visits_invited < VISITS.size())
+		description = "All three visits are finished.\nSales: %d   /   Takings: %d bits\nClose the shop for the evening review." % [sales_completed, till]
+	checkout.present(sale, description, run.phase == "trading" and not is_instance_valid(customer) and visits_invited < VISITS.size())
+	checkout.close_day.disabled = run.phase != "trading"
 	reticle.hide()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _close_checkout() -> void:
 	checkout.hide()
+	day_panel.hide()
 	reticle.show()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func invite_customer() -> bool:
-	if is_instance_valid(customer) or visits_invited >= VISITS.size():
+	if is_instance_valid(customer) or not run.start_visit():
 		return false
 	var visit: Dictionary = VISITS[visits_invited]
 	visits_invited += 1
@@ -544,8 +595,11 @@ func invite_customer() -> bool:
 	wanted.assign(visit.wanted)
 	var prices := {}
 	for product in PRODUCTS:
-		prices[product.id] = product.price
-	customer.begin(wanted, shelf_slots, prices, visit.payment)
+		prices[product.id] = run.prices[product.id]
+	var limits := {}
+	for product in PRODUCTS:
+		limits[product.id] = product.price * 2
+	customer.begin(wanted, shelf_slots, prices, visit.payment, limits)
 	customer.stock_changed.connect(_update_stock_count)
 	customer.remarked.connect(_customer_remark)
 	customer.at_counter.connect(func() -> void:
@@ -554,6 +608,7 @@ func invite_customer() -> bool:
 			_open_checkout())
 	customer.departed.connect(func() -> void:
 		customer = null
+		run.resolve_visit()
 		_update_stock_count()
 		if checkout.visible:
 			_open_checkout())
@@ -570,8 +625,11 @@ func complete_sale() -> bool:
 	checkout.refresh()
 	if not result.ok:
 		return false
-	till += customer.sale.total()
-	sales_completed += 1
+	if not run.book_sale(customer.sale.total()):
+		push_error("Sale confirmed outside its visit boundary")
+		return false
+	till = run.revenue
+	sales_completed = run.sales
 	customer.leave()
 	_update_stock_count()
 	_customer_remark(result.message)
@@ -580,3 +638,162 @@ func complete_sale() -> bool:
 func _customer_remark(message: String) -> void:
 	toast.text = message
 	feedback_seconds = 9
+
+
+func open_trading() -> bool:
+	if not run.open_shop():
+		return false
+	_close_checkout()
+	_update_stock_count()
+	_customer_remark("The shop is open. Invite the first visitor from the ledger.")
+	return true
+
+func _delivery_capacity() -> int:
+	var count := 0
+	for slot in slots:
+		if not slot.is_shelf and not is_instance_valid(slot.item):
+			count += 1
+	return count
+
+func _refresh_prices() -> void:
+	for i in range(PRODUCTS.size()):
+		price_labels[i].text = "%s / %d bits" % [PRODUCTS[i].title.to_upper(), run.prices[PRODUCTS[i].id]]
+
+func _set_shelf_price(product: String, amount: int) -> void:
+	if run.set_price(product, amount):
+		_refresh_prices()
+
+func _day_action(action: String) -> void:
+	var message := ""
+	match action:
+		"open":
+			open_trading()
+			return
+		"close":
+			if run.close_shop():
+				message = "Finish the current customer, then review the evening." if run.phase == "closing" else "Closed. The 12-bit shop expense has been charged once."
+		"buy":
+			message = run.place_order(day_panel.quantities(), _delivery_capacity()).message
+		"borrow":
+			message = "Received 112 bits. Debt is 118 total, with no compounding or late fees." if run.borrow() else "No further recovery loan is available."
+		"repay":
+			var amount := mini(run.debt, maxi(run.cash, 0))
+			message = "Repaid %d bits." % amount if run.repay(amount) else "No repayment made."
+		"advance":
+			message = _advance_morning()
+		"finish":
+			if run.finish():
+				message = "Two days complete. Thank you for keeping the shop!"
+	_update_stock_count()
+	_open_checkout()
+	if day_panel.visible:
+		day_panel.feedback.text = message
+	else:
+		_customer_remark(message)
+
+func _advance_morning() -> String:
+	if is_instance_valid(player.held_item):
+		return "Place the bottle you are carrying before sleeping."
+	var incoming := 0
+	for quantity in run.pending_order.values():
+		incoming += int(quantity)
+	if incoming > _delivery_capacity():
+		return "Free %d delivery spaces before sleeping; your paid order is still safe." % incoming
+	var result := run.advance_morning()
+	if not result.ok:
+		return result.message
+	for product in result.shipment:
+		for i in range(result.shipment[product]):
+			for slot in slots:
+				if not slot.is_shelf and slot.item == null:
+					_seed_product(slot, product)
+					break
+	visits_invited = 0
+	sales_completed = 0
+	till = 0
+	checkout.sale = null
+	day_panel.run = null
+	player.position = Vector3(0, 0.05, 3.35)
+	player.velocity = Vector3.ZERO
+	_refresh_prices()
+	_save_morning()
+	return "Day %d. Delivery received once. %s" % [run.day, save_status]
+
+func _seed_product(slot: StockSlot, product_id: String) -> void:
+	for product in PRODUCTS:
+		if product.id == product_id:
+			slot.seed(StockItem.new().configure(product.id, product.title, product.color, product.magic))
+			return
+
+func _save_morning() -> bool:
+	if not persistence_enabled:
+		return true
+	if save_blocked:
+		save_status = "Existing save could not be read. Start fresh to replace it; this run is unsaved."
+		return false
+	if run.phase != "preparation" or is_instance_valid(player.held_item):
+		return false
+	var stock := []
+	for slot in slots:
+		stock.append({"slot": String(slot.name), "product": slot.item.product_id if is_instance_valid(slot.item) else ""})
+	var ok := MorningSave.write_file(save_path, {"version": 1, "run": run.morning_state(), "stock": stock})
+	save_status = "Morning saved. Reloading returns to this morning's start." if ok else "Morning save failed; the previous checkpoint has been kept."
+	return ok
+
+func _load_morning() -> bool:
+	save_blocked = FileAccess.file_exists(save_path)
+	var result := MorningSave.read_file(save_path)
+	if not result.ok:
+		save_status = result.message
+		return false
+	var data: Dictionary = result.data
+	var restored := ShopRun.from_morning(data.run)
+	if restored == null or data.stock.size() != slots.size():
+		save_status = "Saved morning is invalid and has not been replaced."
+		return false
+	var stock_by_slot := {}
+	for entry in data.stock:
+		if not entry is Dictionary or not entry.get("slot") is String or not entry.get("product") is String or stock_by_slot.has(entry.slot):
+			save_status = "Saved stock is invalid and has not been replaced."
+			return false
+		stock_by_slot[entry.slot] = entry.product
+	for slot in slots:
+		if not stock_by_slot.has(String(slot.name)) or (stock_by_slot[String(slot.name)] != "" and not ShopRun.BASE_PRICES.has(stock_by_slot[String(slot.name)])):
+			save_status = "Saved stock is invalid and has not been replaced."
+			return false
+		if slot.is_shelf and stock_by_slot[String(slot.name)] not in ["", slot.accepted_product]:
+			save_status = "Saved shelf stock is incompatible and has not been replaced."
+			return false
+	# Apply only after the entire checkpoint validates.
+	if is_instance_valid(customer):
+		customer.free()
+		customer = null
+	if is_instance_valid(player.held_item):
+		player.held_item.free()
+		player.held_item = null
+	for slot in slots:
+		if is_instance_valid(slot.item):
+			slot.item.free()
+			slot.item = null
+		if stock_by_slot[String(slot.name)] != "":
+			_seed_product(slot, stock_by_slot[String(slot.name)])
+	save_blocked = false
+	run = restored
+	visits_invited = 0
+	sales_completed = 0
+	till = 0
+	completed = false
+	checkout.sale = null
+	day_panel.run = null
+	player.position = Vector3(0, 0.05, 3.35)
+	player.velocity = Vector3.ZERO
+	_refresh_prices()
+	save_status = "Resumed day %d morning. Deliveries and payments have not been repeated." % run.day
+	return true
+
+func _fresh_run() -> void:
+	if persistence_enabled and FileAccess.file_exists(save_path):
+		if DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path)) != OK:
+			menu_copy.text = "Could not replace the saved morning. Your previous save is unchanged."
+			return
+	_reset()
