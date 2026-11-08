@@ -47,12 +47,13 @@ Still planned; follows the first story slice under the revised iteration order.
 
 ## 5. Optional encounter and review (current focus)
 
-The short [story strategy](story-strategy.md) is written, with three connected examples: a paid product promise, a counter-display choice, and a returning regular without a quest. The next implementation is Fen's starlight request, using existing visits and ordinary checkout. No encounter code has been added by this strategy step.
+The short [story strategy](story-strategy.md) is written, with three connected examples: a paid product promise, a counter-display choice, and a returning regular without a quest. Fen's starlight request is now implemented using existing visits and ordinary checkout: optional offer/defer/decline, a day-two paid purchase, a visible lamp test and one claimable tonic. Promise state survives the morning checkpoint, and replay rolls back narrative, stock and money together. Nessa and Ivo remain design examples.
 
 - [x] Define story principles, optional participation, connected examples and first-slice acceptance checks.
 
-- [ ] Optional day-one request, day-two return, brief consequence, and bonus stock.
-- [ ] Verify ordinary trade alone funds the helper; declining remains viable.
+- [x] Optional day-one request, day-two return, brief consequence, and bonus stock.
+- [x] Verify declining, ignoring or missing the story leaves ordinary trade viable.
+- [ ] Verify ordinary trade alone funds the helper once hiring is implemented.
 - [ ] Finish enough feedback and sound to assess counting and handling.
 - [ ] Package a Windows build and conduct the agreed playtest.
 - [ ] Record evidence against continuation criteria and decide whether to extend the project.

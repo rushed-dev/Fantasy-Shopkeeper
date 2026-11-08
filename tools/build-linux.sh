@@ -21,13 +21,16 @@ if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-checkout.log; then exit 1; f
 "$engine" --headless --fixed-fps 60 --main-pack "$PWD/builds/linux/FantasyShopkeeper.x86_64" \
   --script "$PWD/tests/day_loop_test.gd" 2>&1 | tee test-results/export-day-loop.log
 if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-day-loop.log; then exit 1; fi
+"$engine" --headless --fixed-fps 60 --main-pack "$PWD/builds/linux/FantasyShopkeeper.x86_64" \
+  --script "$PWD/tests/fen_story_test.gd" 2>&1 | tee test-results/export-fen-story.log
+if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-fen-story.log; then exit 1; fi
 python3 - <<'PY'
 import hashlib, zipfile
 from pathlib import Path
 for platform in ('windows', 'linux'):
     directory = Path('builds') / platform
     (directory / 'README.txt').write_text(
-        'Fantasy Shopkeeper - Two Days prototype\n\n'
+        'Fantasy Shopkeeper - The Lantern Walk prototype\n\n'
         'WASD/arrows: move. Mouse: look. E: handle stock or open ledger. Escape: return/pause.\n'
         'Stock all six bottles on their labelled shelves.\n'
         'At the counter, press E to set prices and explicitly open. Invite three customers each day.\n'
@@ -38,7 +41,11 @@ for platform in ('windows', 'linux'):
         'Close the shop for evening orders and finances. Shop expense is 12 bits daily.\n'
         'Pay an order, then sleep to receive it on day two. Recovery loan: 112 received, 118 due.\n'
         'Morning checkpoints save automatically; restarting restores the morning start.\n'
-        'Workers and the optional encounter are not implemented yet.\n'
+        'Fen, the second visitor, has an optional question on day one. Read it through the ledger.\n'
+        'A promise can be made before bedtime. Fen returns as visitor two on day two.\n'
+        'A paid starlight purchase resolves the promise; no donation or stock reservation is automatic.\n'
+        "Collect the thank-you tonic through Fen's note when delivery space is free.\n"
+        'Declining leaves ordinary trade intact. Workers are not implemented yet.\n'
         'Windows export has not been tested on Windows.\n'
         'Engine licence and third-party notices: https://godotengine.org/license/\n')
     for name in ('GODOT-LICENSE.txt', 'GODOT-COPYRIGHT.txt'):

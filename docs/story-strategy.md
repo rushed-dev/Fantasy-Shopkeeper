@@ -1,6 +1,6 @@
 # Story strategy: a shop with a place in the community
 
-Working direction — 2026-11-08. This is a design document, not implemented story content. Names and situations below are working examples. The user has playtested and enjoyed stocking, manual checkout and the two-day loop. Our next useful exploration is the fantasy shop's personality and relationships; the retail foundation has enough evidence to support that work.
+Working direction — 2026-11-08. Fen’s first two-day encounter is now implemented; Nessa and Ivo remain working examples for the broader direction. The user has playtested and enjoyed stocking, manual checkout and the two-day loop. Our next useful exploration is the fantasy shop's personality and relationships; the retail foundation has enough evidence to support that work.
 
 ## The experience we want
 
@@ -58,11 +58,11 @@ Use a small cast before adding breadth. Each regular should have a recognisable 
 
 For each proposed arc, write a short card containing: the character's ordinary trade; the player-facing opening; the retail choice; the commitment and terms; the fulfilled, declined and unfulfilled outcomes; the later visible or conversational change; and the economic effect. If the card needs a new subsystem, identify that cost explicitly. Do not build a general quest engine before the first arc needs one.
 
-## First build and evidence to collect
+## First playable slice and evidence to collect
 
-Build Fen's day-one offer and day-two return first, with one small visible consequence and a modest stock bonus. Use existing visits and normal checkout. Do not add an extra timed customer, a forced conversation, an automatic discount, a new product catalogue or mandatory stock reservation. At default prices the ordinary route must retain its existing customer allocation and ability to fund the shop. A proposed bonus is one tonic bottle; tune it so the story is attractive without making participation the economic default.
+The first build implements Fen's day-one offer and day-two return, with one small visible consequence and a modest stock bonus. Use existing visits and normal checkout. Do not add an extra timed customer, a forced conversation, an automatic discount, a new product catalogue or mandatory stock reservation. At default prices the ordinary route must retain its existing customer allocation and ability to fund the shop. The bonus is one tonic bottle; tune it so the story is attractive without making participation the economic default.
 
-A fulfilled purchase must use real stock and complete payment. Accepted-promise state must survive the transition to the saved day-two morning. Outcome and bonus claims must resolve once; a full delivery tray must leave a bonus safely pending. Restarting the morning must roll back the story and stock together. A deferred or declined offer must leave ordinary trade intact. These are implementation acceptance checks, not features already present.
+A fulfilled purchase must use real stock and complete payment. Accepted-promise state must survive the transition to the saved day-two morning. Outcome and bonus claims must resolve once; a full delivery tray must leave a bonus safely pending. Restarting the morning must roll back the story and stock together. A deferred or declined offer must leave ordinary trade intact. These conditions are covered by encounter regression checks. Narrative tone and the feel of participation still need a human playtest.
 
 In the playtest, look for whether the player remembers Fen and their concern, notices or asks about the return, connects stocking to the outcome, and wants to know more about a regular. Also watch whether they can ignore the offer comfortably and whether conversation interferes with the work they already enjoy. Economic viability and inventory safety remain automated checks.
 

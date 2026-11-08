@@ -1,11 +1,14 @@
 class_name ShopCustomer
 extends Node3D
 
+signal lamp_tested
 signal stock_changed
 signal at_counter
 signal departed
 signal remarked(message: String)
 
+var customer_id := "ordinary"
+var name_tag: Label3D
 var sale: CounterSale
 var shelves: Array[StockSlot] = []
 var requests: Array[String] = []
@@ -24,6 +27,13 @@ func _init() -> void:
 	basket = Node3D.new()
 	basket.position = Vector3(0, 0.9, 0.35)
 	add_child(basket)
+	name_tag = Label3D.new()
+	name_tag.position.y = 2.0
+	name_tag.font_size = 24
+	name_tag.pixel_size = 0.003
+	name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_tag.hide()
+	add_child(name_tag)
 	var coat := CapsuleMesh.new()
 	coat.radius = 0.24
 	coat.height = 1.1
@@ -83,6 +93,9 @@ func _process(delta: float) -> void:
 		"to_counter":
 			state = "waiting"
 			at_counter.emit()
+		"testing_lamp":
+			lamp_tested.emit()
+			leave()
 		"leaving":
 			state = "done"
 			departed.emit()
@@ -126,3 +139,13 @@ func _next_product() -> void:
 func leave() -> void:
 	state = "leaving"
 	route = [Vector3(0, 0, position.z), Vector3(0, 0, 3.75)]
+
+
+func identify(id: String) -> void:
+	customer_id = id
+	name_tag.text = "Fen / lamplighter"
+	name_tag.visible = id == "fen"
+
+func test_lamp() -> void:
+	state = "testing_lamp"
+	route = [Vector3(0, 0, 0.1), Vector3(0, 0, 3.2), Vector3(0.9, 0, 3.2)]

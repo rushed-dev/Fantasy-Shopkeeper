@@ -7,6 +7,7 @@ const DAILY_COST := 12
 const LOAN_CASH := 112
 const LOAN_DUE := 118
 const VISITS_PER_DAY := 3
+var fen := FenStory.new()
 var day := 1
 var phase := "preparation"
 var cash := 24
@@ -66,6 +67,8 @@ func _finish_close() -> void:
 	phase = "evening"
 	expenses = DAILY_COST
 	cash -= DAILY_COST
+	if day == 2:
+		fen.close_day_two()
 
 func set_price(product: String, amount: int) -> bool:
 	if phase not in ["preparation", "evening"] or not prices.has(product) or amount < 1 or amount > 999:
@@ -121,6 +124,7 @@ func advance_morning() -> Dictionary:
 		return _result(false, "Confirm and pay the order first, even if ordering zero bottles.")
 	var shipment := pending_order.duplicate()
 	previous_day = {"day": day, "sales": sales, "revenue": revenue, "expenses": expenses, "stock_spend": stock_spend, "repayments": repayments}
+	fen.night_passes()
 	day += 1
 	phase = "preparation"
 	visits_started = 0
@@ -143,7 +147,7 @@ func finish() -> bool:
 
 # Only morning checkpoints are persisted; a reload never resumes half a sale.
 func morning_state() -> Dictionary:
-	return {"day": day, "phase": phase, "cash": cash, "debt": debt, "loan_taken": loan_taken, "prices": prices.duplicate(), "previous_day": previous_day.duplicate()}
+	return {"day": day, "phase": phase, "cash": cash, "debt": debt, "loan_taken": loan_taken, "prices": prices.duplicate(), "previous_day": previous_day.duplicate(), "fen": fen.to_state()}
 
 static func from_morning(data: Dictionary) -> ShopRun:
 	if data.get("phase") != "preparation" or not _whole(data.get("day")) or int(data.day) not in [1, 2]:
@@ -159,7 +163,13 @@ static func from_morning(data: Dictionary) -> ShopRun:
 	for product in BASE_PRICES:
 		if not _whole(data.prices.get(product)) or data.prices[product] < 1 or data.prices[product] > 999:
 			return null
+	if not data.get("fen", {}) is Dictionary:
+		return null
+	var story := FenStory.from_state(data.get("fen", {}))
+	if story == null:
+		return null
 	var run := ShopRun.new()
+	run.fen = story
 	run.day = int(data.day)
 	run.cash = int(data.cash)
 	run.debt = int(data.debt)

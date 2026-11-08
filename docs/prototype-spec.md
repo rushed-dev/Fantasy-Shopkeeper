@@ -60,7 +60,7 @@ Customers may comment on queue length but do not abandon purchases, reduce payme
 
 ## Optional encounter
 
-The recommended first slice is Fen’s optional day-one request and day-two return, described in story-strategy.md. It is not implemented yet. One customer makes an optional request on day one and returns on day two. Fulfilling it produces a short story consequence and a small merchandise reward, potentially glowing stock. Declining preserves viable ordinary progression. Failed accepted requests may have clearly understood, bounded consequences.
+The recommended first slice is Fen’s optional day-one request and day-two return, described in story-strategy.md. Fen’s first encounter is implemented; the other examples remain future directions. One customer makes an optional request on day one and returns on day two. Fulfilling it produces a short story consequence and a small merchandise reward, potentially glowing stock. Declining preserves viable ordinary progression. Failed accepted requests may have clearly understood, bounded consequences.
 
 Magical automation rewards, branching quest systems, and additional encounter content are later work. The prototype's helper is mundane and affordable through ordinary trading alone.
 

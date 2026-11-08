@@ -1,3 +1,19 @@
+# Fen encounter validation — 2026-11-08
+
+Fen is the existing second visitor on both days. Their request and outcome do not add visits, change ordinary basket demand, reserve stock or discount purchases. Reading is opt-in through a ledger note; the question can be deferred until bedtime.
+
+- Encounter regression: **265 assertions, 0 failures** headlessly. Covers accepted/deferred/declined/ignored promises, actual payment, wrong customer/day, repeat callbacks and reward claims, a full delivery tray, ordinary economics, no-stock/price-rejection/early-close outcomes, older save compatibility, invalid story data, fresh-scene resume and rolling back a claimed gift with the morning snapshot.
+- Graphical encounter run: **272 assertions, 0 failures**, including seven inspected screenshots of the optional ledger entry, conversation, largest basket layout, lamp and reward states.
+- Ordinary decline/ignore/defer paths retain the existing **224-bit** two-day ending and no story debt. The only additional merchandise on fulfillment is one tonic, created once into a free delivery slot after an explicit claim.
+- A paid starlight purchase makes Fen walk to the doorway and test the lamp. The lamp is decorative and cannot duplicate sold stock. Missed promises receive the bakery-lantern fallback with no fine.
+- Source and exported-resource-pack checks include the encounter suite alongside shared actions, checkout and day-loop tests. Test saves use a separate file and are cleaned up; player saves are untouched.
+
+The promise is stored in the day-two morning snapshot. Mid-day fulfillment and reward claims are deliberately not autosaved: restarting restores the complete morning world, including story state, stock and cash. Saves from before this encounter default to no promise. A pre-existing day-two save remains ordinary trade; start fresh or resume day one to experience the offer.
+
+Human feedback on Fen's voice, the optional delivery and the value of the consequence is still outstanding. Native Windows execution remains unverified on this Linux executor. This tests one encounter's implementation, not the whole story strategy. The broader examples and intended evidence are in story-strategy.md.
+
+---
+
 # Two-day loop validation — 2026-11-08
 
 The day-loop regression covers both full trading days, cash reconciliation, explicit opening, safe closing, supplier orders, retained stock, price rejection, customer payment adjustment, recovery credit, repayments and morning persistence.

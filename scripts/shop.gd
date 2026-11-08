@@ -11,6 +11,11 @@ const VISITS := [
 	{"wanted": ["ink", "light"], "payment": 100},
 	{"wanted": ["tonic", "ink", "light"], "payment": 200},
 ]
+var fen_panel: FenPanel
+var story_before_pause := false
+var fen_bulb: MeshInstance3D
+var fen_light: OmniLight3D
+var fen_lamp_label: Label3D
 var run := ShopRun.new()
 var day_panel: DayPanel
 var price_labels: Array[Label3D] = []
@@ -57,6 +62,7 @@ func _ready() -> void:
 			persistence_enabled = false
 	_configure_input()
 	_build_room()
+	_build_fen_lamp()
 	_build_stock()
 	player = ShopPlayer.new()
 	player.name = "Shopkeeper"
@@ -72,6 +78,15 @@ func _ready() -> void:
 	day_panel.close_requested.connect(_close_checkout)
 	day_panel.action_requested.connect(_day_action)
 	day_panel.price_changed.connect(_set_shelf_price)
+	day_panel.story_requested.connect(_open_fen)
+	fen_panel = FenPanel.new()
+	fen_panel.process_mode = Node.PROCESS_MODE_PAUSABLE
+	hud.add_child(fen_panel)
+	fen_panel.choice_requested.connect(_choose_fen)
+	fen_panel.claim_requested.connect(_claim_fen_bonus)
+	fen_panel.back_requested.connect(func() -> void:
+		fen_panel.hide()
+		_open_checkout())
 	if persistence_enabled:
 		if FileAccess.file_exists(save_path):
 			_load_morning()
@@ -334,7 +349,7 @@ func _build_menu(frame: Control) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	panel.add_child(column)
-	column.add_child(_text("FANTASY SHOPKEEPER  /  TWO DAYS", 14, Color("c4a771")))
+	column.add_child(_text("FANTASY SHOPKEEPER  /  THE LANTERN WALK", 14, Color("c4a771")))
 	menu_title = _text("Your first delivery", 36, Color("f2dfb6"))
 	column.add_child(menu_title)
 	menu_copy = _text("A quiet morning. Six bottles. An empty display.\n\nCarry each bottle from the delivery tray to its labelled\nshelf. Starlight will brighten the shop as you move it.\n\nThen visit the counter and invite your first customer.\nCount totals and change yourself. Nobody is in a rush.", 19, Color("ced5c5"))
@@ -407,7 +422,10 @@ func _start() -> void:
 	started = true
 	get_tree().paused = false
 	overlay.hide()
-	if planning_before_pause:
+	if story_before_pause:
+		story_before_pause = false
+		_open_fen()
+	elif planning_before_pause:
 		planning_before_pause = false
 		_open_checkout()
 	elif checkout_before_pause:
@@ -427,6 +445,8 @@ func _reset() -> void:
 func _pause() -> void:
 	checkout_before_pause = checkout.visible
 	planning_before_pause = day_panel.visible
+	story_before_pause = fen_panel.visible
+	fen_panel.hide()
 	checkout.hide()
 	day_panel.hide()
 	get_tree().paused = true
@@ -443,12 +463,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause_shop") and not event.is_echo():
 		if overlay.visible:
 			_start()
+		elif fen_panel.visible:
+			fen_panel.hide()
+			_open_checkout()
 		elif checkout.visible or day_panel.visible:
 			_close_checkout()
 		else:
 			_pause()
 		get_viewport().set_input_as_handled()
-	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused and not checkout.visible and not day_panel.visible:
+	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused and not checkout.visible and not day_panel.visible and not fen_panel.visible:
 		if player.aimed_body() == counter_body:
 			_open_checkout()
 			get_viewport().set_input_as_handled()
@@ -472,7 +495,7 @@ func _process(delta: float) -> void:
 		capture_frames -= 1
 		if capture_frames == 0:
 			_capture()
-	if not started or get_tree().paused or checkout.visible or day_panel.visible:
+	if not started or get_tree().paused or checkout.visible or day_panel.visible or fen_panel.visible:
 		return
 	var target := player.aimed_slot()
 	if focused != target:
@@ -554,12 +577,14 @@ func _build_checkout() -> void:
 	checkout.close_requested.connect(_close_checkout)
 	checkout.invite_requested.connect(invite_customer)
 	checkout.confirm_requested.connect(complete_sale)
+	checkout.story_requested.connect(_open_fen)
 	checkout.close_day_requested.connect(func() -> void: _day_action("close"))
 
 func _open_checkout() -> void:
 	if run.phase in ["preparation", "evening", "complete"]:
 		checkout.hide()
 		day_panel.present(run, _delivery_capacity(), save_status)
+		_update_fen_notes()
 		reticle.hide()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		return
@@ -575,10 +600,13 @@ func _open_checkout() -> void:
 		description = "All three visits are finished.\nSales: %d   /   Takings: %d bits\nClose the shop for the evening review." % [sales_completed, till]
 	checkout.present(sale, description, run.phase == "trading" and not is_instance_valid(customer) and visits_invited < VISITS.size())
 	checkout.close_day.disabled = run.phase != "trading"
+	checkout.heading.text = "Fen / sales ledger" if is_instance_valid(customer) and customer.customer_id == "fen" else "The sales ledger"
+	_update_fen_notes()
 	reticle.hide()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _close_checkout() -> void:
+	fen_panel.hide()
 	checkout.hide()
 	day_panel.hide()
 	reticle.show()
@@ -591,6 +619,9 @@ func invite_customer() -> bool:
 	visits_invited += 1
 	customer = ShopCustomer.new()
 	add_child(customer)
+	var identity := "fen" if visits_invited == 2 else "ordinary"
+	customer.identify(identity)
+	run.fen.offer(run.day, identity)
 	var wanted: Array[String] = []
 	wanted.assign(visit.wanted)
 	var prices := {}
@@ -602,11 +633,19 @@ func invite_customer() -> bool:
 	customer.begin(wanted, shelf_slots, prices, visit.payment, limits)
 	customer.stock_changed.connect(_update_stock_count)
 	customer.remarked.connect(_customer_remark)
+	customer.lamp_tested.connect(func() -> void:
+		_sync_fen_lamp()
+		_customer_remark("Fen: There. Finally, a light that doesn't send directions to moths."))
 	customer.at_counter.connect(func() -> void:
-		_customer_remark("I'm ready when you are. Meet me at the counter.")
+		if identity == "fen" and run.day == 1:
+			_customer_remark("Fen, lamplighter: A small question, if you have a moment. Or carry on trading.")
+		else:
+			_customer_remark("I'm ready when you are. Meet me at the counter.")
 		if checkout.visible:
 			_open_checkout())
 	customer.departed.connect(func() -> void:
+		if run.fen.departed(run.day, identity) and run.fen.outcome == "missed":
+			_customer_remark("Fen: I borrowed the bakery's lantern. Payment was in buns. Complicated exchange rate.")
 		customer = null
 		run.resolve_visit()
 		_update_stock_count()
@@ -630,9 +669,22 @@ func complete_sale() -> bool:
 		return false
 	till = run.revenue
 	sales_completed = run.sales
-	customer.leave()
+	var story_changed := run.fen.paid_visit(customer.sale, run.day, customer.customer_id)
+	if story_changed and run.fen.outcome == "fulfilled":
+		customer.test_lamp()
+		checkout.feedback.text = "Fen: Let's give that lamp by your door a try. I have a spare tonic to thank you."
+	else:
+		customer.leave()
+		if story_changed and run.fen.outcome == "missed":
+			checkout.feedback.text = "Fen: I borrowed the bakery's lantern instead. Payment was in buns. No trouble."
+	_update_fen_notes()
 	_update_stock_count()
-	_customer_remark(result.message)
+	var reply: String = result.message
+	if story_changed and run.fen.outcome == "fulfilled":
+		reply = "Fen is taking the starlight to the lamp by the door."
+	elif story_changed and run.fen.outcome == "missed":
+		reply = "Fen: I borrowed the bakery's lantern. Payment was in buns. Complicated exchange rate."
+	_customer_remark(reply)
 	return true
 
 func _customer_remark(message: String) -> void:
@@ -779,6 +831,7 @@ func _load_morning() -> bool:
 			_seed_product(slot, stock_by_slot[String(slot.name)])
 	save_blocked = false
 	run = restored
+	_sync_fen_lamp()
 	visits_invited = 0
 	sales_completed = 0
 	till = 0
@@ -797,3 +850,70 @@ func _fresh_run() -> void:
 			menu_copy.text = "Could not replace the saved morning. Your previous save is unchanged."
 			return
 	_reset()
+
+
+func _build_fen_lamp() -> void:
+	var bracket := BoxMesh.new()
+	bracket.size = Vector3(0.34, 0.06, 0.32)
+	_mesh(bracket, Vector3(1.15, 1.66, 4.12), Color("81633f"))
+	var bulb := SphereMesh.new()
+	bulb.radius = 0.13
+	bulb.height = 0.26
+	fen_bulb = _mesh(bulb, Vector3(1.15, 1.83, 4.12), Color("574b38"))
+	fen_light = OmniLight3D.new()
+	fen_light.position = fen_bulb.position
+	fen_light.light_color = Color("f4cf85")
+	fen_light.omni_range = 3.5
+	fen_light.light_energy = 0
+	add_child(fen_light)
+	fen_lamp_label = _label_3d("Fen's trial lamp", Vector3(1.15, 2.15, 4.1), 24, Color("f7dfac"), 0.003)
+	fen_lamp_label.rotation.y = PI
+	fen_lamp_label.hide()
+
+func _sync_fen_lamp() -> void:
+	var lit := run.fen.outcome == "fulfilled"
+	var material := fen_bulb.material_override as StandardMaterial3D
+	material.albedo_color = Color("f4cf85") if lit else Color("574b38")
+	material.emission_enabled = lit
+	material.emission = Color("f4cf85")
+	material.emission_energy_multiplier = 2.0
+	fen_light.light_energy = 1.4 if lit else 0.0
+	fen_lamp_label.visible = lit
+
+func _update_fen_notes() -> void:
+	for button in [checkout.story_button, day_panel.story_button]:
+		button.visible = run.fen.has_note()
+		button.text = run.fen.note_title(run.day)
+
+func _open_fen() -> bool:
+	if not run.fen.has_note():
+		return false
+	checkout.hide()
+	day_panel.hide()
+	fen_panel.present(run.fen, run.day)
+	reticle.hide()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	return true
+
+func _choose_fen(action: String) -> void:
+	if run.fen.choose(action, run.day):
+		fen_panel.present(run.fen, run.day)
+		_update_fen_notes()
+		if action == "defer":
+			fen_panel.hide()
+			_open_checkout()
+
+func _claim_fen_bonus() -> bool:
+	if run.fen.reward != "pending":
+		return false
+	for slot in slots:
+		if not slot.is_shelf and not is_instance_valid(slot.item):
+			_seed_product(slot, "tonic")
+			run.fen.claim_bonus()
+			fen_panel.present(run.fen, run.day)
+			fen_panel.feedback.text = "One dawn tonic placed in the delivery tray. Thank you for helping with the light."
+			_update_fen_notes()
+			_update_stock_count()
+			return true
+	fen_panel.feedback.text = "Your delivery tray is full. The tonic is safely pending; make a space and collect it later."
+	return false

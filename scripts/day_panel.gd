@@ -1,10 +1,12 @@
 class_name DayPanel
 extends ColorRect
 
+signal story_requested
 signal action_requested(action: String)
 signal price_changed(product: String, amount: int)
 signal close_requested
 var run: ShopRun
+var story_button: Button
 var heading: Label
 var summary: Label
 var feedback: Label
@@ -72,6 +74,11 @@ func _ready() -> void:
 		button.pressed.connect(func() -> void: action_requested.emit(key))
 		column.add_child(button)
 		buttons[key] = button
+	story_button = Button.new()
+	story_button.custom_minimum_size.y = 38
+	story_button.pressed.connect(func() -> void: story_requested.emit())
+	column.add_child(story_button)
+	story_button.hide()
 	feedback = _label(column, "", 17)
 	feedback.custom_minimum_size = Vector2(744, 50)
 	feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

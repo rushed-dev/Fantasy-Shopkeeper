@@ -2,11 +2,11 @@
 
 A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
 
-**Current checkpoint: two trading days.** Stocking and manual checkout now sit inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Customers remain one at a time; queues, workers and the optional encounter are future work.
+**Current checkpoint: The Lantern Walk.** Stocking and manual checkout now sit inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Fen now has an optional two-day encounter within the existing visits. Customers remain one at a time; queues, workers and further stories are future work.
 
 ## Play this checkpoint
 
-1. Continue the saved morning, or confirm **Start a fresh two-day experiment** from the opening/pause menu. A fresh shop starts with 24 bits and six already-paid delivery bottles. The menu says **TWO DAYS**.
+1. Continue the saved morning, or confirm **Start a fresh two-day experiment** from the opening/pause menu. A fresh shop starts with 24 bits and six already-paid delivery bottles. The menu says **THE LANTERN WALK**.
 2. Stock shelves at your pace. Approach the counter, aim at the ledger and press **E**. During preparation you can set shelf prices, then explicitly **Open the shop**. Prices lock while trading; unreasonable prices can lose purchases.
 3. Invite each of the three customers. Only shelf stock is available. Add the displayed basket prices yourself, agree the total, and count change from the customer's payment. Click/hold pouches or keys **1 / 2 / 3** for 1/10/100; click tray stacks or **Shift + 1 / 2 / 3** to take coins back. Confirm the sale when ready. Corrections and leaving/returning preserve the transaction; waiting has no penalty.
 4. **Close shop** from the ledger after the visits, or close early and forgo unstarted visits. An existing customer finishes before the evening starts. The 12-bit shop expense is charged once.
@@ -16,6 +16,18 @@ A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
 If funds are low on evening one, a **one-time recovery loan** provides 112 bits with 118 bits total debt. Repayment is voluntary, with no compounding or late fee. Terms are visible before accepting. This funds roughly two ordinary six-bottle deliveries; the values are prototype tuning, not a finished economy.
 
 WASD/arrows move, mouse looks, **E** handles stock or the ledger, and **Escape** returns from a ledger/planning screen or pauses the shop. Look sensitivity is in the opening/pause menu.
+
+## Fen and the Lantern Walk
+
+For the full encounter, start a fresh run or resume a day-one morning. Older day-two saves remain playable but do not invent a promise you never made.
+
+Fen is the second visitor on both days, with a name label and the usual ink/starlight basket. On day one a small optional question appears in the ledger. You can keep trading, read it, promise to try, defer until evening planning, or decline. There are no automatic story popups. A deferred note remains in the ledger until bedtime.
+
+If you promise, have bottled starlight on a shelf for Fen's second-visitor return on day two. It is an ordinary paid purchase at your shelf price, with the usual price rejection; nothing is donated or reserved automatically. Only completing the correct total and change fulfills it. Fen then walks to the lamp by the shop entrance and tests the light.
+
+Fen offers one spare dawn tonic as a thank-you. Accept it through their ledger note when a delivery space is free. A full tray leaves it pending safely; collecting it twice is impossible. Ignoring, declining or missing the promise leaves ordinary customer opportunities and finances intact, with a gentle bakery-lantern fallback instead of a fine.
+
+Morning saves retain the promise. Restarting day two rolls the story outcome, claimed gift, stock and money back together to that morning. The lamp is decoration, not another bottle of saleable stock. Nessa and Ivo's proposed stories are not implemented yet.
 
 ## Morning saves
 
@@ -54,7 +66,7 @@ bash tools/setup-godot-linux.sh
 bash tools/check-godot-linux.sh
 ```
 
-The check runner imports the project, runs shared item actions, the physical scene regression, checkout regression, day-loop/save/recovery regression, and scene smoke. It rejects engine errors even when Godot exits zero. Logs are generated under ignored `test-results/`.
+The check runner imports the project, runs shared item actions, the physical scene regression, checkout regression, day-loop/save/recovery regression, Fen encounter regression, and scene smoke. It rejects engine errors even when Godot exits zero. Logs are generated under ignored `test-results/`.
 
 With a graphical display available, use the pinned engine to launch the editor or game:
 
@@ -85,6 +97,12 @@ Run the complete day-loop regression with screenshots:
 
 Tests use isolated checkpoint files and do not modify the player's saved morning.
 
+To render the encounter regression and its screenshots:
+
+```bash
+.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --audio-driver Dummy --fixed-fps 60 --path . --script res://tests/fen_story_test.gd -- --capture-fen
+```
+
 ## Export
 
-`bash tools/build-linux.sh` runs validation, installs checksum-verified official templates, exports Windows/Linux, checks the Linux release, and packages ZIPs with licence notices and SHA256 sidecars under ignored `builds/`. Native Windows execution and human usability of the new day/economy screens remain unverified here. No additional services or credentials are required.
+`bash tools/build-linux.sh` runs validation, installs checksum-verified official templates, exports Windows/Linux, checks the Linux release, and packages ZIPs with licence notices and SHA256 sidecars under ignored `builds/`. Native Windows execution and human usability of the new encounter remain unverified here. No additional services or credentials are required.

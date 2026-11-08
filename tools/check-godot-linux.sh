@@ -20,4 +20,5 @@ check item-actions --headless --path . --script res://tests/item_actions_test.gd
 check scene --headless --path . --script res://tests/shop_scene_test.gd
 check checkout --headless --fixed-fps 60 --path . --script res://tests/checkout_test.gd
 check day-loop --headless --fixed-fps 60 --path . --script res://tests/day_loop_test.gd
+check fen-story --headless --fixed-fps 60 --path . --script res://tests/fen_story_test.gd
 check smoke --headless --path . -- --smoke-test
