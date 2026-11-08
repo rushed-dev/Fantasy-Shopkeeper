@@ -2,18 +2,31 @@
 
 A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
 
-**Checkpoint status:** cloud development resumed on 2026-11-07. Player initialisation uses local attachment before entering the scene tree. Shared actions pass 30 assertions; the continuous graphical walk-and-stock route passes 74 assertions. All six bottles can be stocked through movement, aiming, and interaction inputs without teleporting. Windows and Linux release ZIPs are available under `builds/`. The extracted Linux release passed startup validation. Native Windows execution and subjective mouse/interaction feel still need a human playtest. See [validation evidence](docs/validation.md).
+**Current checkpoint: first customers.** Movement and stocking have been playtested. Customers now browse shelf stock, carry baskets to the counter, and pay through a manual total/change interaction. This is a one-customer-at-a-time slice, with three explicitly invited visits. Days, expenses, loans, workers, saves and the optional encounter remain future milestones.
 
-## Start here
+## Play this checkpoint
 
-- [Cloud handoff and immediate next steps](docs/cloud-handoff.md)
-- [Approved prototype specification](docs/prototype-spec.md)
+1. Stock the six delivery bottles on their matching shelves. Prices are printed on the shelf labels.
+2. Approach the counter, aim at the ledger, and press **E**.
+3. Choose **Invite a customer**, then watch them browse and return to the counter. Only items on shelves are available for sale; they can miss items even when delivery stock exists.
+4. Open the ledger again. Add the listed prices yourself, enter the basket total, and choose **Agree total**.
+5. Read the customer's payment and dispense change. Click or hold a coin pouch, or hold **1 / 2 / 3** for bits (1), marks (10), and crowns (100). Click a tray stack or press **Shift + 1 / 2 / 3** to take back one coin.
+6. Choose **Confirm sale**. Incorrect totals or change allow correction. Any correct combination of coins works. Leave the counter and return whenever you like; the pending sale and tray remain intact.
+7. After the customer leaves, invite the next one. There are three visits, with baskets of one, two, and three items. Waiting never penalises the player. Reset from the pause menu to try again.
+
+WASD/arrows move, mouse looks, **E** handles stock or the ledger, and **Escape** returns from the ledger or pauses the shop. Look sensitivity is in the opening/pause menu. The opening menu says **FIRST CUSTOMERS**, which distinguishes this checkpoint from the earlier delivery-only build.
+
+## Project documents
+
+- [Prototype specification](docs/prototype-spec.md)
 - [Implementation checklist](docs/implementation-plan.md)
+- [Validation evidence and limitations](docs/validation.md)
 - [Domain glossary](GLOSSARY.md)
+- [Historical cloud handoff](docs/cloud-handoff.md)
 
 ## Windows development
 
-Run `tools/setup-godot.ps1` once to download the pinned portable engine. Then use:
+Pull the latest `main` in the project folder opened by Godot. Run `tools/setup-godot.ps1` once to download the pinned portable engine, then:
 
 ```powershell
 ./tools/run.ps1 -Test
@@ -22,31 +35,42 @@ Run `tools/setup-godot.ps1` once to download the pinned portable engine. Then us
 ./tools/run.ps1
 ```
 
-`Play.cmd` is a double-click launcher after engine setup. Engine downloads and caches are deliberately ignored by Git.
+`Play.cmd` launches the source project after engine setup. PowerShell launcher changes have not been executed on this Linux host. For packaged play, extract the Windows ZIP in `builds/` and launch `FantasyShopkeeper.exe`; pulling source does not update an already exported executable.
 
 ## Linux / cloud development
 
 ```bash
+export XDG_CACHE_HOME="$PWD/.tools/cache"
+export XDG_DATA_HOME="$PWD/.tools/data"
+export XDG_CONFIG_HOME="$PWD/.tools/config"
+mkdir -p "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
 bash tools/setup-godot-linux.sh
-.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --import
-.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/item_actions_test.gd
-.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . -- --smoke-test
+bash tools/check-godot-linux.sh
 ```
 
-Run `bash tools/check-godot-linux.sh` for import, item-action tests, scene tests, and smoke validation. This runner uses writable local cache/data directories and rejects engine errors even if Godot exits zero. Logs go to ignored `test-results/`.
+The check runner imports the project, runs shared item actions, the physical scene regression, checkout regression, and scene smoke. It rejects engine errors even when Godot exits zero. Logs are generated under ignored `test-results/`.
 
-Headless scene tests explicitly skip walking because mouse capture requires a display. With a graphical display, run the pinned engine with `--audio-driver Dummy --path . --script res://tests/shop_scene_test.gd` (omit Dummy when testing audio). The scene test relocates the player between stations, then aims and interacts through the player path; it does not validate continuous navigation or manual mouse feel. Export templates are installed by `bash tools/setup-export-templates-linux.sh`. Run `bash tools/build-linux.sh` to validate, export and package both platforms. Native Windows execution remains untested.
+With a graphical display available, use the pinned engine to launch the editor or game:
 
-## First milestone controls
+```bash
+.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --editor --path .
+.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path .
+```
 
-WASD or arrows to move, mouse to look, E to pick up/place a bottle, Escape to pause. The opening menu exposes mouse sensitivity. The scene has a delivery tray, six labelled shelf spaces, and six bottles, including glowing starlight. Customers, sales, days, wages, loans, and saves are planned but not implemented yet.
+Run the checkout regression with rendering (omit Dummy to test real audio):
 
-## Continuous route validation
+```bash
+.tools/godot/Godot_v4.7.2-stable_linux.x86_64 --audio-driver Dummy --fixed-fps 60 --path . --script res://tests/checkout_test.gd -- --capture-checkout
+```
 
-With a graphical display available, set the XDG directories as in `tools/check-godot-linux.sh`, then run:
+This saves ledger/customer screenshots under `builds/screenshots/`. Headless checks do not play coin audio. To test continuous navigation and stocking with a display:
 
 ```bash
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --audio-driver Dummy --disable-render-loop --path . --script res://tests/shop_scene_test.gd -- --walk-route
 ```
 
-This route uses movement inputs between stations, tests collisions and pause, and aims and interacts with all six bottles. Omit `--disable-render-loop` to watch it. Add `--capture-final=/absolute/path/shop.png` only with rendering enabled to save the completed scene. The default scene test relocates between stations for a quicker geometry check; headless runs explicitly skip walking.
+Remove `--disable-render-loop` to watch the route; add `--capture-final=/absolute/path/shop.png` only with rendering enabled. The default scene test relocates between stations for quicker geometry checks; headless runs explicitly skip walking.
+
+## Export
+
+`bash tools/build-linux.sh` runs validation, installs checksum-verified official templates, exports Windows/Linux, checks the Linux release, and packages ZIPs with licence notices and SHA256 sidecars under ignored `builds/`. Native Windows execution and human usability of the new checkout remain unverified here. No additional services or credentials are required.

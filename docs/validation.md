@@ -1,3 +1,18 @@
+# First customers validation — 2026-11-08
+
+The user confirmed delivery movement and stocking work well. The new customer/checkout slice is tested separately from that physical-shop checkpoint.
+
+- Checkout regression: **107 assertions, 0 failures** headlessly. Covers physical shelf-to-basket ownership, invalid totals, under/overchange, alternate denominations, correction, click/hold/release, focus loss, returning to the ledger, pause/resume, duplicate confirmation, the fixed three-visit allocation, no waiting timeout, delivery stock remaining unavailable, and competing player/customer pickup with another-shelf retry.
+- Graphical checkout regression on Xvfb/Mesa with dummy audio: **111 assertions, 0 failures**, including the complete three-visit flow plus four screenshot captures. Screenshots cover invitation, a customer at the counter, the basket ledger, and the change tray.
+- Existing shared actions: 30 assertions. Existing scene regression: 36 headless assertions (walking explicitly skipped without a display); 74 assertions in the graphical continuous walking mode.
+- `bash tools/check-godot-linux.sh` includes checkout checks. Windows/Linux export packaging succeeds. The standalone Linux release passes startup smoke checks outside the repository. All 107 checkout assertions also pass against the exported Linux resource pack using the pinned editor engine with `--main-pack`; the release executable itself does not support the editor script runner. The build script includes this exported-pack check.
+
+Customer paths follow the room's clear aisles; they are a single-visitor prototype rather than general navigation or queueing. Prices are fixed (12/23/35 bits). Missing products produce immediate remarks; no persistent missing-stock report is added. Customers buy the available portion of a requested basket and leave without a sale if nothing is available. Physical sold items remain with the customer until departure. Takings are recorded once at confirmation; full daily accounting is not implemented.
+
+For play instructions and reproduction commands, see README.md. New checkout audio and mouse feel still need human validation; automated graphical runs use dummy audio. Native Windows and PowerShell execution remain unverified on this Linux host. Days, queues, adjustable prices, price rejection, recovery loans, workers, saves, and encounters remain outstanding.
+
+---
+
 # Milestone 1 validation — 2026-11-07
 
 Godot 4.7.2 official ed1daf0bf, Linux x86_64. Engine and export-template archives verified against the official release SHA512 sums. No application services or credentials are required.
@@ -37,4 +52,4 @@ Run `bash tools/build-linux.sh` to validate, install checksum-verified export te
 - Subjective mouse feel, comfort, and uncoached discovery. Scripted routes and screenshots do not replace a human playtest.
 - Audio: graphical tests use the dummy audio driver because the executor has no audio device. There is currently no authored game audio.
 
-The complete five-session prototype is not implemented. Customers, checkout, daily finances, persistence, workers, and the optional encounter remain future milestones; these checks establish the physical-shop checkpoint only.
+These historical checks establish the physical-shop checkpoint. The first customer/checkout slice above was added afterwards; daily finances, persistence, workers and the optional encounter remain future work.

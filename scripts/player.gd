@@ -57,7 +57,7 @@ func action_origin() -> Vector3:
 	return camera.global_position
 
 
-func aimed_slot() -> StockSlot:
+func aimed_body() -> Object:
 	var start := camera.global_position
 	var finish := start - camera.global_basis.z * (interaction_reach + 0.15)
 	var ray := PhysicsRayQueryParameters3D.create(start, finish)
@@ -66,4 +66,8 @@ func aimed_slot() -> StockSlot:
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
 	if hit.is_empty():
 		return null
-	return hit.collider as StockSlot
+	return hit.collider
+
+
+func aimed_slot() -> StockSlot:
+	return aimed_body() as StockSlot

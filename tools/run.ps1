@@ -17,6 +17,7 @@ if ($Test) {
     Invoke-GodotCheck -EngineArguments @('--headless', '--editor', '--path', $projectRoot, '--import', '--quit')
     Invoke-GodotCheck -EngineArguments @('--headless', '--path', $projectRoot, '--script', 'res://tests/item_actions_test.gd')
     Invoke-GodotCheck -EngineArguments @('--headless', '--path', $projectRoot, '--script', 'res://tests/shop_scene_test.gd')
+    Invoke-GodotCheck -EngineArguments @('--headless', '--fixed-fps', '60', '--path', $projectRoot, '--script', 'res://tests/checkout_test.gd')
     exit 0
 } elseif ($Smoke) {
     Invoke-GodotCheck -EngineArguments @('--headless', '--path', $projectRoot, '--', '--smoke-test')

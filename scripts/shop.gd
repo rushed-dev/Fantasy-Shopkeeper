@@ -1,10 +1,23 @@
 extends Node3D
 
 const PRODUCTS := [
-	{"id": "tonic", "title": "Dawn tonic", "color": Color("479e8c"), "magic": false},
-	{"id": "ink", "title": "Whisper ink", "color": Color("9976b8"), "magic": false},
-	{"id": "light", "title": "Bottled starlight", "color": Color("f4be69"), "magic": true},
+	{"id": "tonic", "title": "Dawn tonic", "color": Color("479e8c"), "magic": false, "price": 12},
+	{"id": "ink", "title": "Whisper ink", "color": Color("9976b8"), "magic": false, "price": 23},
+	{"id": "light", "title": "Bottled starlight", "color": Color("f4be69"), "magic": true, "price": 35},
 ]
+
+const VISITS := [
+	{"wanted": ["tonic"], "payment": 20},
+	{"wanted": ["ink", "light"], "payment": 100},
+	{"wanted": ["tonic", "ink", "light"], "payment": 200},
+]
+var customer: ShopCustomer
+var checkout: CheckoutPanel
+var counter_body: StaticBody3D
+var visits_invited := 0
+var sales_completed := 0
+var till := 0
+var checkout_before_pause := false
 
 var player: ShopPlayer
 var slots: Array[StockSlot] = []
@@ -40,6 +53,7 @@ func _ready() -> void:
 	player.camera.rotation.x = -0.1
 	player.camera.current = true
 	_build_hud()
+	_build_checkout()
 	_update_stock_count()
 	for argument in OS.get_cmdline_user_args():
 		if argument == "--smoke-test":
@@ -118,12 +132,12 @@ func _build_room() -> void:
 	_box(Vector3(2.4, 0.025, 4.4), Vector3(0, 0.04, 0.45), Color("68505c"))
 	for x in [-1.12, 1.12]:
 		_box(Vector3(0.055, 0.03, 4.2), Vector3(x, 0.043, 0.45), Color("ba9259"))
-	# Future checkout counter, visibly present but not interactive in milestone one.
+	# The ledger and coin pouches are the counter interaction target.
 	_table(Vector3(3.1, 0, 1.35), Vector3(2.4, 1.0, 1.1))
 	_box(Vector3(0.55, 0.06, 0.4), Vector3(2.75, 1.1, 1.25), Color("ebe0bd"))
 	_box(Vector3(0.04, 0.07, 0.42), Vector3(2.75, 1.105, 1.25), Color("74513a"))
 	_label_3d("COUNTER", Vector3(3.1, 0.71, 1.93), 32, Color("f4d9a1"), 0.005)
-	_label_3d("Checkout comes next", Vector3(3.1, 0.49, 1.93), 23, Color("d8c5a4"), 0.004)
+	_label_3d("Ledger & change", Vector3(3.1, 0.49, 1.93), 23, Color("d8c5a4"), 0.004)
 	for x in [3.25, 3.55, 3.85]:
 		var pouch := SphereMesh.new()
 		pouch.radius = 0.1
@@ -145,7 +159,7 @@ func _build_stock() -> void:
 	for product_index in range(PRODUCTS.size()):
 		var product: Dictionary = PRODUCTS[product_index]
 		var center_x: float = -1.8 + product_index * 1.8
-		_label_3d(product.title.to_upper(), Vector3(center_x, 0.81, -2.92), 27, Color("f7dfac"), 0.004)
+		_label_3d("%s  /  %d bits" % [product.title.to_upper(), product.price], Vector3(center_x, 0.81, -2.92), 27, Color("f7dfac"), 0.004)
 		for position_index in range(2):
 			var slot := StockSlot.new()
 			slot.name = "Shelf_%s_%d" % [product.id, position_index]
@@ -243,10 +257,10 @@ func _build_hud() -> void:
 	branding.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_row.add_child(branding)
 	branding.add_child(_text("THE WANDERING WICK", 26, Color("f2d9a4")))
-	branding.add_child(_text("First delivery  /  a shopkeeping prototype", 16, Color("c2c9bc")))
+	branding.add_child(_text("Stock the shelves  /  serve your first customers", 16, Color("c2c9bc")))
 	var objectives := VBoxContainer.new()
 	top_row.add_child(objectives)
-	objectives.add_child(_text("PREPARE YOUR SHELVES", 15, Color("cfb784")))
+	objectives.add_child(_text("STOCK • THEN VISIT THE COUNTER", 15, Color("cfb784")))
 	progress_label = _text("0 / 6 bottles stocked", 22, Color("f0eadb"))
 	objectives.add_child(progress_label)
 	reticle = _text("+", 22, Color("f5e5bf"))
@@ -292,10 +306,10 @@ func _build_menu(frame: Control) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	panel.add_child(column)
-	column.add_child(_text("FANTASY SHOPKEEPER  /  MILESTONE 01", 14, Color("c4a771")))
+	column.add_child(_text("FANTASY SHOPKEEPER  /  FIRST CUSTOMERS", 14, Color("c4a771")))
 	menu_title = _text("Your first delivery", 36, Color("f2dfb6"))
 	column.add_child(menu_title)
-	menu_copy = _text("A quiet morning. Six bottles. An empty display.\n\nCarry each bottle from the delivery tray to its labelled\nshelf. Starlight will brighten the shop as you move it.\n\nTake your time. There are no customers or costs yet.", 19, Color("ced5c5"))
+	menu_copy = _text("A quiet morning. Six bottles. An empty display.\n\nCarry each bottle from the delivery tray to its labelled\nshelf. Starlight will brighten the shop as you move it.\n\nThen visit the counter and invite your first customer.\nCount totals and change yourself. Nobody is in a rush.", 19, Color("ced5c5"))
 	column.add_child(menu_copy)
 	column.add_child(_text("WASD / arrows to walk   •   Mouse to look   •   E to handle stock", 15, Color("b4c3b4")))
 	var sensitivity_row := HBoxContainer.new()
@@ -357,8 +371,12 @@ func _start() -> void:
 	started = true
 	get_tree().paused = false
 	overlay.hide()
-	reticle.show()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if checkout_before_pause:
+		checkout_before_pause = false
+		_open_checkout()
+	else:
+		reticle.show()
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _reset() -> void:
@@ -368,6 +386,8 @@ func _reset() -> void:
 
 
 func _pause() -> void:
+	checkout_before_pause = checkout.visible
+	checkout.hide()
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	menu_title.text = "A moment to yourself"
@@ -382,10 +402,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause_shop") and not event.is_echo():
 		if overlay.visible:
 			_start()
+		elif checkout.visible:
+			_close_checkout()
 		else:
 			_pause()
 		get_viewport().set_input_as_handled()
-	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused:
+	if event.is_action_pressed("interact") and not event.is_echo() and started and not get_tree().paused and not checkout.visible:
+		if player.aimed_body() == counter_body:
+			_open_checkout()
+			get_viewport().set_input_as_handled()
+			return
 		# Query again at commit rather than trusting last frame's highlighted slot.
 		var target := player.aimed_slot()
 		if target != null:
@@ -405,7 +431,7 @@ func _process(delta: float) -> void:
 		capture_frames -= 1
 		if capture_frames == 0:
 			_capture()
-	if not started or get_tree().paused:
+	if not started or get_tree().paused or checkout.visible:
 		return
 	var target := player.aimed_slot()
 	if focused != target:
@@ -414,7 +440,9 @@ func _process(delta: float) -> void:
 		focused = target
 		if is_instance_valid(focused):
 			focused.set_highlight(true)
-	if focused != null:
+	if player.aimed_body() == counter_body:
+		prompt.text = "[E]  Open the sales ledger"
+	elif focused != null:
 		var result := ItemActions.inspect(player, focused)
 		prompt.text = ("[E]  " if result.ok else "") + result.message
 	elif is_instance_valid(player.held_item):
@@ -433,10 +461,10 @@ func _update_stock_count() -> void:
 	for slot in shelf_slots:
 		if is_instance_valid(slot.item):
 			count += 1
-	progress_label.text = "%d / 6 bottles stocked" % count
+	progress_label.text = "%d / 6 bottles stocked" % count if visits_invited == 0 else "Sales: %d   /   Till: %d bits" % [sales_completed, till]
 	if count == 6 and not completed:
 		completed = true
-		toast.text = "Ready for business. Your first delivery is stocked!"
+		toast.text = "Ready for business. Your first delivery is stocked! Visit the counter."
 		feedback_seconds = 8
 	elif count < 6:
 		completed = false
@@ -466,3 +494,89 @@ func _finish_smoke_test() -> void:
 		return
 	print("SCENE SMOKE PASS: player camera and carry anchor, 14 slots, 6 items and HUD verified")
 	get_tree().quit(0)
+
+
+func _build_checkout() -> void:
+	counter_body = StaticBody3D.new()
+	counter_body.collision_layer = 2
+	counter_body.collision_mask = 0
+	counter_body.position = Vector3(2.75, 1.12, 1.25)
+	var collider := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.85, 0.3, 0.7)
+	collider.shape = shape
+	counter_body.add_child(collider)
+	add_child(counter_body)
+	checkout = CheckoutPanel.new()
+	checkout.process_mode = Node.PROCESS_MODE_PAUSABLE
+	hud.add_child(checkout)
+	checkout.close_requested.connect(_close_checkout)
+	checkout.invite_requested.connect(invite_customer)
+	checkout.confirm_requested.connect(complete_sale)
+
+func _open_checkout() -> void:
+	var sale: CounterSale
+	var description := "Stock the shelves, then invite a customer.\nThree visits, at your pace. Only shelf stock is available."
+	if is_instance_valid(customer):
+		if customer.state == "waiting":
+			sale = customer.sale
+		else:
+			description = "Your customer is browsing or leaving. Take your time."
+	elif visits_invited >= VISITS.size():
+		description = "All three visits are finished.\nSales: %d   /   Takings: %d bits\nReset from the pause menu to try again." % [sales_completed, till]
+	checkout.present(sale, description, not is_instance_valid(customer) and visits_invited < VISITS.size())
+	reticle.hide()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _close_checkout() -> void:
+	checkout.hide()
+	reticle.show()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func invite_customer() -> bool:
+	if is_instance_valid(customer) or visits_invited >= VISITS.size():
+		return false
+	var visit: Dictionary = VISITS[visits_invited]
+	visits_invited += 1
+	customer = ShopCustomer.new()
+	add_child(customer)
+	var wanted: Array[String] = []
+	wanted.assign(visit.wanted)
+	var prices := {}
+	for product in PRODUCTS:
+		prices[product.id] = product.price
+	customer.begin(wanted, shelf_slots, prices, visit.payment)
+	customer.stock_changed.connect(_update_stock_count)
+	customer.remarked.connect(_customer_remark)
+	customer.at_counter.connect(func() -> void:
+		_customer_remark("I'm ready when you are. Meet me at the counter.")
+		if checkout.visible:
+			_open_checkout())
+	customer.departed.connect(func() -> void:
+		customer = null
+		_update_stock_count()
+		if checkout.visible:
+			_open_checkout())
+	_close_checkout()
+	_customer_remark("A customer has arrived. They'll browse the shelves first.")
+	_update_stock_count()
+	return true
+
+func complete_sale() -> bool:
+	if not is_instance_valid(customer) or customer.state != "waiting":
+		return false
+	var result := customer.sale.confirm()
+	checkout.feedback.text = result.message
+	checkout.refresh()
+	if not result.ok:
+		return false
+	till += customer.sale.total()
+	sales_completed += 1
+	customer.leave()
+	_update_stock_count()
+	_customer_remark(result.message)
+	return true
+
+func _customer_remark(message: String) -> void:
+	toast.text = message
+	feedback_seconds = 9

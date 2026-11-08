@@ -2,9 +2,9 @@
 
 The approved experiment has five focused sessions. These are playable milestones, not calendar promises. Review the effort cap if a milestone requires more work. The full target is in prototype-spec.md.
 
-## 1. Physical shop and shared actions (current)
+## 1. Physical shop and shared actions
 
-Cloud validation on 2026-11-07 fixed the player constructor and false smoke success. Shared actions pass 30 assertions; the graphical route passes 74, including continuous walking, aiming, all six transfers, collision and pause/resume. Windows/Linux release archives are packaged; the extracted Linux release passes smoke validation. See validation.md. Technical implementation is ready for playtesting; native Windows and subjective usability acceptance remain outstanding.
+Cloud validation on 2026-11-07 fixed the player constructor and false smoke success. Shared actions pass 30 assertions; the graphical route passes 74, including continuous walking, aiming, all six transfers, collision and pause/resume. Windows/Linux release archives are packaged; the extracted Linux release passes smoke validation. See validation.md. The user confirmed on 2026-11-08 that delivery movement and stocking work well.
 
 - [x] Set up Godot and a Windows launch path (Windows engine launcher not re-executed on Linux).
 - [x] Build a navigable, modest fantasy shop with a delivery area and labelled shelves.
@@ -14,14 +14,16 @@ Cloud validation on 2026-11-07 fixed the player constructor and false smoke succ
 - [x] Verify successful transfers and failure cases through the public action interface using two actors (30 assertions; clean cloud rerun passed).
 - [x] Run a visual smoke test and package a playable first milestone (native Windows playtest pending).
 
-## 2. Customer and checkout
+## 2. Customer and checkout (current)
 
-- [ ] Customer browses, obtains one to three available products, queues, and visits the counter.
-- [ ] Missing stock and unreasonable prices cause explicit lost sales; waiting causes no penalty.
-- [ ] Enter basket total, receive payment, count change using 1/10/100 pouches.
-- [ ] Click/hold repeat, tray removal, keyboard equivalents, confirmation and correction.
-- [ ] Leaving and returning to the counter preserves the pending transaction.
-- [ ] Verify no duplicate charges or stock loss on retries.
+First playable slice added on 2026-11-08: three explicitly invited visits, one customer at a time, with baskets of one/two/three physical items. Fixed shelf prices are visible; the ledger requires manual totals and change. Stock races retry another matching shelf; missing shelf stock receives explicit feedback. No timeouts or penalties for waiting. This is not yet the full queue/price-rejection milestone.
+
+- [ ] Customer browses, obtains one to three available products, queues, and visits the counter. (Browsing/baskets/counter implemented; queue deferred.)
+- [ ] Missing stock and unreasonable prices cause explicit lost sales; waiting causes no penalty. (Missing stock/waiting implemented; adjustable prices and rejection deferred.)
+- [x] Enter basket total, receive payment, count change using 1/10/100 pouches.
+- [x] Click/hold repeat, tray removal, keyboard equivalents, confirmation and correction.
+- [x] Leaving and returning to the counter preserves the pending transaction.
+- [x] Verify no duplicate charges or stock loss on retries.
 
 ## 3. Days, stock, finances, persistence
 

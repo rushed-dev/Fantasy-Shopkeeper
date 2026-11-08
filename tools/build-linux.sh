@@ -15,16 +15,24 @@ for target in 'Windows Desktop' Linux; do
 done
 builds/linux/FantasyShopkeeper.x86_64 --headless -- --smoke-test 2>&1 | tee test-results/export-smoke.log
 if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-smoke.log; then exit 1; fi
+"$engine" --headless --fixed-fps 60 --main-pack "$PWD/builds/linux/FantasyShopkeeper.x86_64" \
+  --script "$PWD/tests/checkout_test.gd" 2>&1 | tee test-results/export-checkout.log
+if rg -n 'SCRIPT ERROR:|ERROR:' test-results/export-checkout.log; then exit 1; fi
 python3 - <<'PY'
 import hashlib, zipfile
 from pathlib import Path
 for platform in ('windows', 'linux'):
     directory = Path('builds') / platform
     (directory / 'README.txt').write_text(
-        'Fantasy Shopkeeper - First Delivery prototype\n\n'
-        'WASD/arrows: move. Mouse: look. E: pick up/place. Escape: pause.\n'
+        'Fantasy Shopkeeper - First Customers prototype\n\n'
+        'WASD/arrows: move. Mouse: look. E: handle stock or open ledger. Escape: return/pause.\n'
         'Stock all six bottles on their labelled shelves.\n'
-        'Customers and checkout are not implemented in this milestone.\n'
+        'At the counter, aim at the ledger and press E. Invite each of three customers.\n'
+        'Enter their basket total, then count change with 1/10/100 pouches.\n'
+        'Click or hold pouches, or use keys 1/2/3. Click tray stacks to take one back.\n'
+        'Shift+1/2/3 removes coins. Confirm when ready; mistakes allow correction.\n'
+        'Leaving the counter preserves the sale. Nobody times out.\n'
+        'Days, finances, workers and saves are not implemented yet.\n'
         'Windows export has not been tested on Windows.\n'
         'Engine licence and third-party notices: https://godotengine.org/license/\n')
     for name in ('GODOT-LICENSE.txt', 'GODOT-COPYRIGHT.txt'):
