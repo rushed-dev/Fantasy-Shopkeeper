@@ -2,6 +2,8 @@
 
 2026-11-09 · Recommendation, not an executed migration
 
+**Setup recommendation:** Unreal Engine 5.8.4 with GitHub Desktop and Git LFS. See the [version, version control and implementation roadmap](unreal-roadmap.md) for the checked release sources, setup steps and milestone completion checks.
+
 **Recommend Unreal as the leading production choice**, validated by one bounded visual/workflow evaluation before porting the game. Keep the Godot prototype as the playable behavioural reference. The user has chosen stylised, richly lit 3D, owns a Ryzen 7 9800X3D / 32 GB / RTX 5070 Ti development PC, and has moderate Blueprint experience with limited C++. Those facts make Unreal a credible solo workflow, rather than a choice based solely on screenshots.
 
 The evaluation should determine whether Unreal delivers the desired room and crafting feel at a sustainable authoring cost. If it fails that practical test, improve the Godot version using Forward+ and the same art assets. Do not maintain two full games indefinitely.
