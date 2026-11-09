@@ -3,3 +3,23 @@
 builds/
 test-results/
 *.tmp
+
+# Unreal Engine generated files
+/unreal/**/DerivedDataCache/
+/unreal/**/Intermediate/
+/unreal/**/Saved/
+/unreal/FantasyShopkeeper/Binaries/
+
+# Unreal IDE files (regenerated from the .uproject)
+/unreal/**/.vs/
+/unreal/**/.idea/
+/unreal/**/*.sln
+/unreal/**/*.slnx
+/unreal/**/*.suo
+/unreal/**/*.VC.db
+/unreal/**/*.VC.opendb
+/unreal/**/*.code-workspace
+
+# Unreal packaged builds and local staging
+/unreal/FantasyShopkeeper/PackagedBuilds/
+/unreal/FantasyShopkeeper/StagedBuilds/
