@@ -1,5 +1,7 @@
 # Implementation checklist
 
+Production planning now takes priority: see [the GDD](game-design-document.md) and [engine recommendation](engine-decision.md). The next proposed action is a bounded Unreal visual/workflow evaluation, followed by a representative brewing slice in the selected engine. No migration is implemented. The numbered checklist below records the original prototype, rather than a production backlog.
+
 The approved experiment has five focused sessions. These are playable milestones, not calendar promises. Review the effort cap if a milestone requires more work. The full target is in prototype-spec.md.
 
 ## 1. Physical shop and shared actions
@@ -45,7 +47,7 @@ Still planned; follows the first story slice under the revised iteration order.
 - [ ] Competing player/worker actions remain safe; worker retries if a product or slot changes.
 - [ ] Play two days and compare manual work with assisted work.
 
-## 5. Optional encounter and review (current focus)
+## 5. Optional encounter and review
 
 The short [story strategy](story-strategy.md) is written, with three connected examples: a paid product promise, a counter-display choice, and a returning regular without a quest. Fen's starlight request is now implemented using existing visits and ordinary checkout: optional offer/defer/decline, a day-two paid purchase, a visible lamp test and one claimable tonic. Promise state survives the morning checkpoint, and replay rolls back narrative, stock and money together. Nessa and Ivo remain design examples.
 
@@ -58,6 +60,8 @@ The short [story strategy](story-strategy.md) is written, with three connected e
 - [ ] Package a Windows build and conduct the agreed playtest.
 - [ ] Record evidence against continuation criteria and decide whether to extend the project.
 
-## Early follow-up if continuing
+## Historical early follow-up suggestions
+
+These were prototype follow-ups. Reassess their priority against the production GDD and brewing/engine evaluation.
 
 Prioritise crate handling, then act on playtest evidence. Preserve the ideas for different workers, magical machinery, maintenance automation, richer lenders, and missing-stock reports without implementing them speculatively.

@@ -2,6 +2,8 @@
 
 A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
 
+**Production planning:** the project is now being designed as a potion-making and shopkeeping game. Read the [game design document](docs/game-design-document.md), [Unreal/Godot recommendation](docs/engine-decision.md), [selected art direction](docs/art-direction.md) and [content-provenance policy draft](docs/content-provenance.md). Unreal is the recommended production candidate for a bounded evaluation; no migration or brewing implementation has started. The Godot checkpoint below remains playable.
+
 **Current checkpoint: The Lantern Walk.** Stocking and manual checkout now sit inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Fen now has an optional two-day encounter within the existing visits. Customers remain one at a time; queues, workers and further stories are future work.
 
 ## Play this checkpoint
@@ -34,6 +36,11 @@ Morning saves retain the promise. Restarting day two rolls the story outcome, cl
 A checkpoint is created at the start of the first morning and after day-two deliveries, under Godot's per-project `user://morning.json`. Reopening the game or choosing **Restart saved morning** restores that morning's starting stock, prices, cash and debt. Preparation changes and mid-day transactions are deliberately not saved. Loading replaces the world; it does not repeat deliveries or loan payments. Invalid saves are reported and preserved until you explicitly choose a fresh experiment. Starting fresh replaces the checkpoint after confirmation.
 
 ## Project documents
+
+- [Production game design document](docs/game-design-document.md)
+- [Engine decision and evaluation plan](docs/engine-decision.md)
+- [Selected art direction and references](docs/art-direction.md)
+- [AI assistance and content provenance](docs/content-provenance.md)
 
 - [Story strategy and connected examples](docs/story-strategy.md)
 - [Prototype specification](docs/prototype-spec.md)

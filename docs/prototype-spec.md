@@ -1,5 +1,7 @@
 # Fantasy Shopkeeper: two-day prototype
 
+Production direction is now described in [game-design-document.md](game-design-document.md). This file records the original two-day experiment; its content limits and five-session effort cap are not the scope or schedule of the production game. The Godot implementation remains a playable reference while the engine decision is evaluated.
+
 Status: scope approved in the grilling session on 2026-11-07. The recovery loan supersedes the proposed bankruptcy/replay policy. This document describes the target prototype; see implementation-plan.md for what is actually built.
 
 ## Purpose and decision to make

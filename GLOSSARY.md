@@ -45,3 +45,19 @@ Credit intended to fund another one or two days of basic stock when the shop can
 
 **Special request**:
 An optional customer opportunity with a later outcome and possible bonus reward, independent of ordinary progression.
+
+## Production design terms
+
+These terms describe the proposed brewing game; the systems are not all implemented in the Godot prototype.
+
+**Ingredient**:
+A raw material consumed in a recipe, measured in explicit units or portions.
+
+**Recipe**:
+Defined ingredient quantities and preparation steps that produce a known product or authored variation.
+
+**Batch**:
+One preparation operation with a defined material cost and number of physical output items.
+
+**Bespoke order**:
+A customer agreement specifying the needed product or effect, quantity, price and collection terms. It does not automatically reserve physical stock.

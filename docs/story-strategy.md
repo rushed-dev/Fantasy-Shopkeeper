@@ -2,6 +2,8 @@
 
 Working direction — 2026-11-08. Fen’s first two-day encounter is now implemented; Nessa and Ivo remain working examples for the broader direction. The user has playtested and enjoyed stocking, manual checkout and the two-day loop. Our next useful exploration is the fantasy shop's personality and relationships; the retail foundation has enough evidence to support that work.
 
+The [production GDD](game-design-document.md) now connects this narrative direction to potion-making and bespoke work. Fen remains an implemented retail/story reference; the crafting interpretation is proposed future work.
+
 ## The experience we want
 
 The player should gradually recognise who comes through the door, understand a little of their lives, and see their own shop becoming useful to those people. Fantasy changes what people need, what products can do, and what happens after a sale. A bottle can be both an item worth 35 bits and the reason a familiar customer comes back with something to tell you.
