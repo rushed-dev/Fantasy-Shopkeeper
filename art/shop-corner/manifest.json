@@ -1,0 +1,529 @@
+{
+  "blender": "5.3.0",
+  "units": "cm",
+  "assets": {
+    "SM_DawnTonic": {
+      "triangles": 4208,
+      "dimensions_cm": [
+        14.0,
+        10.460000991821289,
+        25.0
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "AmberGlass",
+        "TonicLiquid",
+        "Cork",
+        "CreamLabel",
+        "LabelInk",
+        "Brass"
+      ]
+    },
+    "SM_MoonlitInk": {
+      "triangles": 3840,
+      "dimensions_cm": [
+        16.0,
+        13.059999465942383,
+        25.0
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "InkGlass",
+        "InkLiquid",
+        "Cork",
+        "CreamLabel",
+        "LabelInk"
+      ]
+    },
+    "SM_ApothecaryBench": {
+      "triangles": 4564,
+      "dimensions_cm": [
+        220.00001525878906,
+        99.70001220703125,
+        100.0
+      ],
+      "collision_hulls": 10,
+      "materials": [
+        "HoneyWood",
+        "DarkWood",
+        "SagePaint",
+        "Brass"
+      ]
+    },
+    "SM_ApothecaryShelving": {
+      "triangles": 4576,
+      "dimensions_cm": [
+        124.00000762939453,
+        48.0000114440918,
+        196.0
+      ],
+      "collision_hulls": 10,
+      "materials": [
+        "HoneyWood",
+        "DarkWood",
+        "SagePaint",
+        "Brass"
+      ]
+    },
+    "SM_BrewingVessel": {
+      "triangles": 2636,
+      "dimensions_cm": [
+        58.12565612792969,
+        42.0,
+        42.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "CreamCeramic",
+        "Brass",
+        "DarkWood",
+        "WaterGlass"
+      ]
+    },
+    "SM_MoonleafJar": {
+      "triangles": 1720,
+      "dimensions_cm": [
+        20.0,
+        20.100000381469727,
+        27.5
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "SagePaint",
+        "CreamCeramic",
+        "CreamLabel"
+      ]
+    },
+    "SM_SpringWaterJug": {
+      "triangles": 1672,
+      "dimensions_cm": [
+        28.117830276489258,
+        20.0,
+        32.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "WaterGlass",
+        "Cork"
+      ]
+    },
+    "SM_MortarAndPestle": {
+      "triangles": 1240,
+      "dimensions_cm": [
+        23.015548706054688,
+        22.0,
+        27.33388328552246
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "CreamCeramic",
+        "DarkWood"
+      ]
+    },
+    "SM_BrassPendant": {
+      "triangles": 868,
+      "dimensions_cm": [
+        48.0,
+        48.0,
+        58.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Brass",
+        "LampGlow",
+        "DarkWood"
+      ]
+    },
+    "SM_ApothecaryTill": {
+      "triangles": 1964,
+      "dimensions_cm": [
+        56.000003814697266,
+        34.80000305175781,
+        36.0
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "HoneyWood",
+        "DarkWood",
+        "SagePaint",
+        "Brass",
+        "CreamLabel",
+        "LabelInk"
+      ]
+    },
+    "SM_SupplyCrate": {
+      "triangles": 5944,
+      "dimensions_cm": [
+        70.00000762939453,
+        51.006004333496094,
+        67.0
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "DarkWood",
+        "HoneyWood",
+        "Brass",
+        "CreamLabel",
+        "LabelInk",
+        "CreamCeramic",
+        "SagePaint"
+      ]
+    },
+    "SM_OakFloorTile": {
+      "triangles": 1880,
+      "dimensions_cm": [
+        199.6000213623047,
+        99.70001220703125,
+        3.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "FloorWood"
+      ]
+    },
+    "SM_PlasterWallPanel": {
+      "triangles": 752,
+      "dimensions_cm": [
+        100.0,
+        12.000009536743164,
+        300.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "WarmPlaster",
+        "DarkWood",
+        "HoneyWood"
+      ]
+    },
+    "SM_TimberPost": {
+      "triangles": 188,
+      "dimensions_cm": [
+        13.000000953674316,
+        16.0,
+        300.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "DarkWood"
+      ]
+    },
+    "SM_ArchedWindow": {
+      "triangles": 1945,
+      "dimensions_cm": [
+        164.0,
+        33.00001525878906,
+        203.5
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "WindowGlow",
+        "HoneyWood",
+        "DarkWood",
+        "Brass"
+      ]
+    },
+    "SM_DawnRecipeBook": {
+      "triangles": 2496,
+      "dimensions_cm": [
+        43.000003814697266,
+        33.000003814697266,
+        3.8598074913024902
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "CreamLabel",
+        "BookCloth",
+        "DarkWood",
+        "LabelInk"
+      ]
+    },
+    "SM_DryingMoonleaf": {
+      "triangles": 508,
+      "dimensions_cm": [
+        27.290019989013672,
+        27.29798126220703,
+        65.03621673583984
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Cork",
+        "MoonleafGreen"
+      ]
+    },
+    "SM_PottedFern": {
+      "triangles": 1576,
+      "dimensions_cm": [
+        58.96214294433594,
+        59.87173080444336,
+        73.62728118896484
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "CreamCeramic",
+        "DarkWood",
+        "MoonleafGreen"
+      ]
+    },
+    "SM_DawnPriceCard": {
+      "triangles": 1632,
+      "dimensions_cm": [
+        30.0,
+        10.00000286102295,
+        16.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "DarkWood",
+        "CreamLabel",
+        "LabelInk",
+        "HoneyWood"
+      ]
+    },
+    "SM_InkPriceCard": {
+      "triangles": 1708,
+      "dimensions_cm": [
+        30.0,
+        10.00000286102295,
+        16.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "BookCloth",
+        "CreamLabel",
+        "LabelInk",
+        "HoneyWood"
+      ]
+    },
+    "SM_InkRecipeBook": {
+      "triangles": 2428,
+      "dimensions_cm": [
+        43.000003814697266,
+        33.000003814697266,
+        3.6560001373291016
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "CreamLabel",
+        "BookCloth",
+        "LabelInk"
+      ]
+    },
+    "SM_ShopDoorSurround": {
+      "triangles": 564,
+      "dimensions_cm": [
+        230.0,
+        25.000019073486328,
+        222.0
+      ],
+      "collision_hulls": 3,
+      "materials": [
+        "DarkWood",
+        "HoneyWood"
+      ]
+    },
+    "SM_StockMarkerRing": {
+      "triangles": 576,
+      "dimensions_cm": [
+        18.59935760498047,
+        18.600000381469727,
+        0.5196154117584229
+      ],
+      "collision_hulls": 0,
+      "materials": [
+        "Brass"
+      ]
+    }
+  },
+  "palette": {
+    "HoneyWood": [
+      [
+        0.34,
+        0.15,
+        0.055,
+        1
+      ],
+      0.48,
+      0
+    ],
+    "DarkWood": [
+      [
+        0.14,
+        0.055,
+        0.022,
+        1
+      ],
+      0.57,
+      0
+    ],
+    "SagePaint": [
+      [
+        0.24,
+        0.32,
+        0.19,
+        1
+      ],
+      0.55,
+      0
+    ],
+    "Brass": [
+      [
+        0.53,
+        0.32,
+        0.095,
+        1
+      ],
+      0.29,
+      0.72
+    ],
+    "AmberGlass": [
+      [
+        0.55,
+        0.22,
+        0.025,
+        1
+      ],
+      0.16,
+      0
+    ],
+    "TonicLiquid": [
+      [
+        0.9,
+        0.34,
+        0.025,
+        1
+      ],
+      0.23,
+      0
+    ],
+    "Cork": [
+      [
+        0.33,
+        0.18,
+        0.075,
+        1
+      ],
+      0.85,
+      0
+    ],
+    "CreamLabel": [
+      [
+        0.88,
+        0.77,
+        0.51,
+        1
+      ],
+      0.8,
+      0
+    ],
+    "LabelInk": [
+      [
+        0.09,
+        0.13,
+        0.055,
+        1
+      ],
+      0.8,
+      0
+    ],
+    "CreamCeramic": [
+      [
+        0.75,
+        0.65,
+        0.43,
+        1
+      ],
+      0.3,
+      0
+    ],
+    "MoonleafGreen": [
+      [
+        0.15,
+        0.29,
+        0.095,
+        1
+      ],
+      0.65,
+      0
+    ],
+    "WaterGlass": [
+      [
+        0.2,
+        0.51,
+        0.62,
+        1
+      ],
+      0.15,
+      0
+    ],
+    "LampGlow": [
+      [
+        1,
+        0.65,
+        0.2,
+        1
+      ],
+      0.3,
+      0
+    ],
+    "WarmPlaster": [
+      [
+        0.63,
+        0.52,
+        0.36,
+        1
+      ],
+      0.92,
+      0
+    ],
+    "FloorWood": [
+      [
+        0.22,
+        0.105,
+        0.045,
+        1
+      ],
+      0.76,
+      0
+    ],
+    "WindowGlow": [
+      [
+        0.32,
+        0.57,
+        0.68,
+        1
+      ],
+      0.35,
+      0
+    ],
+    "BookCloth": [
+      [
+        0.15,
+        0.23,
+        0.23,
+        1
+      ],
+      0.85,
+      0
+    ],
+    "InkGlass": [
+      [
+        0.045,
+        0.19,
+        0.32,
+        1
+      ],
+      0.2,
+      0
+    ],
+    "InkLiquid": [
+      [
+        0.025,
+        0.26,
+        0.58,
+        1
+      ],
+      0.26,
+      0
+    ]
+  }
+}

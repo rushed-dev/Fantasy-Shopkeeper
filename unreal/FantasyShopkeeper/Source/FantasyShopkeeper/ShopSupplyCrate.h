@@ -1,0 +1,59 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "ShopInteractable.h"
+#include "ShopSupplyCrate.generated.h"
+
+class AShopBrewingStation;
+class UStaticMeshComponent;
+class USoundBase;
+
+USTRUCT(BlueprintType)
+struct FShopSupplyOffer
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Supplies")
+    int32 PriceBits = 12;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Supplies")
+    TMap<FName, int32> Ingredients;
+};
+
+UCLASS(Blueprintable)
+class FANTASYSHOPKEEPER_API AShopSupplyCrate : public AActor, public IShopInteractable
+{
+    GENERATED_BODY()
+
+public:
+    AShopSupplyCrate();
+    virtual bool Interact_Implementation(UShopInteractionComponent* Interactor) override;
+
+    UFUNCTION(BlueprintCallable, Category = "Shop|Supplies")
+    bool CycleOffer(UShopInteractionComponent* Interactor);
+
+    UFUNCTION(BlueprintPure, Category = "Shop|Supplies")
+    FText GetInteractionPrompt(UShopInteractionComponent* Interactor) const;
+
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Shop|Supplies")
+    TObjectPtr<AShopBrewingStation> Station;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Supplies", meta = (ClampMin = "1"))
+    int32 PriceBits = 12;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Supplies")
+    TMap<FName, int32> Delivery = {{TEXT("Moonleaf"), 6}, {TEXT("Spring Water"), 3}};
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Supplies")
+    TArray<FShopSupplyOffer> Offers;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shop|Supplies")
+    TObjectPtr<UStaticMeshComponent> CrateMesh;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Audio")
+    TObjectPtr<USoundBase> DeliverySound;
+
+private:
+    FText GetBlockReason() const;
+};

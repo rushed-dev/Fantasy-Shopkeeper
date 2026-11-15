@@ -1,10 +1,52 @@
 # Fantasy Shopkeeper
 
-A cosy first-person fantasy shop prototype built with Godot 4.7.2 and GDScript.
+A cosy first-person fantasy shop game about brewing, stocking and serving customers by hand.
 
-**Production planning:** the project is now being designed as a potion-making and shopkeeping game. Read the [game design document](docs/game-design-document.md), [Unreal/Godot recommendation](docs/engine-decision.md), [selected art direction](docs/art-direction.md) and [content-provenance policy draft](docs/content-provenance.md). Unreal is the recommended production candidate for a bounded evaluation; no migration or brewing implementation has started. The Godot checkpoint below remains playable.
+The Unreal 5.8.4 production project is under `unreal/FantasyShopkeeper`. Its C++ shop loop includes two recipes, physical stock, walking customers, manual checkout and paid ingredient replenishment, with an original modelled interior. The Godot project remains the earlier behavioural reference. Read the [game design document](docs/game-design-document.md), [engine decision](docs/engine-decision.md), [art direction](docs/art-direction.md) and [content policy](docs/content-provenance.md).
 
-**Current checkpoint: The Lantern Walk.** Stocking and manual checkout now sit inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Fen now has an optional two-day encounter within the existing visits. Customers remain one at a time; queues, workers and further stories are future work.
+## Unreal shop checkpoint
+
+Open `unreal/FantasyShopkeeper/FantasyShopkeeper.uproject`. The startup map is `L_Shop`. Use the existing first-person movement and mouse controls, aim the centre dot at the labelled amber bottle on the workbench, and press **E** within two metres to pick it up. Aim at a circular shelf marker and press **E** to place it. Press **E** on a shelved item to retrieve it. The prompt shows the available action, occupied slots reject placement, and only one item can be carried.
+
+With an item in hand, aim at a clear, flat floor or table within two metres and press **G** to set it down. A blocked placement keeps it in hand. E retrieves the loose item again. This also lets you free a hand when shelves are full. Items placed loosely can be moved onto sale slots for customers to collect.
+
+The brewing workbench has a brass-and-ceramic vessel between two ingredient containers, with a circular output marker alongside. With empty hands, aim at the vessel and press **E** to brew the selected recipe. Press **R** while aiming at it to switch recipes. **Dawn Tonic** uses **two Moonleaf and one Spring Water**. The blue **Moonlit Ink** uses **one Moonleaf and two Spring Water**. The station begins with six Moonleaf and three Spring Water. Stock, money and the customer sequence reset when a fresh play session starts.
+
+Collect the finished potion from the output marker and shelve it using the same E interaction. An occupied output, insufficient ingredients or full hands block brewing without spending ingredients. The vessel prompt shows the current stock and recipe cost. Hands-on checks are to assess aiming, readable feedback, collection and repeated batches.
+
+Edit recipes under `/Game/Shop/Recipes`. The placed `BrewingStation` exposes `Recipe`, `Available Recipes`, `Starting Ingredients`, `Ingredient Capacity` and `Output Slot`. Its Blueprint child is `/Game/Shop/Native/BP_BrewingStation`. `ShopBrewingStation` validates and commits batches, while `ShopBrewingRecipe` contains ingredient costs, output type and brewing sound. Produced bottles acquire ordinary slot ownership through the shared item placement code.
+
+The first mannequin customer wants **Dawn Tonic for 12 bits** and tenders **20 bits**. After checkout, close the till and allow them to walk out. A second customer enters and wants **Moonlit Ink for 18 bits**, tendering **50 bits**. These visits alternate throughout the session. The HUD shows the current request. Customers walk to an accessible sale position, pick up the physical bottle through the shared interaction component and carry it back to checkout. The shelf becomes free at collection. Customers select matching products from sale slots.
+
+With empty hands, aim at the till and press **E**. Enter the displayed item price, accept payment, count the customer's change and confirm. Dawn Tonic needs **8 bits** change. Moonlit Ink needs **32 bits**, which can be counted as three marks and two bits. Buttons support click-and-hold dispensing and taking coins back. Keys **1 / 2 / 3** add denominations worth **1 / 10 / 100** bits. Hold **Shift** with those keys to remove matching coins. **Escape** or **Back to shop** closes the panel and restores movement and mouse look. Pending totals and change survive closing and reopening within the session. Confirmation credits the quoted price once. The receipt remains available until that customer leaves.
+
+The labelled **SUPPLIES** crate beside the brewing bench sells **six Moonleaf and three Spring Water for 12 bits**. Press **R** while aiming at it to choose that bundle, **six Moonleaf for 6 bits**, or **three Spring Water for 6 bits**. Press **E** with empty hands to buy the selected pack. Individual packs let you replenish water while Moonleaf storage is full, and vice versa. This prototype replenishes the station immediately. Storage holds up to 30 of each ingredient, and a parcel must fit in full. Invalid deliveries, full storage and insufficient funds preserve both cash and ingredients. These recipes, prices, tenders, capacity and delivery timing are provisional tuning choices.
+
+`CustomerFlow` manages one visit at a time, the entrance/exit waypoint, checkout destination, visit interval and authored `Orders`. Each order can specify its customer Blueprint, product, price and tender. Paid customers wait while the till panel is open, then carry their bought bottle out before a replacement enters. The new request resets the old till receipt. Manny and Quinn currently provide the two customer presentations through the existing unarmed animation Blueprint.
+
+`ShopCustomer` uses Character Movement, an AI controller, dynamic navigation and the same `ShopInteractionComponent` and item pickup operation as the player. Acceleration-driven path following supplies the animation Blueprint's movement signal, and the mesh keeps its pose and hand socket updated offscreen. `ShopGameMode` builds missing navigation tiles at startup when a newly imported map has bounds without tile data. The current presentation is `/Game/Shop/Native/BP_CustomerCharacter`, using the project's existing Manny mannequin and unarmed animation Blueprint. The carry anchor follows the right hand with the bottle neck near the palm. Detailed reach, grasp and finger animation is future presentation work. Ordinary shelf slots have `Available For Sale` enabled by default, so additional shelves join the sale stock automatically. Brewing output slots are marked unavailable for sale. Unreachable or removed stock is retried without teleporting or charging money.
+
+`ShopTill` snapshots the waiting customer's item, price and tender, validates the entered total and counted change, and retains the pending checkout state. `ShopTillWidget` provides the native UMG panel. `ShopGameState` commits item removal and net payment through one guarded transaction. Edit `Price Bits` and `Tender Bits` on the customer, and assign that customer to the till's `Customer` property. The till rejects stale orders, invalid tender, remote confirmation and repeated payment. The map before till installation is backed up under `Saved/BeforeTill`.
+
+Gameplay lives in `Source/FantasyShopkeeper`. `ShopInteractionComponent` performs the trace and tracks the held item. `ShopPickupItem` owns attachment, collision and item transfers. `ShopShelfSlot` tracks occupancy and routes interaction. `ShopPlayerController` binds E through Enhanced Input and activates the template's movement and separate mouse-look mappings. `ShopGameMode` uses the existing first-person Blueprint character.
+
+Edit visuals through the Blueprint children in `/Game/Shop/Native`. The original Blueprint prototypes are retained in `/Game/Shop`. The map before migration is backed up locally under `Saved/BeforeNativeInteraction`.
+
+The modelled art kit adds a timber brewing bench, sage-backed shelving, brass-and-ceramic brewer, Moonleaf jar, water jug, mortar and pendant lamp, under the `ShopArt` Outliner folder. Six brass markers on the new unit are functional sale slots. Dawn Tonic uses the recipe-specific `BP_DawnTonic` presentation child, with a flattened tapered cork sized to fit the neck. Editable Blender source, FBX exports, studio and cork-fit previews, and regeneration instructions live in [art/shop-corner](art/shop-corner/README.md). The pre-art map is backed up locally under `Saved/BeforeShopArt`, and the map before the mannequin migration is under `Saved/BeforeCustomerCharacter`. The wider room uses the greybox presentation.
+
+Run the build and nineteen interaction, brewing, customer, supply, till and sale regressions from the repository root when Unreal Editor is closed:
+
+```powershell
+./unreal/FantasyShopkeeper/Tools/check.ps1
+```
+
+The runner checks the report as well as the process exit code and reports passing tests that logged warnings. The actual-map keyboard regression completes three visits, including both recipes, R selection, G set-down/retrieval, natural walking departure and arrival, supply purchases, checkout controls, restored mouse look and order-sequence wraparound. Focused checks cover ownership, reach, occlusion, occupied slots, blocked set-down surfaces, preserved scale, destruction cleanup, exact ingredient costs, malformed recipes, changed recipes during spawning, rollback, walking animation, purchased-item presentation, rejected and reentrant payments, cash overflow, mixed change, pending checkout state, supply capacity and delivery overflow, malformed orders and interrupted visitor spawning. The keyboard fixture isolates desktop events and verifies that normal game-viewport input is restored when each till panel closes. Reports are under the Unreal project's ignored `Saved/Automation` folder. Pass `-EngineRoot` if the engine is installed elsewhere.
+
+`Tools/migrate_interaction.py` is the editor-Python migration used to create the native Blueprint children and replace the placed prototype actors. It can be rerun against this greybox with the PythonScriptPlugin and EditorScriptingUtilities editor plugins enabled.
+
+## Godot prototype reference
+
+**The Lantern Walk** has stocking and manual checkout inside preparation, trading, closing and evening planning. Set prices, buy the next delivery, manage cash and a simple recovery loan, and resume from morning checkpoints. Fen has an optional two-day encounter within the existing visits. Customers arrive one at a time. Queues, workers and further stories are future work.
 
 ## Play this checkpoint
 

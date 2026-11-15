@@ -3,12 +3,14 @@
 builds/
 test-results/
 *.tmp
+*.blend1
 
 # Unreal Engine generated files
 /unreal/**/DerivedDataCache/
 /unreal/**/Intermediate/
 /unreal/**/Saved/
 /unreal/FantasyShopkeeper/Binaries/
+/unreal/FantasyShopkeeper/Build/Windows/FileOpenOrder/
 
 # Unreal IDE files (regenerated from the .uproject)
 /unreal/**/.vs/

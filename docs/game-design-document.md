@@ -13,7 +13,7 @@ The project is now a serious game concept. The Godot prototype remains the playa
 | User confirmed | Solo development; first-person fantasy shopkeeping; stocking and a little arithmetic are enjoyable; optional stories are worthwhile; pursue the game beyond the two-day experiment. |
 | User confirmed | Stylised, richly lit 3D, using Tiny Glade and Kena as visual references. Their content scale and character-production budgets are not our targets. |
 | User confirmed | Development PC: Ryzen 7 9800X3D, 32 GB RAM, RTX 5070 Ti. Moderate Unreal Blueprint experience; limited C++. |
-| User constraint | Human-made art and as much AI assistance as platform rules permit, with a preference to avoid a Steam AI label. Current disclosure requirements still need official verification; manual art alone is not a guarantee. See [content provenance](content-provenance.md). |
+| User confirmed, updated 2026-11-15 | AI-generated artwork is permitted. Prioritise fast production, quality and rigorous verification. Maintain asset/tool records and verify current release disclosure requirements. See [content provenance](content-provenance.md). |
 | Existing design retained | Single player, Windows first, keyboard/mouse, relaxed pacing, manual totals/change, physical stock, ordinary trade viable, voluntary stories and recoverable financial trouble. |
 | Recommendation | Make brewing the next major design exploration. Evaluate Unreal as the production engine before growing the Godot implementation. See [engine decision](engine-decision.md). |
 | Proposed, not approved release commitments | The content envelope, crafting rules, progression and shipping save behaviour below. Validate these in a representative slice. No release date or advertised playtime is set. |
@@ -120,7 +120,7 @@ Stories can involve a product promise, a shop display choice, advice, an unusual
 
 Fen's existing encounter demonstrates optional delivery and a visible consequence through normal trade. It currently accepts an off-the-shelf starlight bottle. The production brewing slice should explore a suitable recipe/effect choice for that need, while keeping the request voluntary and the transaction honest. This is a proposed reworking, not a crafting feature already present.
 
-Player-facing dialogue, item descriptions and localisation intended for release need human authorship and provenance under the stated AI policy goal. Prototype dialogue is a placeholder for that production process; see [content provenance](content-provenance.md).
+Review player-facing dialogue, item descriptions and localisation before release, and record their sources and tool use. Production text authorship remains a workflow decision. See [content provenance](content-provenance.md).
 
 ## 9. Economy and progression
 
@@ -154,7 +154,7 @@ Keep recipes, product data, customer schedules and arc definitions separate from
 
 1. **Design/engine decision:** choose the visual reference direction (now selected), resolve content-policy questions, and run the bounded Unreal evaluation in engine-decision.md. Preserve the Godot checkpoint.
 2. **Representative brewing slice:** one coherent room, one bench, two recipes, one normal batch and a made-to-order interpretation of Fen's need. Complete stocking and manual checkout in the chosen engine; package on Windows.
-3. **Production foundation:** stable data/ownership model, saves, supplier flow, a representative returning customer and human-authored content workflow. Prove that a second recipe and encounter can be added without rebuilding the system.
+3. **Production foundation:** stable data/ownership model, saves, supplier flow, a representative returning customer and a traceable content workflow. Prove that a second recipe and encounter can be added without rebuilding the system.
 4. **Attention and progression:** one mundane restocker, a small set of storage/batch upgrades and a short local chapter. Verify that ordinary trade alone funds this route.
 5. **Content and release:** complete the chosen content envelope, accessibility, performance, Windows QA, store materials and accurate policy/asset disclosures. Set advertised length only after testing.
 

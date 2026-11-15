@@ -28,14 +28,14 @@ The environment should reveal use through a few authored details—worn working 
 
 One window-lit shop corner is enough: a shelf with repeated bottles, a wooden counter, readable labels, a coin tray, a brewing bench and the doorway lamp. Make a morning and evening composition without a real-time closing deadline. Include one moving/held glowing bottle so lighting is tested during work, not only in a still image.
 
-Select a coherent human-made asset kit or create a small modular kit manually. The hero objects to assess are a bottle, one ingredient container, a mixing tool and the lamp. Use shared assets, camera framing and a comparable quality budget when judging engines. The present Godot primitive room remains a mechanical reference, not the opposing visual candidate.
+Select a coherent asset kit using original, licensed or AI-generated work. The hero objects to assess are a bottle, one ingredient container, a mixing tool and the lamp. Use shared assets, camera framing and a comparable quality budget when judging engines. The present Godot primitive room remains a mechanical reference, not the opposing visual candidate.
 
 Record product readability, glare/reflection behaviour, contrast at the bench, effect visibility and packaged performance. Test different bottle roughness/opacity treatments. An attractive still image that obscures labels or causes expensive transparent overdraw is not the finished look.
 
 ## Solo art workflow
 
-Use Blender or another familiar modelling tool for original modular pieces and adjustments, plus appropriately licensed human-made packs where practical. Establish scale, pivots, a small material palette and a consistent degree of stylisation before buying many unrelated packs. Vendor assets still need licence and AI-provenance checks; buying an asset does not establish how it was made.
+As of 2026-11-15, AI-generated artwork is permitted. Use a small reusable kit assembled from suitable licensed assets, generated artwork and original work. Use Blender or another familiar modelling tool for mesh adjustments. Establish scale, pivots, a small material palette and a consistent degree of stylisation before expanding the library. Check generated meshes for topology, collision and runtime cost before adoption.
 
-Maintain an asset register with source, author/vendor, licence, edits and intended use. Keep player-facing art, textures, icons, audio, narrative and store materials within the agreed human-authored production policy. AI assistance for planning or technical work must be assessed separately against current platform rules; see [content provenance](content-provenance.md).
+Maintain an asset register with source, author/vendor or generation tool, usage terms, edits and intended use. Judge assets in the room under gameplay lighting, at normal viewing distances. Record generated references and variants so the selected look can be reproduced. See [content provenance](content-provenance.md) for the current assistance boundary.
 
 The first art milestone is one convincing room corner and a pleasant brewing gesture. Additional rooms, elaborate character rigs and cinematic dialogue should follow evidence that this level of work is sustainable alone.

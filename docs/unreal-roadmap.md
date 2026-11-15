@@ -1,14 +1,20 @@
 # Unreal setup and implementation roadmap
 
-2026-11-09 · Recommended plan; Unreal implementation has not started
+2026-11-15 · Unreal implementation checkpoint and remaining production roadmap
 
 This roadmap follows the [production GDD](game-design-document.md) and [engine evaluation](engine-decision.md). The existing Godot game remains the playable reference. The [prototype checklist](implementation-plan.md) records that implementation's progress; its completed items do not mean those features exist in Unreal.
+
+## Current Unreal checkpoint
+
+The shared repository now contains the Unreal 5.8.4 project, native interaction and item ownership, safe surface set-down, two ingredient-checked recipes, walking customers, manual totals/change, repeating visits and paid immediate ingredient replenishment. Dawn Tonic and Moonlit Ink have separate data assets and physical bottle presentations. An original procedural kit dresses the interior. Nineteen automated regressions cover the gameplay boundaries and a three-visit keyboard workflow through both products. The new repeating loop, art and sounds await the user's hands-on playtest.
+
+Recipe prices, tender, supplier quantities, storage capacity and immediate delivery are prototype tuning decisions. The Unreal session currently restarts its stock, money and visits when play starts again. Day phases, scheduled deliveries, persistent checkpoints and the story slice are subsequent milestones. The older Godot implementation already explores those systems and supplies scenario references for the Unreal port.
 
 ## Recommended engine
 
 Use **Unreal Engine 5.8.4**, installed through Epic Games Launcher, for the evaluation and first production slice. Epic has published its [5.8.4 hotfix announcement](https://forums.unrealengine.com/t/5-8-4-hotfix-released/2842775). This is a current released UE5 baseline, not a claim that this project has been tested on it.
 
-Your Blueprint experience and Ryzen 7 9800X3D / 32 GB / RTX 5070 Ti make a Blueprint-first evaluation appropriate. Start with the first-person template, one contained map, Enhanced Input, UMG and simple snap placement. Try Lumen for the selected lighting direction and measure the result. Nanite and advanced effects should earn their place through a visible benefit.
+Your Blueprint experience and Ryzen 7 9800X3D / 32 GB / RTX 5070 Ti support the contained-shop evaluation. For agent-assisted production, the updated recommendation is C++ gameplay classes with Blueprint children for presentation and tuning. Start with the first-person template, one contained map, Enhanced Input, UMG and simple snap placement. Try Lumen for the selected lighting direction and measure the result. Nanite and advanced effects should earn their place through a visible benefit.
 
 Check required asset packs and plugins against 5.8 before buying or depending on them. Prefer a small dependency list. If an essential dependency only supports 5.7, evaluate its latest released hotfix as a fallback before creating production content. Record the exact engine and plugin versions and keep them fixed through the slice; evaluate upgrades separately with a packaged-build check.
 
@@ -16,7 +22,7 @@ Check required asset packs and plugins against 5.8 before buying or depending on
 
 Use **GitHub Desktop + Git LFS + a private GitHub repository**. Git is the version control system, Desktop provides the everyday interface, LFS stores large binary versions, and GitHub holds the remote copy. This fits solo development without running a Perforce server.
 
-Create a separate Unreal repository when starting the evaluation; keep this Godot repository and its history intact. This is a proposed setup, not a repository already created by this document.
+The Unreal project lives under `unreal/FantasyShopkeeper` in this repository alongside the Godot reference. The repository's root Git ignores and LFS rules cover the Unreal project and its source art.
 
 Before the first Unreal content commit:
 
@@ -41,7 +47,7 @@ Work in the order below. Finish and play the completion check before expanding s
 ### 0. Establish a recoverable project
 
 - [ ] Preserve a working Godot build and record its current behaviour.
-- [ ] Install/pin Unreal, create the separate candidate project and configure Git/LFS.
+- [x] Install/pin Unreal, create the project alongside the reference and configure Git/LFS.
 - [ ] Add input, pause and look sensitivity; create a small greybox shop.
 - [ ] Package a Windows build and verify a fresh clone can produce it.
 
@@ -49,8 +55,8 @@ Work in the order below. Finish and play the completion check before expanding s
 
 ### 1. Evaluate look, feel and authoring cost
 
-- [ ] Dress one corner with a counter, shelf, brewing bench, window and a few coherent licensed assets.
-- [ ] Pick up and snap-place a bottle, turn a fixed ingredient input into one bottle, then complete one simple sale.
+- [x] Dress one corner with a counter, shelf, brewing bench, window and coherent original assets.
+- [x] Pick up and snap-place a bottle, turn a fixed ingredient input into one bottle, then complete one simple sale.
 - [ ] Compare morning/evening lighting, readable labels, glass/liquid treatment and a small magical effect.
 - [ ] Record packaged frame times, memory, shader waits, edit/play time and package time. Choose a representative player hardware target; the development GPU alone cannot establish minimum specifications.
 
@@ -58,10 +64,10 @@ Work in the order below. Finish and play the completion check before expanding s
 
 ### 2. Prove the brewing-to-sale loop
 
-- [ ] Introduce stable product, recipe and item IDs; separate definitions from runtime quantities and locations.
+- [x] Introduce stable product/recipe IDs and separate definitions from runtime ingredient quantities and item ownership.
 - [ ] Implement one bench, a few ingredients and two authored recipes with readable steps and recoverable corrections.
-- [ ] Create physical output once, carry it, stock it and let one customer buy it.
-- [ ] Restore manual totals and change using 1/10/100 denominations, including correction and leaving/returning to the counter.
+- [x] Create physical output once, carry it, stock it and let one customer buy it.
+- [x] Restore manual totals and change using 1/10/100 denominations, including correction and leaving/returning to the counter.
 - [ ] Add one shared action boundary for consuming ingredients, moving items and completing a sale. Keep UI and visual effects from independently changing economic state.
 
 **Complete when:** a player makes and sells both products repeatedly without duplicated output, lost ownership or duplicate payment. Playtest repeated batches: change uninteresting actions before adding recipes.
@@ -99,7 +105,7 @@ Work in the order below. Finish and play the completion check before expanding s
 
 - [ ] Use the GDD's provisional caps: six recurring customers, three short arcs, six to eight recipes and eight to twelve ingredients.
 - [ ] Complete a small upgrade set and one coherent chapter in the shop/workroom.
-- [ ] Track human-made art, dialogue, audio and licences as content is added; resolve the existing content-policy questions before commissioning or producing release material.
+- [ ] Track asset sources, generation tools, dialogue, audio and usage rights as content is added. AI-generated artwork is permitted as of 2026-11-15. Verify applicable release disclosures during release preparation.
 - [ ] Measure content cost and pacing continuously; reduce scope if either exceeds the solo budget.
 
 **Complete when:** the chapter is playable from a fresh save through its ending, optional-story paths remain viable, and content/provenance records are complete. These counts remain planning caps rather than advertised promises.
@@ -116,7 +122,7 @@ Work in the order below. Finish and play the completion check before expanding s
 
 ## Implementation habits
 
-Start Blueprint-first with focused actors/components, a shared interaction interface, separate recipe/product data and small UI widgets. Keep the level Blueprint for level-specific presentation. Introduce C++ only for a concrete maintainability, testing, tooling or performance need.
+Use focused C++ gameplay actors/components, a shared interaction interface, separate recipe/product data and small UI widgets. Use Blueprint children for meshes, materials, effects and tuning. Interaction, item ownership, brewing, customer visits, supplies and checkout now follow this approach, with editor-Python tools for repeatable asset installation and map checks.
 
 Use the existing Godot regressions as scenario specifications, not evidence that Unreal is correct. Add focused Unreal checks for ownership, transaction retries and persistence as those systems arrive, alongside hands-on checks for handling, readability and fun. Package at every milestone.
 
