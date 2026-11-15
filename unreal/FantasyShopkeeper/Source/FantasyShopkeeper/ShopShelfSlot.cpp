@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
+#include "ShopShelfSection.h"
 #include "UObject/ConstructorHelpers.h"
 
 AShopShelfSlot::AShopShelfSlot()
@@ -45,6 +46,32 @@ AShopPickupItem* AShopShelfSlot::GetOccupyingItem() const
     return IsValid(OccupyingItem) ? OccupyingItem.Get() : nullptr;
 }
 
+AShopShelfSection* AShopShelfSlot::GetSection() const { return Section.Get(); }
+
+bool AShopShelfSlot::CanAcceptItem(const AShopPickupItem* Item) const
+{
+    if (IsActorBeingDestroyed() || bChangingOccupancy || GetOccupyingItem())
+    {
+        return false;
+    }
+    const AShopShelfSection* Shelf = GetSection();
+    return !Shelf || (Shelf->CanAccept(Item) && Shelf->GetNextFreeSlot() == this);
+}
+
+bool AShopShelfSlot::IsAvailableForSale() const
+{
+    const AShopShelfSection* Shelf = GetSection();
+    return Shelf ? Shelf->bAvailableForSale : bAvailableForSale;
+}
+
+void AShopShelfSlot::NotifyContentsChanged()
+{
+    if (AShopShelfSection* Shelf = GetSection(); Shelf && !Shelf->IsActorBeingDestroyed())
+    {
+        Shelf->RefreshLabel();
+    }
+}
+
 bool AShopShelfSlot::Interact_Implementation(UShopInteractionComponent* Interactor)
 {
     if (!IsValid(Interactor) || !Interactor->CanReach(this))
@@ -67,5 +94,6 @@ void AShopShelfSlot::EndPlay(const EEndPlayReason::Type EndPlayReason)
         Item->CurrentSlot = nullptr;
     }
     OccupyingItem = nullptr;
+    NotifyContentsChanged();
     Super::EndPlay(EndPlayReason);
 }

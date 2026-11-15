@@ -16,6 +16,7 @@
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
 #include "ShopShelfSlot.h"
+#include "ShopShelfSection.h"
 
 AShopCustomer::AShopCustomer()
 {
@@ -77,7 +78,8 @@ bool AShopCustomer::IsEligibleStock(const AShopPickupItem* Item) const
         return false;
     }
     const AShopShelfSlot* Slot = Item->GetCurrentSlot();
-    return IsValid(Slot) && Slot->bAvailableForSale && Slot->GetOccupyingItem() == Item;
+    return IsValid(Slot) && Slot->IsAvailableForSale() && Slot->GetOccupyingItem() == Item
+        && (!Slot->GetSection() || Slot->GetSection()->GetFirstStockedSlot() == Slot);
 }
 
 AShopPickupItem* AShopCustomer::FindSaleItem() const
@@ -143,7 +145,7 @@ bool AShopCustomer::BeginCollecting()
             FCollisionQueryParams Params(SCENE_QUERY_STAT(CustomerStock), false, this);
             GetWorld()->LineTraceSingleByChannel(Hit, Eyes, Target, ECC_Visibility, Params);
             if (FVector::Dist(Eyes, Target) > ShopInteraction->InteractionDistance
-                || (Hit.GetActor() != Item && Hit.GetActor() != *It))
+                || (Hit.GetActor() != Item && Hit.GetActor() != *It && Hit.GetActor() != It->GetSection()))
             {
                 continue;
             }

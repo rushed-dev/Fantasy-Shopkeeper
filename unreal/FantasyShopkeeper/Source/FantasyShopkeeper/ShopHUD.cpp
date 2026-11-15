@@ -6,6 +6,7 @@
 #include "ShopPickupItem.h"
 #include "ShopPlayerController.h"
 #include "ShopShelfSlot.h"
+#include "ShopShelfSection.h"
 #include "ShopBrewingStation.h"
 #include "ShopCustomer.h"
 #include "ShopGameState.h"
@@ -55,7 +56,11 @@ void AShopHUD::DrawHUD()
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
-    if (const AShopShelfSlot* Slot = Cast<AShopShelfSlot>(Target))
+    if (const AShopShelfSection* Section = Cast<AShopShelfSection>(Target))
+    {
+        Prompt = Section->GetInteractionPrompt(Controller->ShopInteraction).ToString();
+    }
+    else if (const AShopShelfSlot* Slot = Cast<AShopShelfSlot>(Target))
     {
         if (Interaction->GetHeldItem())
         {

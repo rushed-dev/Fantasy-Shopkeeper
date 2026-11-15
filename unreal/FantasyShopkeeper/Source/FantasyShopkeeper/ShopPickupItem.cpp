@@ -4,6 +4,7 @@
 #include "Components/ArrowComponent.h"
 #include "ShopInteractionComponent.h"
 #include "ShopShelfSlot.h"
+#include "ShopShelfSection.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -83,6 +84,7 @@ bool AShopPickupItem::PickUp(UShopInteractionComponent* Interactor)
     if (PreviousSlot)
     {
         PreviousSlot->OccupyingItem = nullptr;
+        PreviousSlot->NotifyContentsChanged();
     }
     CurrentSlot = nullptr;
     Carrier = Interactor;
@@ -111,11 +113,17 @@ bool AShopPickupItem::PlaceInSlot(UShopInteractionComponent* Interactor, AShopSh
 bool AShopPickupItem::PlaceAtSlot(AShopShelfSlot* DestinationSlot)
 {
     if (!IsValid(DestinationSlot) || DestinationSlot->GetWorld() != GetWorld()
-        || DestinationSlot->GetOccupyingItem() || GetCurrentSlot())
+        || !DestinationSlot->CanAcceptItem(this) || GetCurrentSlot())
     {
         return false;
     }
 
+    TGuardValue<bool> SlotGuard(DestinationSlot->bChangingOccupancy, true);
+    TOptional<TGuardValue<bool>> SectionGuard;
+    if (AShopShelfSection* Section = DestinationSlot->GetSection())
+    {
+        SectionGuard.Emplace(Section->bChangingStock, true);
+    }
     const FAttachmentTransformRules Rules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::KeepWorld, false);
     if (!AttachToComponent(DestinationSlot->PlacementPoint, Rules))
     {
@@ -130,6 +138,7 @@ bool AShopPickupItem::PlaceAtSlot(AShopShelfSlot* DestinationSlot)
     }
     Carrier = nullptr;
     SetActorEnableCollision(true);
+    DestinationSlot->NotifyContentsChanged();
     return true;
 }
 
@@ -195,6 +204,7 @@ void AShopPickupItem::EndPlay(const EEndPlayReason::Type EndPlayReason)
     if (AShopShelfSlot* Slot = GetCurrentSlot(); Slot && Slot->OccupyingItem == this)
     {
         Slot->OccupyingItem = nullptr;
+        Slot->NotifyContentsChanged();
     }
     CurrentSlot = nullptr;
     ReleaseFromCarrier();

@@ -9,6 +9,7 @@ class AShopPickupItem;
 class UBoxComponent;
 class UArrowComponent;
 class UStaticMeshComponent;
+class AShopShelfSection;
 
 UCLASS(Blueprintable)
 class FANTASYSHOPKEEPER_API AShopShelfSlot : public AActor, public IShopInteractable
@@ -22,6 +23,10 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Shop|Shelf")
     AShopPickupItem* GetOccupyingItem() const;
+    AShopShelfSection* GetSection() const;
+    bool CanAcceptItem(const AShopPickupItem* Item) const;
+    bool IsAvailableForSale() const;
+    void NotifyContentsChanged();
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Shelf")
     bool bAvailableForSale = true;
@@ -40,6 +45,11 @@ protected:
 
 private:
     friend class AShopPickupItem;
+    friend class AShopShelfSection;
+    bool bChangingOccupancy = false;
+
+    UPROPERTY(Transient)
+    TWeakObjectPtr<AShopShelfSection> Section;
 
     UPROPERTY(Transient)
     TObjectPtr<AShopPickupItem> OccupyingItem;

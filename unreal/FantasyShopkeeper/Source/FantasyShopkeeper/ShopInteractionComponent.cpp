@@ -6,6 +6,25 @@
 #include "GameFramework/PlayerController.h"
 #include "ShopInteractable.h"
 #include "ShopPickupItem.h"
+#include "ShopShelfSlot.h"
+#include "ShopShelfSection.h"
+
+namespace
+{
+    AActor* SectionTarget(AActor* Actor)
+    {
+        AShopShelfSlot* Slot = Cast<AShopShelfSlot>(Actor);
+        if (const AShopPickupItem* Item = Cast<AShopPickupItem>(Actor))
+        {
+            Slot = Item->GetCurrentSlot();
+        }
+        if (Slot && Slot->GetSection())
+        {
+            return Slot->GetSection();
+        }
+        return Actor;
+    }
+}
 
 UShopInteractionComponent::UShopInteractionComponent()
 {
@@ -50,12 +69,19 @@ AActor* UShopInteractionComponent::GetInteractionTarget() const
     const FVector Start = Camera->GetComponentLocation();
     GetWorld()->LineTraceSingleByChannel(Hit, Start,
         Start + Camera->GetForwardVector() * FMath::Max(0.0f, InteractionDistance), ECC_Visibility, Params);
-    return Hit.GetActor();
+    return SectionTarget(Hit.GetActor());
 }
 
 bool UShopInteractionComponent::CanReach(const AActor* Target) const
 {
-    return IsValid(Target) && Target->GetWorld() == GetWorld() && GetInteractionTarget() == Target;
+    if (!IsValid(Target) || Target->GetWorld() != GetWorld())
+    {
+        return false;
+    }
+    AActor* Resolved = SectionTarget(const_cast<AActor*>(Target));
+    const UCameraComponent* Camera = GetCamera();
+    return GetInteractionTarget() == Resolved && (Resolved == Target
+        || (Camera && FVector::Dist(Camera->GetComponentLocation(), Target->GetActorLocation()) <= InteractionDistance));
 }
 
 AShopPickupItem* UShopInteractionComponent::GetHeldItem() const

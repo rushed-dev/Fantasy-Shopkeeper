@@ -21,6 +21,7 @@
 #include "../ShopTill.h"
 #include "../ShopSupplyCrate.h"
 #include "../ShopCustomerFlow.h"
+#include "../ShopShelfSection.h"
 
 namespace
 {
@@ -1078,6 +1079,106 @@ bool FShopSetDownTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Repeating set-down cannot act on an empty hand"), Test.Interaction->SetDownHeldItem());
     Test.AimAt(Item);
     TestTrue(TEXT("Loose bottle can be retrieved through normal interaction"), Test.Interaction->Interact());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopSectionStockTest, "FantasyShopkeeper.ShelfSection.SequentialStockAndProductLock",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopSectionStockTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopShelfSection* Section = Test.Spawn<AShopShelfSection>(FVector(100, 60, 0));
+    for (int32 Index = 0; Index < 8; ++Index)
+    {
+        AShopPickupItem* Item = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+        Item->ProductId = TEXT("DawnTonic");
+        Test.AimAt(Item);
+        if (!TestTrue(TEXT("Pick up stock for the section"), Test.Interaction->Interact()))
+        {
+            return false;
+        }
+        Test.AimAt(Section);
+        if (Index == 1)
+        {
+            TestFalse(TEXT("Direct placement cannot skip earlier positions"), Item->PlaceInSlot(Test.Interaction, Section->GetSlot(7)));
+        }
+        TestTrue(TEXT("Whole-section interaction stocks the next position"), Test.Interaction->Interact());
+        TestEqual(TEXT("The correct sequential slot owns the bottle"), Section->GetSlot(Index)->GetOccupyingItem(), Item);
+        TestEqual(TEXT("Section count increases once per bottle"), Section->GetStockCount(), Index + 1);
+        TestEqual(TEXT("Section locks to the first product"), Section->GetLockedProductId(), FName(TEXT("DawnTonic")));
+        if (Index == 0)
+        {
+            AShopPickupItem* Wrong = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+            Wrong->ProductId = TEXT("MoonlitInk");
+            Test.AimAt(Wrong);
+            TestTrue(TEXT("Pick up a different product"), Test.Interaction->Interact());
+            Test.AimAt(Section);
+            TestFalse(TEXT("Locked section rejects another product"), Test.Interaction->Interact());
+            TestFalse(TEXT("Direct slot API also enforces the product lock"), Wrong->PlaceInSlot(Test.Interaction, Section->GetSlot(1)));
+            TestEqual(TEXT("Rejected bottle stays carried"), Test.Interaction->GetHeldItem(), Wrong);
+            Wrong->Destroy();
+        }
+    }
+    AShopPickupItem* Extra = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+    Extra->ProductId = TEXT("DawnTonic");
+    Test.AimAt(Extra);
+    Test.Interaction->Interact();
+    Test.AimAt(Section);
+    TestFalse(TEXT("A ninth bottle is rejected"), Test.Interaction->Interact());
+    TestEqual(TEXT("Full section retains exactly eight bottles"), Section->GetStockCount(), 8);
+    Extra->Destroy();
+    Section->GetSlot(0)->GetOccupyingItem()->Destroy();
+    TestEqual(TEXT("Destruction frees the first position"), Section->GetNextFreeSlot(), Section->GetSlot(0));
+    TestEqual(TEXT("Remaining stock keeps the section locked"), Section->GetLockedProductId(), FName(TEXT("DawnTonic")));
+    for (int32 Index = 1; Index < 8; ++Index)
+    {
+        Test.AimAt(Section);
+        AShopPickupItem* Expected = Section->GetSlot(Index)->GetOccupyingItem();
+        TestTrue(TEXT("Whole-section retrieval takes the first stocked position"), Test.Interaction->Interact());
+        TestEqual(TEXT("Retrieved bottle follows stock order"), Test.Interaction->GetHeldItem(), Expected);
+        Expected->Destroy();
+    }
+    TestTrue(TEXT("An empty section releases its product assignment"), Section->GetLockedProductId().IsNone());
+    AShopPickupItem* Ink = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+    Ink->ProductId = TEXT("MoonlitInk");
+    Test.AimAt(Ink);
+    Test.Interaction->Interact();
+    Test.AimAt(Section);
+    TestTrue(TEXT("Emptied section can be reassigned to another product"), Test.Interaction->Interact());
+    TestEqual(TEXT("New product fills the first position"), Section->GetSlot(0)->GetOccupyingItem(), Ink);
+    Section->Destroy();
+    TestNull(TEXT("Removing the section releases its stock"), Ink->GetCurrentSlot());
+    TestTrue(TEXT("Released stock survives as a loose item"), IsValid(Ink));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopSectionCustomerTest, "FantasyShopkeeper.ShelfSection.SharedCustomerPickupAndReach",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopSectionCustomerTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopShelfSection* Section = Test.Spawn<AShopShelfSection>(FVector(100, 60, 0));
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        AShopPickupItem* Item = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+        Item->ProductId = TEXT("DawnTonic");
+        Test.AimAt(Item);
+        Test.Interaction->Interact();
+        Test.AimAt(Section);
+        TestTrue(TEXT("Prepare matching section stock"), Test.Interaction->Interact());
+    }
+    AShopCustomer* Customer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+    TestFalse(TEXT("Customer cannot skip the first stocked position"), Customer->TryCollectItem(Section->GetSlot(1)->GetOccupyingItem()));
+    TestEqual(TEXT("Customer selects the first stocked bottle"), Customer->FindSaleItem(), Section->GetSlot(0)->GetOccupyingItem());
+    TestTrue(TEXT("Customer uses the shared pickup operation through the section"), Customer->TryCollectItem(Customer->FindSaleItem()));
+    TestEqual(TEXT("Customer collection frees a section position"), Section->GetStockCount(), 1);
+    Section->bAvailableForSale = false;
+    TestNull(TEXT("Storage sections are excluded from sale selection"), Customer->FindSaleItem());
+    Section->SetActorLocation(FVector(500, 60, 0));
+    Test.AimAt(Section);
+    TestFalse(TEXT("Whole-section retrieval still enforces interaction distance"), Test.Interaction->Interact());
     return true;
 }
 
