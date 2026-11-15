@@ -67,17 +67,16 @@ def create_material(name, settings):
     MATERIALS.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
     constant(material, roughness, unreal.MaterialProperty.MP_ROUGHNESS)
     constant(material, metallic, unreal.MaterialProperty.MP_METALLIC)
-    if name in ("AmberGlass", "InkGlass"):
+    if name in ("AmberGlass", "InkGlass", "WindowGlass"):
         material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
         material.set_editor_property("translucency_lighting_mode", unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
-        constant(material, 0.68, unreal.MaterialProperty.MP_OPACITY)
+        constant(material, 0.06 if name == "WindowGlass" else 0.68, unreal.MaterialProperty.MP_OPACITY)
     if name == "LampGlow":
         emission = color_node(material, (3, 1.8, 0.5))
         MATERIALS.connect_material_property(emission, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    if name == "WindowGlow":
+    if name == "WindowGlass":
         material.set_editor_property("two_sided", True)
-        emission = color_node(material, (0.2, 0.38, 0.48))
-        MATERIALS.connect_material_property(emission, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        constant(material, 1.01, unreal.MaterialProperty.MP_REFRACTION)
     if name == "InkLiquid":
         emission = color_node(material, (0.025, 0.12, 0.26))
         MATERIALS.connect_material_property(emission, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
@@ -233,20 +232,11 @@ for actor in list(ACTORS.get_all_level_actors()):
         removed.append(actor.get_actor_label())
         ACTORS.destroy_actor(actor)
 
-# Keep every existing sales slot, and add six reachable positions on the new unit.
-slot_class = LIBRARY.load_blueprint_class("/Game/Shop/Native/BP_ShopShelfSlot")
-for z in (60, 100):
-    for x in (746, 780, 814):
-        slot = actor_with_label(f"Art_ShelfSlot_{x}_{z}", slot_class, (x, 430, z))
-        slot.set_folder_path("ShopArt")
-        slot.set_editor_property("available_for_sale", True)
-        marker = slot.get_editor_property("slot_marker")
-        marker.set_material(0, materials["Brass"])
-        marker.set_relative_scale3d(unreal.Vector(0.19, 0.19, 0.004))
-
-# Upgrade the existing loose sample without changing its gameplay identity.
+# Give the loose sample the same product identity as its authored bottle.
 for actor in ACTORS.get_all_level_actors():
     if isinstance(actor, unreal.ShopPickupItem) and actor.get_actor_label() == "BP_Bottle":
+        actor.set_editor_property("product_id", "DawnTonic")
+        actor.set_editor_property("display_name", unreal.Text("Dawn Tonic"))
         component = actor.get_editor_property("item_mesh")
         component.set_static_mesh(meshes["SM_DawnTonic"])
         component.set_relative_location(unreal.Vector(0, 0, 0), False, False)

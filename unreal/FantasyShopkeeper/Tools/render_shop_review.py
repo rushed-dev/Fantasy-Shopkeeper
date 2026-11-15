@@ -23,8 +23,8 @@ component.set_editor_property("constrain_aspect_ratio", False)
 component.set_editor_property("aspect_ratio", 1.6)
 tonic = unreal.EditorAssetLibrary.load_blueprint_class("/Game/Shop/Native/BP_DawnTonic")
 ink = unreal.EditorAssetLibrary.load_blueprint_class("/Game/Shop/Native/BP_MoonlitInk")
-for cls, position in ((tonic, (746, 430, 100)), (tonic, (780, 430, 100)),
-                      (ink, (814, 430, 100)), (ink, (814, 430, 60)), (tonic, (650, 330, 100))):
+for cls, position in ((tonic, (747, 430, 100)), (tonic, (769, 430, 100)),
+                      (ink, (791, 430, 60)), (ink, (813, 430, 60)), (tonic, (650, 330, 100))):
     actors.spawn_actor_from_class(cls, unreal.Vector(*position))
 frames = 0
 

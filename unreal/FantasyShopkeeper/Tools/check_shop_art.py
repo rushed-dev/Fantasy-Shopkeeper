@@ -37,23 +37,24 @@ actors.destroy_actor(sample)
 all_actors = actors.get_all_level_actors()
 for label in ("Art_BrewingBench", "Art_ApothecaryShelving"):
     assert sum(a.get_actor_label() == label for a in all_actors) == 1, label
-slots = [a for a in all_actors if a.get_actor_label().startswith("Art_ShelfSlot_")]
-assert len(slots) == 6
-assert all(isinstance(a, unreal.ShopShelfSlot) and a.get_editor_property("available_for_sale") for a in slots)
+sections = [a for a in all_actors if isinstance(a, unreal.ShopShelfSection)]
+assert len(sections) == 10
+assert all(a.get_editor_property("available_for_sale") for a in sections)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 shelving = next(a for a in all_actors if a.get_actor_label() == "Art_ApothecaryShelving")
 center, extent = shelving.get_actor_bounds(False)
 assert abs(center.z - extent.z) < 0.5 and center.z + extent.z > 190, (center, extent)
-for slot in slots:
-    position = slot.get_actor_location()
-    hit = unreal.SystemLibrary.line_trace_single(
-        world, position + unreal.Vector(0, -100, 12), position + unreal.Vector(0, 0, 12),
-        unreal.TraceTypeQuery.ECC_VISIBILITY, False, [], unreal.DrawDebugTrace.NONE, True)
-    assert hit and hit.to_tuple()[9] == slot, (slot.get_actor_label(), hit)
-    hit = unreal.SystemLibrary.line_trace_single(
-        world, position + unreal.Vector(0, 0, 1), position + unreal.Vector(0, 0, -2),
-        unreal.TraceTypeQuery.ECC_VISIBILITY, False, slots, unreal.DrawDebugTrace.NONE, True)
-    assert hit and hit.to_tuple()[9] == shelving, (slot.get_actor_label(), hit)
+for section in sections:
+    markers = section.get_editor_property("position_markers")
+    assert markers.get_instance_count() == 8
+    assert markers.static_mesh.get_name() == "SM_StockMarkerRing"
+    for index in range(8):
+        transform = markers.get_instance_transform(index, world_space=True)
+        position = transform.translation
+        hit = unreal.SystemLibrary.line_trace_single(
+            world, position + unreal.Vector(0, 0, 1), position + unreal.Vector(0, 0, -3),
+            unreal.TraceTypeQuery.ECC_VISIBILITY, False, sections, unreal.DrawDebugTrace.NONE, True)
+        assert hit and isinstance(hit.to_tuple()[9], unreal.StaticMeshActor), f"Unsupported position {section.get_actor_label()} [{index}]"
 station = next(a for a in all_actors if isinstance(a, unreal.ShopBrewingStation))
 assert station.get_editor_property("vessel_mesh").static_mesh.get_name() == "SM_BrewingVessel"
 assert station.get_editor_property("moonleaf_container").static_mesh.get_name() == "SM_MoonleafJar"
@@ -62,8 +63,13 @@ customer = next(a for a in all_actors if isinstance(a, unreal.ShopCustomer))
 assert customer.get_editor_property("mesh").skeletal_mesh_asset, "Customer mannequin mesh is missing"
 assert any(isinstance(a, unreal.NavMeshBoundsVolume) for a in all_actors), "Customer navigation bounds missing"
 till = next(a for a in all_actors if isinstance(a, unreal.ShopTill))
-assert till.get_editor_property("till_mesh").static_mesh.get_name() == "SM_ApothecaryTill"
+assert till.get_editor_property("till_mesh").static_mesh.get_name() == "SM_CheckoutCounter"
 assert till.get_editor_property("customer") == customer
+assert till.get_editor_property("physical_counter")
+assert till.get_editor_property("pouch_mesh").get_name() == "SM_CoinPouch"
+assert len(till.get_editor_property("coin_meshes")) == 3
+assert abs(till.get_actor_location().z) < 1
+assert not any(a.get_actor_label() == "CheckoutCounter" for a in all_actors)
 crate = next(a for a in all_actors if isinstance(a, unreal.ShopSupplyCrate))
 assert crate.get_editor_property("station") == station
 assert crate.get_editor_property("crate_mesh").static_mesh.get_name() == "SM_SupplyCrate"
@@ -102,16 +108,23 @@ sound_manifest = json.loads((project.parents[1] / "art/shop-audio/manifest.json"
 for name, expected in sound_manifest.items():
     sound = unreal.load_asset(f"/Game/Shop/Audio/{name}")
     assert sound and abs(sound.get_editor_property("duration") - expected["duration_seconds"]) < 0.01, name
-sale_slots = [a for a in all_actors if isinstance(a, unreal.ShopShelfSlot) and a.get_editor_property("available_for_sale")]
-for slot in sale_slots:
-    assert slot.get_editor_property("slot_marker").static_mesh.get_name() == "SM_StockMarkerRing"
-    position = slot.get_actor_location()
-    hit = unreal.SystemLibrary.line_trace_single(
-        world, position + unreal.Vector(0, 0, 1), position + unreal.Vector(0, 0, -3),
-        unreal.TraceTypeQuery.ECC_VISIBILITY, False, sale_slots, unreal.DrawDebugTrace.NONE, True)
-    assert hit and isinstance(hit.to_tuple()[9], unreal.StaticMeshActor), f"Unsupported sale slot {slot.get_actor_label()}"
+assert not any(isinstance(a, unreal.ShopShelfSlot) and a.get_editor_property("available_for_sale") for a in all_actors)
+# Ignore glazing for a trace through each opening to its exterior garden. Any
+# retained cube or interior wall panel would intercept these paths.
+for side, start, end in (("Back", (600, 600, 180), (600, 1000, 180)),
+                         ("Side", (900, 400, 180), (1250, 400, 180))):
+    glass = next(a for a in all_actors if a.get_actor_label() == f"Art_{side}WindowGlass")
+    assert glass.get_component_by_class(unreal.StaticMeshComponent).static_mesh.get_name() == "SM_WindowGlass"
+    hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(*start), unreal.Vector(*end),
+        unreal.TraceTypeQuery.ECC_VISIBILITY, False, [glass], unreal.DrawDebugTrace.NONE, True)
+    assert not hit or not hit.to_tuple()[0], f"Window opening is blocked: {side} {hit}"
+material = unreal.load_asset("/Game/Shop/Art/Materials/M_WindowGlass")
+assert material.get_editor_property("blend_mode") == unreal.BlendMode.BLEND_TRANSLUCENT
+assert sum(a.get_actor_label().endswith("Pendant") for a in all_actors) == 4
+assert all(any(a.get_actor_label() == label for a in all_actors) for label in (
+    "Art_EntryLight", "Art_CheckoutLight", "Art_PrepLight", "Art_BackWindowLight", "Art_SideWindowLight"))
 assert station.get_editor_property("output_slot").get_editor_property("slot_marker").static_mesh.get_name() == "SM_StockMarkerRing"
 assert all(any(a.get_actor_label() == label for a in all_actors) for label in (
     "Art_WorkbenchWindow", "Art_SideWindow", "Art_DawnRecipeBook", "Art_DoorSurround",
     "Art_RetailFront", "Art_RetailBack", "Art_PrepFront", "Art_PrepBack"))
-unreal.log(f"SHOP_ART_CHECK_PASSED meshes={len(manifest['assets'])} collisions={sum(a['collision_hulls'] for a in manifest['assets'].values())} recipe_mesh=verified stock_positions=6 approach_and_support_traces=12 customer_mesh=verified")
+unreal.log(f"SHOP_ART_CHECK_PASSED meshes={len(manifest['assets'])} collisions={sum(a['collision_hulls'] for a in manifest['assets'].values())} recipe_mesh=verified stock_sections=10 positions=80 window_openings=2 pendants=4 customer_mesh=verified")

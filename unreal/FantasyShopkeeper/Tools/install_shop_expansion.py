@@ -1,7 +1,7 @@
 """Dress the saved greybox and add repeatable visits and paid ingredient parcels.
 
-Run after install_shop_art.py. Existing gameplay actors and shelf-slot positions
-are retained. Only the measured six-block display supports are replaced.
+Run after install_shop_art.py. Maintains the saved shop layout, physical checkout,
+product-locked sections, window openings, navigation and customer presentations.
 """
 
 from datetime import datetime
@@ -44,6 +44,10 @@ for wall in list(actors.get_all_level_actors()):
     if not isinstance(wall, unreal.StaticMeshActor) or not wall.get_actor_label().startswith("SM_Cube"):
         continue
     p = wall.get_actor_location()
+    window_strip = (p.y == 700 and p.x in (500, 600)) or (p.x == 1000 and p.y in (300, 400))
+    if window_strip and p.z in (0, 100, 200):
+        actors.destroy_actor(wall)
+        continue
     if p.x not in (-300, 1000) and p.y not in (-500, 700):
         continue
     component = wall.get_component_by_class(unreal.StaticMeshComponent)
@@ -78,28 +82,51 @@ for y in (-390, -100, 200, 500, 690):
     beam.set_actor_rotation(unreal.Rotator(pitch=90), False)
     beam.set_actor_scale3d(unreal.Vector(1, 1, 4))
 
-mesh_actor("Art_WorkbenchWindow", "SM_ArchedWindow", (600, 680, 100), decorative=True)
-mesh_actor("Art_SideWindow", "SM_ArchedWindow", (980, 350, 100), -90, decorative=True)
+for old in list(actors.get_all_level_actors()):
+    if old.get_actor_label() in {"Art_WallPanel_500_700", "Art_WallPanel_600_700", "Art_WallPanel_1000_300", "Art_WallPanel_1000_400"}:
+        actors.destroy_actor(old)
+for label, position, yaw in (("Back", (600, 700, 0), 0), ("Side", (1000, 400, 0), -90)):
+    wall = mesh_actor(f"Art_{label}WindowWall", "SM_WindowWall", position, yaw)
+    wall.set_actor_location(unreal.Vector(*position), False, False)
+    frame_label = "Art_WorkbenchWindow" if label == "Back" else "Art_SideWindow"
+    raised_position = (position[0], position[1], 100)
+    raised = unreal.Vector(*raised_position)
+    frame = mesh_actor(frame_label, "SM_ArchedWindow", raised_position, yaw, decorative=True)
+    frame.set_actor_location(raised, False, False)
+    glass = mesh_actor(f"Art_{label}WindowGlass", "SM_WindowGlass", raised_position, yaw)
+    glass.set_actor_location(raised, False, False)
+    glass.get_component_by_class(unreal.StaticMeshComponent).set_editor_property("cast_shadow", False)
+for label, mesh, position, yaw in (
+    ("Art_BackGarden", "SM_GardenGround", (600, 1250, 0.5), 0),
+    ("Art_SideGarden", "SM_GardenGround", (1500, 350, 0.5), 0),
+    ("Art_BackFence", "SM_GardenFence", (600, 1150, 0), 0),
+    ("Art_SideFence", "SM_GardenFence", (1350, 400, 0), -90),
+    ("Art_BackTree", "SM_GardenTree", (780, 1400, 0), 0),
+    ("Art_SideTree", "SM_GardenTree", (1500, 550, 0), 0),
+):
+    mesh_actor(label, mesh, position, yaw)
+for label, x, y in (("Art_BrassPendant", 600, 350), ("Art_CheckoutPendant", 350, 50),
+                    ("Art_PrepPendant", 150, 400), ("Art_EntryPendant", 250, -250)):
+    pendant = mesh_actor(label, "SM_BrassPendant", (x, y, 242), decorative=True)
+    pendant.set_actor_location(unreal.Vector(x, y, 242), False, False)
 mesh_actor("Art_DoorSurround", "SM_ShopDoorSurround", (300, -390, 0), 180)
 mesh_actor("Art_DawnRecipeBook", "SM_DawnRecipeBook", (665, 320, 100), decorative=True)
 mesh_actor("Art_DryingMoonleaf_1", "SM_DryingMoonleaf", (460, 676, 200), decorative=True)
 mesh_actor("Art_DryingMoonleaf_2", "SM_DryingMoonleaf", (750, 676, 200), decorative=True)
 mesh_actor("Art_EntryFern", "SM_PottedFern", (920, -320, 0))
 mesh_actor("Art_BenchFern", "SM_PottedFern", (905, 590, 0))
-mesh_actor("Art_ShelfPrice", "SM_DawnPriceCard", (780, 422, 140), decorative=True)
-mesh_actor("Art_DisplayPrice", "SM_DawnPriceCard", (650, -86, 100), decorative=True)
-mesh_actor("Art_InkPrice", "SM_InkPriceCard", (814, 422, 140), decorative=True)
-mesh_actor("Art_RetailInkPrice", "SM_InkPriceCard", (750, -86, 100), decorative=True)
 mesh_actor("Art_InkRecipeBook", "SM_InkRecipeBook", (175, 340, 100), decorative=True)
 
 # Window and checkout lights use explicit lumen units in the enclosed room.
 for label, position, target, intensity, color, width, height in (
     ("Art_BackWindowLight", (600, 645, 200), (600, 250, 110), 1600, (0.7, 0.84, 1), 120, 160),
-    ("Art_SideWindowLight", (945, 350, 200), (650, 350, 100), 1000, (0.7, 0.84, 1), 120, 160),
-    ("Art_CheckoutLight", (350, 40, 260), (350, 40, 90), 900, (1, 0.8, 0.57), 140, 100),
-    ("Art_PrepLight", (150, 400, 255), (150, 350, 100), 700, (1, 0.86, 0.65), 140, 100),
+    ("Art_SideWindowLight", (945, 400, 200), (650, 400, 100), 1000, (0.7, 0.84, 1), 120, 160),
+    ("Art_CheckoutLight", (350, 50, 239), (350, 40, 90), 900, (1, 0.8, 0.57), 140, 100),
+    ("Art_EntryLight", (250, -250, 239), (250, -250, 90), 900, (1, 0.8, 0.57), 100, 100),
+    ("Art_PrepLight", (150, 400, 239), (150, 350, 100), 700, (1, 0.86, 0.65), 140, 100),
 ):
     light = actor(label, unreal.RectLight, position)
+    light.set_actor_location(unreal.Vector(*position), False, False)
     light.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(unreal.Vector(*position), unreal.Vector(*target)), False)
     component = light.get_component_by_class(unreal.RectLightComponent)
     component.set_mobility(unreal.ComponentMobility.MOVABLE)
@@ -176,16 +203,51 @@ ink_recipe.set_editor_property("output_item_class", ink_class)
 library.save_loaded_asset(ink_recipe)
 tonic_recipe = library.load_asset("/Game/Shop/Recipes/DA_DawnTonic")
 station.set_editor_property("available_recipes", [tonic_recipe, ink_recipe])
+# Replace independent sale targets with eight-position sections. Brewing output
+# remains an independent station slot. Backups above preserve the prior layout.
+for old in list(actors.get_all_level_actors()):
+    if (isinstance(old, unreal.ShopShelfSlot) and old.get_editor_property("available_for_sale")) or old.get_actor_label() in {
+        "Art_ShelfPrice", "Art_DisplayPrice", "Art_InkPrice", "Art_RetailInkPrice", "CheckoutCounter"}:
+        actors.destroy_actor(old)
+for x in (550, 650, 750):
+    for y in (-50, 50):
+        actor(f"RetailSection_{x}_{y}", unreal.ShopShelfSection, (x, y, 100))
+for z in (20, 60, 100, 140):
+    actor(f"ApothecarySection_{z}", unreal.ShopShelfSection, (780, 440, z))
 ring_mesh = library.load_asset("/Game/Shop/Art/Meshes/SM_StockMarkerRing")
-assert ring_mesh
-for slot in actors.get_all_level_actors():
-    if isinstance(slot, unreal.ShopShelfSlot):
-        marker = slot.get_editor_property("slot_marker")
-        marker.set_static_mesh(ring_mesh)
-        marker.set_relative_scale3d(unreal.Vector(1, 1, 1))
-        marker.set_relative_location(unreal.Vector(0, 0, 0.1), False, False)
-        marker.set_material(0, library.load_asset("/Game/Shop/Art/Materials/M_Brass"))
-        marker.set_editor_property("cast_shadow", False)
+marker = station.get_editor_property("output_slot").get_editor_property("slot_marker")
+marker.set_static_mesh(ring_mesh)
+marker.set_relative_scale3d(unreal.Vector(1, 1, 1))
+marker.set_relative_location(unreal.Vector(0, 0, 0.1), False, False)
+marker.set_editor_property("cast_shadow", False)
+
+# The native till owns its keys, coin stacks, pouch, tray and world-space ticket.
+till_blueprint = library.load_asset("/Game/Shop/Native/BP_ShopTill")
+assert till_blueprint
+counter_mesh = library.load_asset("/Game/Shop/Art/Meshes/SM_CheckoutCounter")
+subobjects = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+for handle in subobjects.k2_gather_subobject_data_for_blueprint(till_blueprint):
+    data = unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle)
+    component = unreal.SubobjectDataBlueprintFunctionLibrary.get_object_for_blueprint(data, till_blueprint)
+    if isinstance(component, unreal.StaticMeshComponent) and component.get_name() == "TillMesh":
+        component.set_static_mesh(counter_mesh)
+        component.set_relative_location(unreal.Vector(), False, False)
+        component.set_relative_scale3d(unreal.Vector(1, 1, 1))
+unreal.BlueprintEditorLibrary.compile_blueprint(till_blueprint)
+for target in (unreal.get_default_object(library.load_blueprint_class("/Game/Shop/Native/BP_ShopTill")), till):
+    target.set_editor_property("physical_counter", True)
+    target.set_editor_property("coin_meshes", [library.load_asset(f"/Game/Shop/Art/Meshes/SM_Coin{v}") for v in (1, 10, 100)])
+    target.set_editor_property("pouch_mesh", library.load_asset("/Game/Shop/Art/Meshes/SM_CoinPouch"))
+    target.set_editor_property("key_mesh", library.load_asset("/Game/Shop/Art/Meshes/SM_TillKey"))
+component = till.get_editor_property("till_mesh")
+component.set_static_mesh(counter_mesh)
+component.set_relative_location(unreal.Vector(), False, False)
+component.set_relative_scale3d(unreal.Vector(1, 1, 1))
+# The original small till sat 100 cm above the floor. Migrate its origin once.
+p = till.get_actor_location()
+if p.z > 50:
+    till.set_actor_location(unreal.Vector(p.x, p.y, p.z - 100), False, False)
+library.save_loaded_asset(till_blueprint)
 
 path = "/Game/Shop/Native/BP_SupplyCrate"
 blueprint = library.load_asset(path) if library.does_asset_exist(path) else None
@@ -215,6 +277,24 @@ flow.set_editor_property("customer_class", customer.get_class())
 flow_transform = flow.get_actor_transform()
 flow.set_editor_property("entrance", unreal.MathLibrary.inverse_transform_location(flow_transform, unreal.Vector(300, -540, 88)))
 flow.set_editor_property("checkout", unreal.MathLibrary.inverse_transform_location(flow_transform, customer.get_actor_location()))
+for presentation, mesh_name in (("BP_CustomerCharacter", "SKM_Manny_Simple"),):
+    blueprint = library.load_asset(f"/Game/Shop/Native/{presentation}")
+    for handle in subobjects.k2_gather_subobject_data_for_blueprint(blueprint):
+        data = unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle)
+        component = unreal.SubobjectDataBlueprintFunctionLibrary.get_object_for_blueprint(data, blueprint)
+        if isinstance(component, unreal.SkeletalMeshComponent):
+            component.set_editor_property("skeletal_mesh_asset", library.load_asset(f"/Game/Characters/Mannequins/Meshes/{mesh_name}"))
+            component.set_editor_property("anim_class", library.load_blueprint_class("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"))
+            component.set_relative_location(unreal.Vector(0, 0, -88), False, False)
+            component.set_relative_rotation(unreal.Rotator(yaw=-90), False, False)
+    unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+    library.save_loaded_asset(blueprint)
+for navigation in actors.get_all_level_actors():
+    if isinstance(navigation, unreal.RecastNavMesh):
+        navigation.set_editor_property("runtime_generation", unreal.RuntimeGenerationType.DYNAMIC)
+        navigation.set_editor_property("force_rebuild_on_load", True)
+        navigation.set_editor_property("agent_radius", 34)
+        navigation.set_editor_property("agent_height", 180)
 navigation_bounds = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.NavMeshBoundsVolume))
 navigation_bounds.set_actor_location(unreal.Vector(350, 100, 150), False, False)
 navigation_bounds.set_actor_scale3d(unreal.Vector(7, 7, 2))
