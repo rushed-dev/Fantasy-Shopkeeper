@@ -36,7 +36,11 @@ PALETTE = {
     "LampGlow": ((1, 0.65, 0.2, 1), 0.3, 0),
     "WarmPlaster": ((0.63, 0.52, 0.36, 1), 0.92, 0),
     "FloorWood": ((0.22, 0.105, 0.045, 1), 0.76, 0),
-    "WindowGlow": ((0.32, 0.57, 0.68, 1), 0.35, 0),
+    "WindowGlass": ((0.78, 0.9, 0.94, 1), 0.1, 0),
+    "Copper": ((0.62, 0.25, 0.09, 1), 0.3, 0.8),
+    "Silver": ((0.62, 0.66, 0.7, 1), 0.25, 0.85),
+    "Leather": ((0.23, 0.075, 0.025, 1), 0.8, 0),
+    "GardenGrass": ((0.16, 0.26, 0.075, 1), 0.95, 0),
     "BookCloth": ((0.15, 0.23, 0.23, 1), 0.85, 0),
     "InkGlass": ((0.045, 0.19, 0.32, 1), 0.2, 0),
     "InkLiquid": ((0.025, 0.26, 0.58, 1), 0.26, 0),
@@ -388,8 +392,7 @@ wall_panel = export_asset("SM_PlasterWallPanel", parts, [((0, 0, 150), (100, 8, 
 parts = [box("TimberUpright", (0, 0, 150), (13, 16, 300), "DarkWood", 1.1)]
 wall_post = export_asset("SM_TimberPost", parts, [((0, 0, 150), (13, 16, 300))])
 
-# Arched, leaded glazing is a cool luminous backdrop for the warm workbench.
-# This kit supplies a window surround. Exterior scenery can be authored later.
+# Separate glazing and an open wall module allow real exterior views.
 arch_points = [(70 * math.cos(i * math.pi / 32), 0, 120 + 70 * math.sin(i * math.pi / 32)) for i in range(33)]
 outline = [(-70, 0, 0), (70, 0, 0)] + arch_points
 mesh = bpy.data.meshes.new("ArchedPane")
@@ -397,8 +400,9 @@ mesh.from_pydata(outline, [], [tuple(range(len(outline)))])
 mesh.update()
 pane = bpy.data.objects.new("CoolWindowPane", mesh)
 scene.collection.objects.link(pane)
-pane.data.materials.append(materials["WindowGlow"])
-parts = [pane, line("CarvedArch", [(-74, -3, 0), (-74, -3, 120)]
+pane.data.materials.append(materials["WindowGlass"])
+window_glass = export_asset("SM_WindowGlass", [pane], [((0, 0, 90), (140, 1, 180))])
+parts = [line("CarvedArch", [(-74, -3, 0), (-74, -3, 120)]
                   + [(74 * math.cos(math.pi - i * math.pi / 32), -3, 120 + 74 * math.sin(math.pi - i * math.pi / 32)) for i in range(33)]
                   + [(74, -3, 0)], 5, "HoneyWood"),
          box("WindowSill", (0, -9, 0), (164, 33, 9), "HoneyWood", 1.3),
@@ -499,7 +503,71 @@ door = export_asset("SM_ShopDoorSurround", parts, [((-104, 0, 100), (12, 20, 200
 stock_ring = export_asset("SM_StockMarkerRing", [line("StockPositionRing",
     [(9 * math.cos(i * math.tau / 48), 9 * math.sin(i * math.tau / 48), 0.3) for i in range(49)], 0.3, "Brass")], [])
 
+
+# A two-metre wall module with a true arched opening from z100 to z290.
+parts = [box("WindowParapet", (0, 50, 50), (200, 100, 100), "WarmPlaster", 0),
+         box("WindowPierLeft", (-85, 50, 200), (30, 100, 200), "WarmPlaster", 0),
+         box("WindowPierRight", (85, 50, 200), (30, 100, 200), "WarmPlaster", 0)]
+hulls = [((0, 50, 50), (200, 100, 100)), ((-85, 50, 200), (30, 100, 200)), ((85, 50, 200), (30, 100, 200))]
+# Narrow convex strips follow the arch and keep the opening clear in collision.
+for index in range(28):
+    x = -70 + (index + 0.5) * 5
+    bottom = 220 + math.sqrt(max(0, 70 ** 2 - x ** 2))
+    parts.append(box("ArchSpandrel", (x, 50, (bottom + 300) / 2), (5.03, 100, 300 - bottom), "WarmPlaster", 0))
+    hulls.append(((x, 50, (bottom + 300) / 2), (5, 100, 300 - bottom)))
+parts.append(box("WindowWallSkirting", (0, -2, 9), (200, 5, 18), "DarkWood", 0.5))
+window_wall = export_asset("SM_WindowWall", parts, hulls)
+
+# The entire checkout table is one authored mesh. Native controls sit on its top.
+parts = [box("CounterTop", (0, 0, 96), (170, 100, 8), "HoneyWood", 1.5),
+         box("CounterFront", (0, 43, 48), (162, 8, 88), "SagePaint", 1),
+         box("CounterShelf", (0, 0, 20), (158, 88, 5), "DarkWood", 0.8),
+         box("TicketFrame", (0, 42, 138), (146, 5, 43), "DarkWood", 1),
+         box("TicketPaper", (0, 38.8, 138), (140, 0.6, 38), "CreamLabel", 0.4)]
+for x in (-76, 76):
+    for y in (-41, 41):
+        parts.append(box("CounterLeg", (x, y, 47), (10, 10, 94), "DarkWood", 1))
+for x in (2, 21, 39, 58):
+    parts.append(box("ChangeTrayDivider", (x, -8, 102), (1.2, 30, 4), "Brass", 0.3))
+for y in (-23, 7):
+    parts.append(box("ChangeTrayRim", (30, y, 102), (57, 1.2, 4), "Brass", 0.3))
+parts.append(box("KeypadBacking", (-22, -8, 100.7), (40, 49, 1.4), "DarkWood", 0.5))
+for y in (-24, 0, 24):
+    parts.append(lathe("CoinWell", [(10, 100), (10, 101), (8.5, 101)], "Brass", segments=32))
+    parts[-1].location.x = -65
+    parts[-1].location.y = y
+counter = export_asset("SM_CheckoutCounter", parts, [((0, 0, 50), (170, 100, 100)), ((0, 42, 138), (146, 5, 43))])
+key = export_asset("SM_TillKey", [box("PressedBrassKey", (0, 0, 0), (9, 9, 3), "Brass", 0.6)], [])
+coin_assets = []
+for denomination, radius, material in ((1, 2.1, "Copper"), (10, 2.5, "Silver"), (100, 2.9, "Brass")):
+    parts = [lathe("StampedCoin", [(radius - 0.1, 0), (radius, 0.12), (radius, 0.36), (radius - 0.1, 0.48)], material, segments=32),
+             line("CoinRim", [(radius * 0.82 * math.cos(i * math.tau / 32), radius * 0.82 * math.sin(i * math.tau / 32), 0.49) for i in range(33)], 0.06, material)]
+    stamp = text(str(denomination), 1.5, (0, -0.6, 0.52))
+    stamp.rotation_euler = (0, 0, 0)
+    stamp.data.materials.clear()
+    stamp.data.materials.append(materials[material])
+    parts.append(stamp)
+    coin_assets.append(export_asset(f"SM_Coin{denomination}", parts, [((0, 0, 0.25), (radius * 2, radius * 2, 0.5))]))
+parts = [lathe("OpenLeatherPouch", [(7, 0), (11, 2), (13, 9), (12, 16), (9, 21), (9.5, 24), (7.8, 24), (7.5, 21), (10.5, 16), (11.5, 9), (9.5, 3), (7, 2)], "Leather", segments=32),
+         line("PouchDrawstring", [(9.6 * math.cos(i * math.tau / 32), 9.6 * math.sin(i * math.tau / 32), 21) for i in range(33)], 0.45, "Cork"),
+         line("LoosePouchCord", [(9, -1, 21), (14, -6, 13), (13, -9, 10)], 0.45, "Cork")]
+pouch = export_asset("SM_CoinPouch", parts, [((0, 0, 12), (26, 26, 24))])
+# Simple original garden pieces make the view through the glazing legible.
+garden_ground = export_asset("SM_GardenGround", [box("GardenBed", (0, 0, -3), (900, 900, 6), "GardenGrass", 1)], [((0, 0, -3), (900, 900, 6))])
+parts = [box("GardenFenceRail", (0, 0, z), (300, 7, 9), "HoneyWood", 1) for z in (35, 75)]
+parts += [box("GardenFencePost", (x, 0, 52), (11, 11, 104), "DarkWood", 1) for x in (-140, 0, 140)]
+fence = export_asset("SM_GardenFence", parts, [((0, 0, 52), (300, 11, 104))])
+parts = [lathe("GardenTreeTrunk", [(15, 0), (10, 120), (5, 250)], "DarkWood", segments=10)]
+for index, (x, y, z, radius) in enumerate(((-35, 0, 220, 85), (40, 15, 260, 90), (0, -10, 320, 80))):
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=radius, location=(x, y, z))
+    parts.append(finish(bpy.context.object, f"TreeCanopy{index}", "MoonleafGreen"))
+tree = export_asset("SM_GardenTree", parts, [((0, 0, 120), (25, 25, 240))])
+
 (OUTPUT / "manifest.json").write_text(json.dumps(dict(blender=bpy.app.version_string, units="cm", assets=assets, palette=PALETTE), indent=2))
+
+# Hide supplementary assets from the established brewing-corner studio shot.
+for asset in [window_glass, window_wall, counter, key, pouch, garden_ground, fence, tree, *coin_assets]:
+    asset.hide_render = True
 
 # Source scene includes a simple studio arrangement for visual review.
 bench.location = (-70, 0, 0)

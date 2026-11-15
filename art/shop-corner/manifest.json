@@ -207,8 +207,20 @@
         "DarkWood"
       ]
     },
+    "SM_WindowGlass": {
+      "triangles": 33,
+      "dimensions_cm": [
+        140.0,
+        1.2239188436069526e-05,
+        190.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "WindowGlass"
+      ]
+    },
     "SM_ArchedWindow": {
-      "triangles": 1945,
+      "triangles": 1912,
       "dimensions_cm": [
         164.0,
         33.00001525878906,
@@ -216,7 +228,6 @@
       ],
       "collision_hulls": 2,
       "materials": [
-        "WindowGlow",
         "HoneyWood",
         "DarkWood",
         "Brass"
@@ -331,6 +342,134 @@
       "collision_hulls": 0,
       "materials": [
         "Brass"
+      ]
+    },
+    "SM_WindowWall": {
+      "triangles": 560,
+      "dimensions_cm": [
+        200.0,
+        104.50001525878906,
+        300.0
+      ],
+      "collision_hulls": 31,
+      "materials": [
+        "WarmPlaster",
+        "DarkWood"
+      ]
+    },
+    "SM_CheckoutCounter": {
+      "triangles": 3572,
+      "dimensions_cm": [
+        170.00001525878906,
+        100.00001525878906,
+        159.5
+      ],
+      "collision_hulls": 2,
+      "materials": [
+        "HoneyWood",
+        "SagePaint",
+        "DarkWood",
+        "CreamLabel",
+        "Brass"
+      ]
+    },
+    "SM_TillKey": {
+      "triangles": 188,
+      "dimensions_cm": [
+        9.000000953674316,
+        9.000000953674316,
+        3.0
+      ],
+      "collision_hulls": 0,
+      "materials": [
+        "Brass"
+      ]
+    },
+    "SM_Coin1": {
+      "triangles": 648,
+      "dimensions_cm": [
+        4.199999809265137,
+        4.199999809265137,
+        0.5419615507125854
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Copper"
+      ]
+    },
+    "SM_Coin10": {
+      "triangles": 776,
+      "dimensions_cm": [
+        5.0,
+        5.0,
+        0.5419615507125854
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Silver"
+      ]
+    },
+    "SM_Coin100": {
+      "triangles": 904,
+      "dimensions_cm": [
+        5.800000190734863,
+        5.800000190734863,
+        0.5419615507125854
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Brass"
+      ]
+    },
+    "SM_CoinPouch": {
+      "triangles": 1172,
+      "dimensions_cm": [
+        27.403608322143555,
+        26.0,
+        24.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "Leather",
+        "Cork"
+      ]
+    },
+    "SM_GardenGround": {
+      "triangles": 188,
+      "dimensions_cm": [
+        900.0000610351562,
+        900.0000610351562,
+        6.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "GardenGrass"
+      ]
+    },
+    "SM_GardenFence": {
+      "triangles": 940,
+      "dimensions_cm": [
+        300.0,
+        11.000024795532227,
+        104.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "HoneyWood",
+        "DarkWood"
+      ]
+    },
+    "SM_GardenTree": {
+      "triangles": 296,
+      "dimensions_cm": [
+        241.43515014648438,
+        195.0,
+        400.0
+      ],
+      "collision_hulls": 1,
+      "materials": [
+        "DarkWood",
+        "MoonleafGreen"
       ]
     }
   },
@@ -485,14 +624,54 @@
       0.76,
       0
     ],
-    "WindowGlow": [
+    "WindowGlass": [
       [
-        0.32,
-        0.57,
-        0.68,
+        0.78,
+        0.9,
+        0.94,
         1
       ],
-      0.35,
+      0.1,
+      0
+    ],
+    "Copper": [
+      [
+        0.62,
+        0.25,
+        0.09,
+        1
+      ],
+      0.3,
+      0.8
+    ],
+    "Silver": [
+      [
+        0.62,
+        0.66,
+        0.7,
+        1
+      ],
+      0.25,
+      0.85
+    ],
+    "Leather": [
+      [
+        0.23,
+        0.075,
+        0.025,
+        1
+      ],
+      0.8,
+      0
+    ],
+    "GardenGrass": [
+      [
+        0.16,
+        0.26,
+        0.075,
+        1
+      ],
+      0.95,
       0
     ],
     "BookCloth": [
