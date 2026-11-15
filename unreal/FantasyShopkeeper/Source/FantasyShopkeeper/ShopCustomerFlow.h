@@ -75,7 +75,6 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
-    bool IsTillOpen() const;
 
     UPROPERTY(Transient)
     TObjectPtr<AShopCustomer> ActiveCustomer;

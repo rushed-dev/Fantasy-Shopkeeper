@@ -8,7 +8,6 @@ class UShopInteractionComponent;
 class UInputAction;
 class UInputMappingContext;
 class AShopTill;
-class UShopTillWidget;
 
 UCLASS(Blueprintable)
 class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
@@ -17,9 +16,7 @@ class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
 
 public:
     AShopPlayerController();
-    bool OpenTill(AShopTill* Till);
-    void CloseTill();
-    UShopTillWidget* GetTillWidget() const { return TillWidget; }
+    virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shop")
     TObjectPtr<UShopInteractionComponent> ShopInteraction;
@@ -52,6 +49,4 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UInputMappingContext> InteractionMappingContext;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UShopTillWidget> TillWidget;
 };

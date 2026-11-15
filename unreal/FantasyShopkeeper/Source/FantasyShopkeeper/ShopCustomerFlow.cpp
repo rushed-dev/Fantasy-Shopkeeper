@@ -2,7 +2,6 @@
 
 #include "Engine/World.h"
 #include "ShopCustomer.h"
-#include "ShopPlayerController.h"
 #include "ShopTill.h"
 
 AShopCustomerFlow::AShopCustomerFlow()
@@ -29,24 +28,11 @@ void AShopCustomerFlow::BeginPlay()
     }
 }
 
-bool AShopCustomerFlow::IsTillOpen() const
-{
-    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-    {
-        const AShopPlayerController* Player = Cast<AShopPlayerController>(It->Get());
-        if (Player && Player->GetTillWidget())
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool AShopCustomerFlow::StartNextVisit()
 {
     if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed() || bStartingVisit
         || IsValid(ActiveCustomer) || !IsValid(Till) || Till->IsActorBeingDestroyed()
-        || Till->GetWorld() != GetWorld() || IsValid(Till->Customer) || IsTillOpen())
+        || Till->GetWorld() != GetWorld() || IsValid(Till->Customer))
     {
         return false;
     }
@@ -115,7 +101,7 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
     if (!IsValid(ActiveCustomer))
     {
         WaitTime += DeltaSeconds;
-        if (WaitTime >= FMath::Max(0.f, VisitInterval) && !IsTillOpen())
+        if (WaitTime >= FMath::Max(0.f, VisitInterval))
         {
             WaitTime = 0;
             StartNextVisit();
@@ -145,7 +131,7 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
         WaitTime = 0;
         return;
     }
-    if (ActiveCustomer->Activity == EShopCustomerActivity::Completed && !IsTillOpen())
+    if (ActiveCustomer->Activity == EShopCustomerActivity::Completed)
     {
         WaitTime += DeltaSeconds;
         if (WaitTime >= FMath::Max(0.f, DepartureDelay))

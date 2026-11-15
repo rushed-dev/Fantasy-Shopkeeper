@@ -3,12 +3,16 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ShopInteractable.h"
+#include "ShopTillControl.h"
 #include "ShopTill.generated.h"
 
 class AShopCustomer;
 class AShopPickupItem;
 class UStaticMeshComponent;
 class USoundBase;
+class UInstancedStaticMeshComponent;
+class UTextRenderComponent;
+class UStaticMesh;
 
 UENUM(BlueprintType)
 enum class EShopTillPhase : uint8
@@ -44,6 +48,25 @@ public:
     bool ConfirmSale(UShopInteractionComponent* Interactor);
 
     bool AssignCustomer(AShopCustomer* NewCustomer);
+    bool UseControl(UShopInteractionComponent* Interactor, EShopTillControl Action, int32 Value = 0);
+    AShopTillControl* FindControl(EShopTillControl Action, int32 Value = 0) const;
+    int32 GetVisibleChangeCoins(int32 Denomination) const;
+    void RefreshPresentation();
+
+    UPROPERTY(EditAnywhere, Category = "Shop|Till")
+    bool bPhysicalCounter = false;
+
+    UPROPERTY(EditAnywhere, Category = "Shop|Till")
+    TArray<TObjectPtr<UStaticMesh>> CoinMeshes;
+
+    UPROPERTY(EditAnywhere, Category = "Shop|Till")
+    TObjectPtr<UStaticMesh> PouchMesh;
+
+    UPROPERTY(EditAnywhere, Category = "Shop|Till")
+    TObjectPtr<UStaticMesh> KeyMesh;
+
+    UPROPERTY(VisibleAnywhere, Category = "Shop|Till")
+    TObjectPtr<UTextRenderComponent> Ticket;
 
     int64 GetChangeTotal() const;
     int32 GetCoinCount(int32 Denomination) const { return TrayCoins.FindRef(Denomination); }
@@ -66,7 +89,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Audio")
     TObjectPtr<USoundBase> SaleSound;
 
-    // Keep unsubmitted text when the player closes and reopens the panel.
+    // Unsubmitted total remains on the physical ticket when the player looks away.
     UPROPERTY(Transient)
     FString EnteredTotalText;
 
@@ -75,6 +98,22 @@ private:
     bool IsQuoteValid() const;
     bool CanCommitSale() const;
     void ResetTransaction();
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+    virtual void Tick(float DeltaSeconds) override;
+    void BuildControls();
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<AShopTillControl>> Controls;
+
+    UPROPERTY(VisibleAnywhere)
+    TArray<TObjectPtr<UInstancedStaticMeshComponent>> ChangeVisuals;
+
+    UPROPERTY(VisibleAnywhere)
+    TArray<TObjectPtr<UInstancedStaticMeshComponent>> TenderVisuals;
+
+    int64 DisplayedChange = -1;
+    int32 DisplayedTender = -1;
 
     UPROPERTY(Transient)
     EShopTillPhase Phase = EShopTillPhase::Idle;

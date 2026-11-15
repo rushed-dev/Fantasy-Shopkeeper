@@ -7,12 +7,9 @@
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/Button.h"
-#include "Components/EditableTextBox.h"
 #include "UnrealClient.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
-#include "Framework/Application/SlateApplication.h"
 #include "EngineUtils.h"
 #include "Engine/GameViewportClient.h"
 #include "GameFramework/Pawn.h"
@@ -32,7 +29,8 @@
 #include "../ShopCustomer.h"
 #include "../ShopGameState.h"
 #include "../ShopTill.h"
-#include "../ShopTillWidget.h"
+#include "../ShopTillControl.h"
+#include "../ShopShelfSection.h"
 #include "../ShopCustomerFlow.h"
 #include "../ShopSupplyCrate.h"
 #include "../ShopBrewingRecipe.h"
@@ -211,7 +209,8 @@ namespace
                 }
                 for (TActorIterator<AShopShelfSlot> It(World); It; ++It)
                 {
-                    if (It->bAvailableForSale && *It != Station->OutputSlot)
+                    if (It->IsAvailableForSale() && *It != Station->OutputSlot
+                        && (!It->GetSection() || It->GetSection()->GetSlot(0) == *It))
                     {
                         Slots.Add(*It);
                     }
@@ -233,6 +232,7 @@ namespace
                     Test->AddError(TEXT("Shop map must contain a native item and two native slots"));
                     return true;
                 }
+                Customer->RequestedProductId = TEXT("InputFixturePending");
                 AimAt(Item.Get());
                 break;
             case 1:
@@ -305,6 +305,8 @@ namespace
                 Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), EKeys::MouseY, 20.0f, 1.0f / 60.0f, 1, FPlatformTime::Cycles64()));
                 break;
             case 11:
+                Item->Destroy();
+                Customer->RequestedProductId = TEXT("DawnTonic");
                 Test->TestTrue(TEXT("Mouse Y changes controller pitch"), FMath::Abs(FMath::FindDeltaAngleDegrees(LookStart.Pitch, Controller->GetControlRotation().Pitch)) > 0.1f);
                 Test->TestTrue(TEXT("Camera follows vertical mouse look"), FMath::Abs(FMath::FindDeltaAngleDegrees(CameraStart.Pitch, Camera->GetComponentRotation().Pitch)) > 0.1f);
                 AimAt(Station.Get());
@@ -405,47 +407,45 @@ namespace
                 break;
             case 22:
                 Key(EKeys::E, IE_Released);
-                if (!Test->TestNotNull(TEXT("E at the till opens its checkout panel"), Controller->GetTillWidget()))
+                Test->TestTrue(TEXT("E starts checkout on the counter"), Till->GetPhase() == EShopTillPhase::EnteringTotal);
+                Test->TestFalse(TEXT("Physical checkout preserves mouse look"), Controller->IsLookInputIgnored());
+                Test->TestFalse(TEXT("Physical checkout preserves movement"), Controller->IsMoveInputIgnored());
+                Key(EKeys::One, IE_Pressed);
+                Key(EKeys::One, IE_Released);
+                Key(EKeys::One, IE_Pressed);
+                Key(EKeys::One, IE_Released);
+                Key(EKeys::Enter, IE_Pressed);
+                Key(EKeys::Enter, IE_Released);
+                Test->TestTrue(TEXT("Wrong total keeps total-entry phase"), Till->GetPhase() == EShopTillPhase::EnteringTotal);
+                Key(EKeys::Delete, IE_Pressed);
+                Key(EKeys::Delete, IE_Released);
                 {
-                    return true;
-                }
-                {
-                    UShopTillWidget* Panel = Controller->GetTillWidget();
-                    UEditableTextBox* Total = Cast<UEditableTextBox>(Panel->GetWidgetFromName(TEXT("BasketTotalInput")));
-                    UButton* Accept = Cast<UButton>(Panel->GetWidgetFromName(TEXT("AcceptPayment")));
-                    UButton* Add = Cast<UButton>(Panel->GetWidgetFromName(TEXT("AddBit")));
-                    if (!Total || !Accept || !Add)
+                    const FKey Digits[] = {EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
+                        EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight, EKeys::Nine};
+                    for (TCHAR Digit : FString::FromInt(SalePrice))
                     {
-                        Test->AddError(TEXT("Till checkout controls are missing"));
-                        return true;
+                        Key(Digits[Digit - TEXT('0')], IE_Pressed);
+                        Key(Digits[Digit - TEXT('0')], IE_Released);
                     }
-                    Total->SetText(FText::FromString(TEXT("11")));
-                    Accept->OnClicked.Broadcast();
-                    Test->TestTrue(TEXT("Wrong total keeps checkout in total-entry phase"), Till->GetPhase() == EShopTillPhase::EnteringTotal);
-                    Total->SetText(FText::AsNumber(SalePrice));
-                    Accept->OnClicked.Broadcast();
-                    Test->TestTrue(TEXT("Correct total accepts payment"), Till->GetPhase() == EShopTillPhase::MakingChange);
-                    for (int32 Bit = 0; Bit < Customer->TenderBits - SalePrice; ++Bit)
-                    {
-                        Add->OnPressed.Broadcast();
-                        Add->OnReleased.Broadcast();
-                    }
-                    Test->TestEqual(TEXT("Counting change earns no money before confirmation"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale);
                 }
-                FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::Escape, FModifierKeysState(), 0, false, 0, 0));
-                Test->TestFalse(TEXT("Escape restores game-viewport input"), Viewport->IgnoreInput());
-                Viewport->SetIgnoreInput(true);
-                Test->TestNull(TEXT("Escape closes the till panel"), Controller->GetTillWidget());
-                Test->TestFalse(TEXT("Closing the till restores look input"), Controller->IsLookInputIgnored());
-                Key(EKeys::E, IE_Pressed);
+                Key(EKeys::Enter, IE_Pressed);
+                Key(EKeys::Enter, IE_Released);
+                Test->TestTrue(TEXT("Correct total accepts the pouch"), Till->GetPhase() == EShopTillPhase::MakingChange);
+                AimAt(Till->FindControl(EShopTillControl::AddCoin, 1));
+                AimHeight = 0;
                 break;
             case 23:
+                Key(EKeys::E, IE_Pressed);
+                break;
+            case 24:
                 Key(EKeys::E, IE_Released);
-                if (!Test->TestNotNull(TEXT("Till can be reopened"), Controller->GetTillWidget()))
+                Test->TestEqual(TEXT("E on the coin stack adds a visible bit"), Till->GetCoinCount(1), 1);
+                for (int32 Bit = 1; Bit < Customer->TenderBits - SalePrice; ++Bit)
                 {
-                    return true;
+                    Test->TestTrue(TEXT("Physical stack supplies each change coin"), Controller->ShopInteraction->Interact());
                 }
-                Test->TestEqual(TEXT("Reopening preserves the change tray"), Till->GetChangeTotal(), int64(Customer->TenderBits - SalePrice));
+                Test->TestEqual(TEXT("Change tray shows the actual counted coins"), Till->GetVisibleChangeCoins(1), Customer->TenderBits - SalePrice);
+                Test->TestEqual(TEXT("Counting change earns no money before confirmation"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale);
                 {
                     FString Screenshot;
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopTillScreenshot="), Screenshot))
@@ -453,50 +453,27 @@ namespace
                         FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
                     }
                 }
-                break;
-            case 24:
-                {
-                    UButton* Confirm = Cast<UButton>(Controller->GetTillWidget()->GetWidgetFromName(TEXT("ConfirmSale")));
-                    if (!Confirm)
-                    {
-                        Test->AddError(TEXT("Till confirmation control is missing"));
-                        return true;
-                    }
-                    Confirm->OnClicked.Broadcast();
-                }
-                Test->TestTrue(TEXT("Till confirmation completes the customer order"), Customer->HasCompletedSale());
-                Test->TestEqual(TEXT("E sale credits the quoted price"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
-                Test->TestFalse(TEXT("Sold potion leaves the world"), Item.IsValid());
-                Test->TestTrue(TEXT("Paid customer can carry their purchased bottle out"), Customer->PurchasedItemVisual->IsVisible() && Customer->PurchasedItemVisual->GetStaticMesh());
-                Test->TestNull(TEXT("Sale frees the stocked shelf"), Slots[0]->GetOccupyingItem());
-                {
-                    UButton* Back = Cast<UButton>(Controller->GetTillWidget()->GetWidgetFromName(TEXT("CloseTill")));
-                    if (!Back)
-                    {
-                        Test->AddError(TEXT("Till close control is missing"));
-                        return true;
-                    }
-                    Back->OnClicked.Broadcast();
-                    Test->TestFalse(TEXT("Back to shop restores game-viewport input"), Viewport->IgnoreInput());
-                    Viewport->SetIgnoreInput(true);
-                }
                 LookStart = Controller->GetControlRotation();
                 AimTarget.Reset();
                 Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), EKeys::MouseX, 20.0f, 1.0f / 60.0f, 1, FPlatformTime::Cycles64()));
                 break;
             case 25:
-                Test->TestTrue(TEXT("Mouse look works after closing the till"), FMath::Abs(FMath::FindDeltaAngleDegrees(LookStart.Yaw, Controller->GetControlRotation().Yaw)) > 0.1f);
-                AimAt(Till.Get());
+                Test->TestTrue(TEXT("Mouse look works throughout checkout"), FMath::Abs(FMath::FindDeltaAngleDegrees(LookStart.Yaw, Controller->GetControlRotation().Yaw)) > 0.1f);
+                AimAt(Till->FindControl(EShopTillControl::Confirm));
+                AimHeight = 0;
                 break;
             case 26:
                 Key(EKeys::E, IE_Pressed);
                 break;
             case 27:
                 Key(EKeys::E, IE_Released);
-                Test->TestEqual(TEXT("Reopening the receipt earns no extra cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
-                Controller->CloseTill();
-                Test->TestFalse(TEXT("Closing the receipt restores game-viewport input"), Viewport->IgnoreInput());
-                Viewport->SetIgnoreInput(true);
+                Test->TestTrue(TEXT("Physical SALE key completes the customer order"), Customer->HasCompletedSale());
+                Test->TestEqual(TEXT("E sale credits the quoted price"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
+                Test->TestFalse(TEXT("Sold potion leaves the world"), Item.IsValid());
+                Test->TestTrue(TEXT("Paid customer carries their purchased bottle out"), Customer->PurchasedItemVisual->IsVisible() && Customer->PurchasedItemVisual->GetStaticMesh());
+                Test->TestNull(TEXT("Sale frees the stocked shelf"), Slots[0]->GetOccupyingItem());
+                Test->TestFalse(TEXT("Repeated physical confirmation cannot pay twice"), Controller->ShopInteraction->Interact());
+                Test->TestEqual(TEXT("Repeated confirmation earns no extra cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
                 ++Visits;
                 if (Visits >= 3)
                 {

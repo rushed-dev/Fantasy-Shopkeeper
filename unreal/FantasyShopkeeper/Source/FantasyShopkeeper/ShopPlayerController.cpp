@@ -7,7 +7,8 @@
 #include "InputMappingContext.h"
 #include "ShopInteractionComponent.h"
 #include "ShopTill.h"
-#include "ShopTillWidget.h"
+#include "ShopTillControl.h"
+#include "InputKeyEventArgs.h"
 #include "ShopBrewingStation.h"
 #include "ShopSupplyCrate.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -69,89 +70,79 @@ void AShopPlayerController::SetupInputComponent()
 
 void AShopPlayerController::HandleSetDown()
 {
-    if (!TillWidget)
-    {
-        ShopInteraction->SetDownHeldItem();
-    }
+    ShopInteraction->SetDownHeldItem();
 }
 
 void AShopPlayerController::HandleNextRecipe()
 {
-    if (!TillWidget)
+    if (AShopBrewingStation* Station = Cast<AShopBrewingStation>(ShopInteraction->GetInteractionTarget()))
     {
-        if (AShopBrewingStation* Station = Cast<AShopBrewingStation>(ShopInteraction->GetInteractionTarget()))
-        {
-            Station->CycleRecipe(ShopInteraction);
-        }
-        else if (AShopSupplyCrate* Crate = Cast<AShopSupplyCrate>(ShopInteraction->GetInteractionTarget()))
-        {
-            Crate->CycleOffer(ShopInteraction);
-        }
+        Station->CycleRecipe(ShopInteraction);
+    }
+    else if (AShopSupplyCrate* Crate = Cast<AShopSupplyCrate>(ShopInteraction->GetInteractionTarget()))
+    {
+        Crate->CycleOffer(ShopInteraction);
     }
 }
 
 void AShopPlayerController::HandleInteract()
 {
-    if (!TillWidget)
-    {
-        ShopInteraction->Interact();
-    }
+    ShopInteraction->Interact();
 }
 
-bool AShopPlayerController::OpenTill(AShopTill* Till)
+bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
-    if (TillWidget || !IsValid(Till) || !IsLocalController())
+    AActor* Target = ShopInteraction->GetInteractionTarget();
+    AShopTill* Till = Cast<AShopTill>(Target);
+    if (AShopTillControl* Control = Cast<AShopTillControl>(Target))
     {
-        return false;
+        Till = Control->GetTill();
     }
-    TillWidget = CreateWidget<UShopTillWidget>(this, UShopTillWidget::StaticClass());
-    if (!TillWidget)
+    if (IsValid(Till) && !ShopInteraction->GetHeldItem() && Params.Event == IE_Pressed)
     {
-        return false;
+        const FKey Digits[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
+            EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight, EKeys::Nine };
+        const FKey NumPad[] = { EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo, EKeys::NumPadThree,
+            EKeys::NumPadFour, EKeys::NumPadFive, EKeys::NumPadSix, EKeys::NumPadSeven, EKeys::NumPadEight, EKeys::NumPadNine };
+        for (int32 Digit = 0; Digit <= 9; ++Digit)
+        {
+            if (Params.Key == Digits[Digit] || Params.Key == NumPad[Digit])
+            {
+                if (Till->GetPhase() == EShopTillPhase::MakingChange && Digit >= 1 && Digit <= 3)
+                {
+                    const int32 Denominations[] = {1, 10, 100};
+                    const bool bRemove = IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift);
+                    Till->UseControl(ShopInteraction, bRemove ? EShopTillControl::RemoveCoin : EShopTillControl::AddCoin, Denominations[Digit - 1]);
+                }
+                else
+                {
+                    Till->UseControl(ShopInteraction, EShopTillControl::Digit, Digit);
+                }
+                return true;
+            }
+        }
+        if (Params.Key == EKeys::Delete || Params.Key == EKeys::BackSpace)
+        {
+            Till->UseControl(ShopInteraction, EShopTillControl::Clear);
+            return true;
+        }
+        if (Params.Key == EKeys::Enter)
+        {
+            Till->UseControl(ShopInteraction, EShopTillControl::AcceptPayment);
+            return true;
+        }
     }
-    TillWidget->AddToViewport(100);
-    TillWidget->SetTill(Till);
-    FInputModeUIOnly Mode;
-    Mode.SetWidgetToFocus(TillWidget->TakeWidget());
-    Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-    SetInputMode(Mode);
-    bShowMouseCursor = true;
-    SetIgnoreMoveInput(true);
-    SetIgnoreLookInput(true);
-    FlushPressedKeys();
-    if (GetPawn() && GetPawn()->GetMovementComponent())
-    {
-        GetPawn()->GetMovementComponent()->StopMovementImmediately();
-    }
-    TillWidget->FocusInput();
-    return true;
-}
-
-void AShopPlayerController::CloseTill()
-{
-    if (!TillWidget)
-    {
-        return;
-    }
-    TillWidget->RemoveFromParent();
-    TillWidget = nullptr;
-    SetIgnoreMoveInput(false);
-    SetIgnoreLookInput(false);
-    bShowMouseCursor = false;
-    SetInputMode(FInputModeGameOnly());
-    FlushPressedKeys();
+    return Super::InputKey(Params);
 }
 
 void AShopPlayerController::OnUnPossess()
 {
-    CloseTill();
     ShopInteraction->ReleaseHeldItem();
     Super::OnUnPossess();
 }
 
 void AShopPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    CloseTill();
     if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         if (InteractionMappingContext)

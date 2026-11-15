@@ -1182,4 +1182,64 @@ bool FShopSectionCustomerTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopPhysicalTillTest, "FantasyShopkeeper.Till.PhysicalControlsAndCoinPresentation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, 60, 0));
+    AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+    AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+    if (!TestTrue(TEXT("Customer returns with a product for physical checkout"), Test.CollectAndReturn(Buyer, Item)))
+    {
+        return false;
+    }
+    const FTransform Transform(FVector(0, 84, 0));
+    AShopTill* Till = Test.World->SpawnActorDeferred<AShopTill>(AShopTill::StaticClass(), Transform);
+    Till->bPhysicalCounter = true;
+    Till->Customer = Buyer;
+    Till->FinishSpawning(Transform);
+    Till->DispatchBeginPlay();
+    Test.Camera->SetWorldLocation(FVector(0, -60, 155));
+    auto Press = [&](EShopTillControl Action, int32 Value = 0)
+    {
+        AShopTillControl* Control = Till->FindControl(Action, Value);
+        if (!Control)
+        {
+            return false;
+        }
+        Test.Camera->SetWorldRotation((Control->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
+        return Test.Interaction->Interact();
+    };
+    TestFalse(TEXT("Coins cannot be counted before the pouch is accepted"), Press(EShopTillControl::AddCoin, 1));
+    TestTrue(TEXT("First key starts checkout and enters its digit"), Press(EShopTillControl::Digit, 1));
+    TestFalse(TEXT("Wrong total rejects the physical pouch"), Press(EShopTillControl::AcceptPayment));
+    TestTrue(TEXT("Clear key clears a mistaken total"), Press(EShopTillControl::Clear));
+    TestTrue(TEXT("Enter tens digit"), Press(EShopTillControl::Digit, 1));
+    TestTrue(TEXT("Enter units digit"), Press(EShopTillControl::Digit, 2));
+    TestTrue(TEXT("Correct total accepts the physical pouch"), Press(EShopTillControl::AcceptPayment));
+    TestTrue(TEXT("A physical bit stack supplies a coin"), Press(EShopTillControl::AddCoin, 1));
+    TestEqual(TEXT("One tray coin is rendered"), Till->GetVisibleChangeCoins(1), 1);
+    TestTrue(TEXT("A tray lane returns its coin"), Press(EShopTillControl::RemoveCoin, 1));
+    TestEqual(TEXT("Returned coin leaves the tray presentation"), Till->GetVisibleChangeCoins(1), 0);
+    TestFalse(TEXT("An empty tray lane cannot remove another coin"), Press(EShopTillControl::RemoveCoin, 1));
+    for (int32 Coin = 0; Coin < Buyer->TenderBits - Buyer->PriceBits; ++Coin)
+    {
+        TestTrue(TEXT("Count exact physical change"), Press(EShopTillControl::AddCoin, 1));
+    }
+    TestEqual(TEXT("Physical counting does not credit cash"), State->GetCash(), int64(0));
+    TestTrue(TEXT("Physical confirmation completes the guarded sale"), Press(EShopTillControl::Confirm));
+    TestEqual(TEXT("Sale credits the price once"), State->GetCash(), int64(12));
+    TestFalse(TEXT("Physical confirmation cannot repeat payment"), Press(EShopTillControl::Confirm));
+    Test.Camera->SetWorldLocation(FVector(0, -600, 155));
+    TestFalse(TEXT("Physical controls reject remote input"), Press(EShopTillControl::Digit, 1));
+    AShopTillControl* Control = Till->FindControl(EShopTillControl::Confirm);
+    Till->Destroy();
+    TestFalse(TEXT("Removing the counter removes its interaction controls"), IsValid(Control));
+    return true;
+}
+
 #endif

@@ -11,6 +11,7 @@
 #include "ShopCustomer.h"
 #include "ShopGameState.h"
 #include "ShopTill.h"
+#include "ShopTillControl.h"
 #include "ShopSupplyCrate.h"
 #include "ShopCustomerFlow.h"
 #include "EngineUtils.h"
@@ -27,10 +28,7 @@ void AShopHUD::DrawHUD()
 
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
-    if (!Controller->GetTillWidget())
-    {
-        DrawRect(FLinearColor::White, CenterX - 1.5f, CenterY - 1.5f, 3.0f, 3.0f);
-    }
+    DrawRect(FLinearColor::White, CenterX - 1.5f, CenterY - 1.5f, 3.0f, 3.0f);
 
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
     {
@@ -49,10 +47,6 @@ void AShopHUD::DrawHUD()
         break;
     }
 
-    if (Controller->GetTillWidget())
-    {
-        return;
-    }
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
@@ -86,6 +80,10 @@ void AShopHUD::DrawHUD()
     else if (const AShopSupplyCrate* Crate = Cast<AShopSupplyCrate>(Target))
     {
         Prompt = Crate->GetInteractionPrompt(Controller->ShopInteraction).ToString();
+    }
+    else if (const AShopTillControl* Control = Cast<AShopTillControl>(Target))
+    {
+        Prompt = Control->GetInteractionPrompt().ToString();
     }
     else if (const AShopTill* Till = Cast<AShopTill>(Target))
     {

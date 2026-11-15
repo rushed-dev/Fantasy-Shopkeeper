@@ -8,6 +8,8 @@
 #include "ShopPickupItem.h"
 #include "ShopShelfSlot.h"
 #include "ShopShelfSection.h"
+#include "ShopTill.h"
+#include "ShopTillControl.h"
 
 namespace
 {
@@ -80,7 +82,15 @@ bool UShopInteractionComponent::CanReach(const AActor* Target) const
     }
     AActor* Resolved = SectionTarget(const_cast<AActor*>(Target));
     const UCameraComponent* Camera = GetCamera();
-    return GetInteractionTarget() == Resolved && (Resolved == Target
+    AActor* Hit = GetInteractionTarget();
+    if (const AShopTillControl* Control = Cast<AShopTillControl>(Hit))
+    {
+        if (Control->GetTill() == Target)
+        {
+            return true;
+        }
+    }
+    return Hit == Resolved && (Resolved == Target
         || (Camera && FVector::Dist(Camera->GetComponentLocation(), Target->GetActorLocation()) <= InteractionDistance));
 }
 
