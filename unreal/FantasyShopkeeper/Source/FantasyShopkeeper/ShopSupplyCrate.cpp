@@ -224,13 +224,8 @@ bool AShopSupplyCrate::GetNextDayNeeds(TMap<FName, int64>& Needs, int32& Visitor
     Needs.Empty();
     Visitors = 0;
     if (!IsValid(Station)) return false;
-    TActorIterator<AShopCustomerFlow> Flow(GetWorld());
-    if (!Flow || Flow->Orders.IsEmpty() || Flow->VisitsPerDay < 1 || Flow->VisitsPerDay > 100) return false;
-    Visitors = Flow->VisitsPerDay;
     TMap<FName, int32> RequiredBottles;
-    // ResetMorning restarts the authored order sequence at its first entry.
-    for (int32 Visit = 0; Visit < Visitors; ++Visit)
-        ++RequiredBottles.FindOrAdd(Flow->Orders[Visit % Flow->Orders.Num()].ProductId);
+    if (!GetNextDayProducts(RequiredBottles, Visitors)) return false;
     for (TActorIterator<AShopShelfSlot> Slot(GetWorld()); Slot; ++Slot)
         if (Slot->IsAvailableForSale())
             if (const AShopPickupItem* Item = Slot->GetOccupyingItem())
@@ -250,4 +245,33 @@ bool AShopSupplyCrate::GetNextDayNeeds(TMap<FName, int64>& Needs, int32& Visitor
         }
     }
     return true;
+}
+
+bool AShopSupplyCrate::GetNextDayProducts(TMap<FName, int32>& Products, int32& Visitors) const
+{
+    Products.Empty(); Visitors = 0;
+    TActorIterator<AShopCustomerFlow> Flow(GetWorld());
+    if (!Flow || Flow->Orders.IsEmpty() || Flow->VisitsPerDay < 1 || Flow->VisitsPerDay > 100) return false;
+    Visitors = Flow->VisitsPerDay;
+    for (int32 Visit = 0; Visit < Visitors; ++Visit)
+        ++Products.FindOrAdd(Flow->Orders[Visit % Flow->Orders.Num()].ProductId);
+    return true;
+}
+
+FString AShopSupplyCrate::GetProductPlanText() const
+{
+    TMap<FName, int32> Products; int32 Visitors = 0;
+    if (!GetNextDayProducts(Products, Visitors)) return TEXT("Product plan unavailable");
+    TActorIterator<AShopCustomerFlow> Flow(GetWorld());
+    FString Plan;
+    TSet<FName> Listed;
+    int64 Takings = 0;
+    for (int32 Visit = 0; Visit < Visitors; ++Visit) Takings += Flow->Orders[Visit % Flow->Orders.Num()].PriceBits;
+    for (const FShopCustomerOrder& Order : Flow->Orders)
+        if (Products.Contains(Order.ProductId) && !Listed.Contains(Order.ProductId))
+        {
+            Plan += FString::Printf(TEXT("%s%d %s"), Plan.IsEmpty() ? TEXT("") : TEXT(" / "), Products[Order.ProductId], *Order.ProductName.ToString());
+            Listed.Add(Order.ProductId);
+        }
+    return FString::Printf(TEXT("Expected: %s\nIf all served: %lld bits in sales"), *Plan, Takings);
 }

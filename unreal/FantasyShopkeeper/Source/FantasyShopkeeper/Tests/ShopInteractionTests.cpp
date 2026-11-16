@@ -2411,4 +2411,164 @@ bool FShopIngredientPlanningTest::RunTest(const FString& Parameters)
     return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopThreeDayQueueTest, "FantasyShopkeeper.Day.ThreeDayBalanceAndCheckoutQueue",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopThreeDayQueueTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation(6, 6);
+    UShopBrewingRecipe* Tonic = Station->Recipe;
+    UShopBrewingRecipe* Ink = NewObject<UShopBrewingRecipe>(Station);
+    Ink->ProductId = TEXT("MoonlitInk"); Ink->DisplayName = FText::FromString(TEXT("Moonlit Ink"));
+    Ink->IngredientCosts = {{TEXT("Moonleaf"), 1}, {TEXT("Spring Water"), 2}};
+    Ink->OutputItemClass = AShopPickupItem::StaticClass();
+    Station->AvailableRecipes = {Tonic, Ink};
+    AShopCustomerFlow* Flow = DayFlow(Test); Flow->MaxConcurrentCustomers = 3;
+    FShopCustomerOrder InkOrder; InkOrder.ProductId = TEXT("MoonlitInk");
+    InkOrder.ProductName = Ink->DisplayName; InkOrder.PriceBits = 18; InkOrder.TenderBits = 50;
+    Flow->Orders = {FShopCustomerOrder(), InkOrder};
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0)); Crate->Station = Station;
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -100, 0));
+    State->InitializeDay(File.Path);
+    TestTrue(TEXT("Planning lists the complete product mix"), Crate->GetProductPlanText().Contains(TEXT("2 Dawn Tonic")));
+    TestTrue(TEXT("Planning estimates gross sales"), Crate->GetProductPlanText().Contains(TEXT("42 bits")));
+    for (int32 Day = 1; Day <= 3; ++Day)
+    {
+        TestTrue(TEXT("Open after morning preparation"), State->OpenShop());
+        TArray<AShopCustomer*> Buyers;
+        for (int32 Visit = 0; Visit < 3; ++Visit)
+        {
+            if (!TestTrue(TEXT("Another shopper enters while the till is occupied"), Flow->StartNextVisit())) return false;
+            AShopCustomer* Buyer = Flow->GetCustomerAt(Visit); Buyers.Add(Buyer);
+            Buyer->SetActorLocation(Flow->GetQueuePosition(Visit)); Buyer->Tick(0);
+            Station->Recipe = Visit == 1 ? Ink : Tonic;
+            AShopPickupItem* Bottle = Test.BrewAndStock(Station, Shelf);
+            if (!TestTrue(TEXT("Daily ingredients produce each requested bottle"), IsValid(Bottle))) return false;
+            TestTrue(TEXT("Customer collects through shared stock ownership"), Test.CollectAndReturn(Buyer, Bottle));
+            TestEqual(TEXT("Only the front customer is ready to pay"), Buyer->Activity,
+                Visit == 0 ? EShopCustomerActivity::ReadyToPay : EShopCustomerActivity::Queued);
+            TestEqual(TEXT("New arrivals cannot replace till customer"), Flow->Till->Customer.Get(), Buyers[0]);
+            if (Visit > 0) TestFalse(TEXT("Queued customer cannot take another customer's bottle"), Buyer->TryCollectItem(Buyers[0]->ShopInteraction->GetHeldItem()));
+        }
+        TestFalse(TEXT("Three-customer cap rejects another arrival"), Flow->StartNextVisit());
+        TestTrue(TEXT("Closing starts draining all customers inside"), State->CloseShop());
+        TestFalse(TEXT("Closing prevents arrivals"), Flow->StartNextVisit());
+        for (int32 Visit = 0; Visit < 3; ++Visit)
+        {
+            AShopCustomer* Buyer = Buyers[Visit];
+            TestEqual(TEXT("FIFO promotes the next visitor"), Flow->GetActiveCustomer(), Buyer);
+            Buyer->SetActorLocation(Flow->GetQueuePosition(0)); Buyer->Tick(0);
+            Test.AimAt(Flow->Till);
+            if (!TestTrue(TEXT("Front shopper places goods and payment"), Flow->Till->BeginCheckout(Test.Interaction))) return false;
+            for (int32 Bit = 0; Bit < Buyer->TenderBits - Buyer->PriceBits; ++Bit) Flow->Till->AddChangeCoin(1);
+            TestTrue(TEXT("Manual exact change completes sale"), Flow->Till->ConfirmSale(Test.Interaction));
+            TestFalse(TEXT("Repeated stamp cannot duplicate money"), Flow->Till->ConfirmSale(Test.Interaction));
+            Flow->Tick(0);
+            TestEqual(TEXT("Closing waits for the departing customer"), State->GetDayPhase(), EShopDayPhase::Closing);
+            Buyer->SetActorLocation(Flow->Entrance); Buyer->Tick(0); Flow->Tick(0);
+        }
+        TestEqual(TEXT("All three sales resolve exactly once"), Flow->GetCompletedVisits(), 3);
+        TestEqual(TEXT("Day closes after the entire queue leaves"), State->GetDayPhase(), EShopDayPhase::Evening);
+        TestEqual(TEXT("Daily sales total"), State->GetTakings(), int64(42));
+        if (Day == 1) TestTrue(TEXT("Day one funds storage"), State->TryBuyStorageUpgrade(Station));
+        if (Day == 2)
+        {
+            TestTrue(TEXT("Day two funds batch kit"), State->TryBuyBatchUpgrade(Station));
+            AShopBrewingUpgrade* Kit = Test.Spawn<AShopBrewingUpgrade>(FVector(-100, -80, 22)); Kit->Configure(Station);
+            Test.Camera->SetWorldRotation((Kit->GetActorLocation() + FVector(0, -16, -12) - Test.Camera->GetComponentLocation()).Rotation());
+            TestTrue(TEXT("Select singles for tomorrow's mixed demand"), Kit->Interact_Implementation(Test.Interaction));
+        }
+        Test.AimAt(Crate);
+        TestTrue(TEXT("Evening profits cover tomorrow's bundle"), Crate->Interact_Implementation(Test.Interaction));
+        if (Day == 3)
+        {
+            Crate->PriceBits = 6; Crate->Delivery = {{TEXT("Spring Water"), 3}}; Crate->ResetOrder();
+            TestTrue(TEXT("Water top-up keeps morning four viable"), Crate->Interact_Implementation(Test.Interaction));
+        }
+        TestTrue(TEXT("Paid order covers tomorrow's needs"), State->GetRestWarning().IsEmpty());
+        TestTrue(TEXT("Rest begins overnight"), State->BeginOvernight());
+        {
+            TGuardValue<uint64> FrameGuard(GFrameCounter, GFrameCounter);
+            Test.World->GetTimerManager().Tick(0.f);
+            ++GFrameCounter;
+            Test.World->GetTimerManager().Tick(5.f);
+        }
+        TestEqual(TEXT("Overnight advances one day"), State->GetDay(), Day + 1);
+        const int64 Cash = State->GetCash();
+        TestTrue(TEXT("Morning checkpoint reopens"), State->RestoreMorning());
+        TestEqual(TEXT("Load leaves no old queue"), Flow->GetCustomersInShop(), 0);
+        TestTrue(TEXT("Paid parcel unpacks"), State->UnpackDelivery());
+        const int32 Leaves = Station->GetIngredientQuantity(TEXT("Moonleaf"));
+        const int32 Water = Station->GetIngredientQuantity(TEXT("Spring Water"));
+        TestFalse(TEXT("Parcel cannot unpack twice"), State->UnpackDelivery());
+        TestTrue(TEXT("Reload returns the unopened morning parcel"), State->RestoreMorning());
+        TestTrue(TEXT("Restored parcel can be unpacked once"), State->UnpackDelivery());
+        TestEqual(TEXT("Load and unpack cannot duplicate leaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves);
+        TestEqual(TEXT("Load and unpack cannot duplicate water"), Station->GetIngredientQuantity(TEXT("Spring Water")), Water);
+        TestEqual(TEXT("Loading cannot replay sales or purchases"), State->GetCash(), Cash);
+    }
+    TestEqual(TEXT("Three-day route leaves 24 bits after both upgrades and supplies"), State->GetCash(), int64(24));
+    TestEqual(TEXT("Morning four leaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 9);
+    TestEqual(TEXT("Morning four water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
+    TestTrue(TEXT("Both upgrades persist"), Station->HasStorageUpgrade() && Station->HasBatchUpgrade());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopRestShortageTest, "FantasyShopkeeper.Day.ShortageConfirmationAndQueueRollback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopRestShortageTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(42);
+    AShopBrewingStation* Station = Test.BrewingStation(1, 2);
+    AShopCustomerFlow* Flow = DayFlow(Test); Flow->MaxConcurrentCustomers = 3;
+    Flow->Orders = {FShopCustomerOrder()};
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0)); Crate->Station = Station;
+    State->InitializeDay(File.Path);
+    UShopMorningSave* Initial = File.Read();
+    State->OpenShop();
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        if (!TestTrue(TEXT("Spawn queue before rollback"), Flow->StartNextVisit())) return false;
+        Flow->GetCustomerAt(Index)->SetActorLocation(Flow->GetQueuePosition(Index));
+    }
+    TestTrue(TEXT("Restore clears all live visitors"), State->RestoreMorning());
+    TestEqual(TEXT("Entire queue removed"), Flow->GetCustomersInShop(), 0);
+    TestNull(TEXT("Till loses stale buyer"), Flow->Till->Customer.Get());
+    TestEqual(TEXT("Arrival budget resets"), Flow->GetStartedVisits(), 0);
+    State->OpenShop(); State->CloseShop(); State->ConfirmNoSupplies();
+    TestTrue(TEXT("Warning identifies ingredient shortfall"), State->GetRestWarning().Contains(TEXT("Moonleaf: short 5")));
+    TestFalse(TEXT("Unsigned selection cannot satisfy rest check"), State->BeginOvernight());
+    TestFalse(TEXT("Warning does not begin night"), State->IsOvernight());
+    TestEqual(TEXT("Warning cannot spend money"), State->GetCash(), int64(42));
+    AShopPlayerController* Controller = Test.Spawn<AShopPlayerController>(FVector::ZeroVector);
+    auto Press = [&](FKey Key) { Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), Key, IE_Pressed, FPlatformTime::Cycles64())); };
+    TestTrue(TEXT("Rest opens an explicit shortage choice"), Controller->RequestRest());
+    TestTrue(TEXT("Shortage choice visible"), Controller->IsRestPromptOpen());
+    Press(EKeys::F10);
+    TestFalse(TEXT("Cancel returns to planning"), Controller->IsRestPromptOpen());
+    TestFalse(TEXT("Cancel restores movement"), Controller->IsMoveInputIgnored());
+    Test.AimAt(Crate); TestTrue(TEXT("Paid bundle resolves shortage"), Crate->Interact_Implementation(Test.Interaction));
+    TestTrue(TEXT("Paid delivery now satisfies forecast"), State->GetRestWarning().IsEmpty());
+    TestTrue(TEXT("Covered night needs no override"), State->BeginOvernight());
+    {
+            TGuardValue<uint64> FrameGuard(GFrameCounter, GFrameCounter);
+            Test.World->GetTimerManager().Tick(0.f);
+            ++GFrameCounter;
+            Test.World->GetTimerManager().Tick(5.f);
+        }
+    File.Write(Initial);
+    TestTrue(TEXT("Restore original short morning"), State->RestoreMorning());
+    State->OpenShop(); State->CloseShop(); State->ConfirmNoSupplies();
+    Controller->RequestRest(); Press(EKeys::Enter);
+    TestTrue(TEXT("Player can explicitly accept a short tomorrow"), State->IsOvernight());
+    TestFalse(TEXT("Accepting warning returns input"), Controller->IsMoveInputIgnored());
+    TestFalse(TEXT("Repeated rest cannot advance twice"), State->BeginOvernight(true));
+    return true;
+}
+
 #endif

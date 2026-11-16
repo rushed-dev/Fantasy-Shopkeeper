@@ -19,7 +19,8 @@ enum class EShopCustomerActivity : uint8
     Returning,
     ReadyToPay,
     Completed,
-    Leaving
+    Leaving,
+    Queued
 };
 
 UCLASS(Blueprintable)
@@ -44,6 +45,7 @@ public:
     bool TryCollectItem(AShopPickupItem* Item);
 
     bool BeginVisit(const FVector& Checkout);
+    void SetQueueDestination(const FVector& Destination, bool bFront);
     bool BeginDeparture(const FVector& Exit);
     bool LeaveWithoutPurchase(const FVector& Exit);
     bool HasResolvedVisit() const { return HasCompletedSale() || bLeavingWithoutPurchase; }
@@ -107,6 +109,7 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<AShopPickupItem> TargetItem;
 
+    bool bCheckoutAllowed = true;
     FVector CheckoutLocation = FVector::ZeroVector;
     FVector CollectionLocation = FVector::ZeroVector;
     float RetryAfter = 0;

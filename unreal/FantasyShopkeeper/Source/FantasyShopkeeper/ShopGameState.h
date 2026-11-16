@@ -24,7 +24,8 @@ public:
     bool OpenShop();
     bool CloseShop();
     bool AdvanceMorning();
-    bool BeginOvernight();
+    bool BeginOvernight(bool bAcceptShortage = false);
+    FString GetRestWarning() const;
     bool IsOvernight() const { return bOvernight; }
     bool UnpackDelivery();
     int32 GetDeliveredQuantity(FName Ingredient) const { return MorningDelivery.FindRef(Ingredient); }

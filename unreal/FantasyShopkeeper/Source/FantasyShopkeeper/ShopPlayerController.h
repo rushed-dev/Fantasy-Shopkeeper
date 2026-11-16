@@ -18,6 +18,9 @@ class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
 
 public:
     AShopPlayerController();
+    bool RequestRest();
+    bool IsRestPromptOpen() const { return bRestPromptOpen; }
+    FString GetRestWarningText() const;
     bool OpenOrderingPage(AShopSupplyCrate* Desk);
     void CloseOrderingPage();
     bool IsOrderingPageOpen() const { return OrderingWidget.IsValid(); }
@@ -44,6 +47,8 @@ protected:
 private:
     TWeakObjectPtr<AShopSupplyCrate> OrderingDesk;
     TSharedPtr<SWidget> OrderingWidget;
+    bool bRestPromptOpen = false;
+    void SetRestPrompt(bool bOpen);
     bool bRestartPromptOpen = false;
     bool bFreshGameConfirmation = false;
     void SetRestartPrompt(bool bOpen);

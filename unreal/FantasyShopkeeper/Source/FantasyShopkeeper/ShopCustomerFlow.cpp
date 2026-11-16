@@ -22,6 +22,7 @@ void AShopCustomerFlow::BeginPlay()
     if (IsValid(Till) && Till->GetWorld() == GetWorld() && IsValid(Till->Customer))
     {
         ActiveCustomer = Till->Customer;
+        Customers.Add(ActiveCustomer);
         if (!CustomerClass)
         {
             CustomerClass = ActiveCustomer->GetClass();
@@ -37,8 +38,8 @@ bool AShopCustomerFlow::StartNextVisit()
         return false;
     }
     if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed() || bStartingVisit
-        || IsValid(ActiveCustomer) || !IsValid(Till) || Till->IsActorBeingDestroyed()
-        || Till->GetWorld() != GetWorld() || IsValid(Till->Customer))
+        || GetCustomersInShop() >= FMath::Clamp(MaxConcurrentCustomers, 1, 3) || !IsValid(Till) || Till->IsActorBeingDestroyed()
+        || Till->GetWorld() != GetWorld() || (IsValid(Till->Customer) && !Customers.Contains(Till->Customer)))
     {
         return false;
     }
@@ -47,7 +48,7 @@ bool AShopCustomerFlow::StartNextVisit()
     const bool bHasOrder = !Orders.IsEmpty();
     if (bHasOrder)
     {
-        Order = Orders[CompletedVisits % Orders.Num()];
+        Order = Orders[StartedVisits % Orders.Num()];
         if (Order.ProductId.IsNone() || Order.PriceBits <= 0 || Order.TenderBits < Order.PriceBits)
         {
             return false;
@@ -60,9 +61,7 @@ bool AShopCustomerFlow::StartNextVisit()
         return false;
     }
     const FVector EntryLocation = GetActorTransform().TransformPosition(Entrance);
-    const FVector CheckoutLocation = bCheckoutFollowsTill
-        ? Till->GetActorTransform().TransformPosition(TillCheckoutOffset)
-        : GetActorTransform().TransformPosition(Checkout);
+    const FVector CheckoutLocation = GetQueuePosition(Customers.Num());
     const FTransform SpawnTransform((CheckoutLocation - EntryLocation).Rotation(), EntryLocation);
     AShopCustomer* Customer = GetWorld()->SpawnActorDeferred<AShopCustomer>(VisitClass, SpawnTransform,
         nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
@@ -88,15 +87,14 @@ bool AShopCustomerFlow::StartNextVisit()
         Customer->DispatchBeginPlay();
     }
     if (!IsValid(Till) || IsActorBeingDestroyed() || !Customer->BeginVisit(CheckoutLocation)
-        || !Till->AssignCustomer(Customer))
+        || (Customers.IsEmpty() && !Till->AssignCustomer(Customer)))
     {
         Customer->Destroy();
         return false;
     }
-    ActiveCustomer = Customer;
+    Customers.Add(Customer);
     ++StartedVisits;
-    bOwnsActiveCustomer = true;
-    bVisitCounted = false;
+    RefreshQueue();
     WaitTime = 0;
     return true;
 }
@@ -104,56 +102,84 @@ bool AShopCustomerFlow::StartNextVisit()
 void AShopCustomerFlow::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
+    if (!HasAuthority() || !IsValid(Till) || Till->GetWorld() != GetWorld()) return;
+    bool bRemoved = false;
+    for (int32 Index = Customers.Num() - 1; Index >= 0; --Index)
     {
-        State->UpdateDay();
+        AShopCustomer* Customer = Customers[Index];
+        if (IsValid(Customer) && Customer->HasResolvedVisit() && !CountedVisits.Contains(Customer))
+        {
+            ++CompletedVisits;
+            CountedVisits.Add(Customer);
+        }
+        if (!IsValid(Customer) || Customer->HasLeftShop())
+        {
+            if (Till->Customer == Customer) Till->AssignCustomer(nullptr);
+            Customers.RemoveAt(Index);
+            bRemoved |= IsValid(Customer);
+            DepartureTimes.Remove(Customer);
+            CountedVisits.Remove(Customer);
+            if (IsValid(Customer)) Customer->Destroy();
+            continue;
+        }
+        if (!Customer->HasResolvedVisit()) continue;
+        if (Customer->Activity == EShopCustomerActivity::Completed)
+        {
+            float& Time = DepartureTimes.FindOrAdd(Customer);
+            Time += FMath::Max(0.f, DeltaSeconds);
+            if (Time >= FMath::Max(0.f, DepartureDelay) * Customer->GetDeparturePace())
+                Customer->BeginDeparture(GetActorTransform().TransformPosition(Entrance));
+        }
     }
-    if (!HasAuthority() || !IsValid(Till) || Till->GetWorld() != GetWorld())
+    RefreshQueue();
+    if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>()) State->UpdateDay();
+    if (bRemoved) return;
+    if (GetCustomersInShop() < FMath::Clamp(MaxConcurrentCustomers, 1, 3))
     {
-        return;
-    }
-    if (!IsValid(ActiveCustomer))
-    {
-        WaitTime += DeltaSeconds;
+        WaitTime += FMath::Max(0.f, DeltaSeconds);
         if (WaitTime >= FMath::Max(0.f, VisitInterval))
         {
             WaitTime = 0;
             StartNextVisit();
         }
-        return;
     }
-    if (!ActiveCustomer->HasResolvedVisit())
-    {
-        WaitTime = 0;
-        return;
-    }
-    if (!bVisitCounted)
-    {
-        CompletedVisits = FMath::Min(CompletedVisits, MAX_int32 - 1) + 1;
-        bVisitCounted = true;
-    }
-    if (ActiveCustomer->HasLeftShop())
-    {
-        AShopCustomer* Departed = ActiveCustomer;
-        ActiveCustomer = nullptr;
-        bOwnsActiveCustomer = false;
-        if (Till->Customer == Departed)
-        {
-            Till->AssignCustomer(nullptr);
-        }
-        Departed->Destroy();
-        WaitTime = 0;
-        return;
-    }
-    if (ActiveCustomer->Activity == EShopCustomerActivity::Completed)
-    {
-        WaitTime += DeltaSeconds;
-        if (WaitTime >= FMath::Max(0.f, DepartureDelay) * ActiveCustomer->GetDeparturePace())
-        {
-            ActiveCustomer->BeginDeparture(GetActorTransform().TransformPosition(Entrance));
-            WaitTime = 0;
-        }
-    }
+}
+
+int32 AShopCustomerFlow::GetCustomersInShop() const
+{
+    int32 Count = 0;
+    for (const AShopCustomer* Customer : Customers) if (IsValid(Customer)) ++Count;
+    return Count;
+}
+
+AShopCustomer* AShopCustomerFlow::GetCustomerAt(int32 Index) const
+{
+    return Customers.IsValidIndex(Index) && IsValid(Customers[Index]) ? Customers[Index].Get() : nullptr;
+}
+
+AShopCustomer* AShopCustomerFlow::GetSpeakingCustomer() const
+{
+    if (GetActiveCustomer() && ActiveCustomer->HasCompletedSale() && !ActiveCustomer->GetSpokenLine().IsEmpty()) return ActiveCustomer;
+    for (int32 Index = Customers.Num() - 1; Index >= 0; --Index)
+        if (GetCustomerAt(Index) && !Customers[Index]->GetSpokenLine().IsEmpty()) return Customers[Index];
+    return nullptr;
+}
+
+FVector AShopCustomerFlow::GetQueuePosition(int32 Index) const
+{
+    const FVector Offset(0, FMath::Max(80.f, QueueSpacing) * Index, 0);
+    return bCheckoutFollowsTill && IsValid(Till)
+        ? Till->GetActorTransform().TransformPosition(TillCheckoutOffset + Offset)
+        : GetActorTransform().TransformPosition(Checkout + Offset);
+}
+
+void AShopCustomerFlow::RefreshQueue()
+{
+    ActiveCustomer = GetCustomerAt(0);
+    if (IsValid(Till) && Till->Customer != ActiveCustomer
+        && (!IsValid(Till->Customer) || Customers.Contains(Till->Customer))) Till->AssignCustomer(ActiveCustomer);
+    for (int32 Index = 0; Index < Customers.Num(); ++Index)
+        if (IsValid(Customers[Index])) Customers[Index]->SetQueueDestination(GetQueuePosition(Index), Index == 0);
 }
 
 bool AShopCustomerFlow::EndUnservedVisit()
@@ -168,28 +194,18 @@ void AShopCustomerFlow::ResetMorning()
     {
         Till->AssignCustomer(nullptr);
     }
-    if (IsValid(ActiveCustomer))
-    {
-        ActiveCustomer->Destroy();
-    }
+    for (AShopCustomer* Customer : Customers) if (IsValid(Customer)) Customer->Destroy();
+    Customers.Empty();
+    CountedVisits.Empty();
+    DepartureTimes.Empty();
     ActiveCustomer = nullptr;
-    CompletedVisits = 0;
-    StartedVisits = 0;
+    CompletedVisits = StartedVisits = 0;
     WaitTime = 0;
-    bVisitCounted = false;
-    bOwnsActiveCustomer = false;
 }
 
 void AShopCustomerFlow::EndPlay(const EEndPlayReason::Type Reason)
 {
-    if (bOwnsActiveCustomer && IsValid(ActiveCustomer))
-    {
-        if (IsValid(Till) && Till->Customer == ActiveCustomer)
-        {
-            Till->AssignCustomer(nullptr);
-        }
-        ActiveCustomer->Destroy();
-    }
+    ResetMorning();
     Super::EndPlay(Reason);
 }
 

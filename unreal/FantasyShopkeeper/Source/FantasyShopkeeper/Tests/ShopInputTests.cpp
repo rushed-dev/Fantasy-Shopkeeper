@@ -60,7 +60,7 @@ namespace
         virtual bool Update() override
         {
             const double Now = FPlatformTime::Seconds();
-            if (Now - Started > 180.0)
+            if (Now - Started > 240.0)
             {
                 Test->AddError(FString::Printf(TEXT("Shop E-key workflow timed out at step %d. Customer activity=%d position=%s held=%s"),
                     Step, Customer.IsValid() ? static_cast<int32>(Customer->Activity) : -1,
@@ -89,6 +89,7 @@ namespace
                 Test->AddError(TEXT("Shop player has no camera"));
                 return true;
             }
+            if (Flow.IsValid()) MaxCustomersObserved = FMath::Max(MaxCustomersObserved, Flow->GetCustomersInShop());
             if (Customer.IsValid() && Customer->GetVelocity().SizeSquared2D() > 400)
             {
                 UAnimInstance* Animation = Customer->GetMesh()->GetAnimInstance();
@@ -532,7 +533,7 @@ namespace
                 Test->TestEqual(TEXT("Repeated confirmation earns no extra cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
                 bCapturedSale = false;
                 ++Visits;
-                if (Visits >= 2)
+                if (Visits >= 3)
                 {
                     TActorIterator<AShopDoorSign> Sign(World);
                     AimTarget = *Sign; AimHeight = 0;
@@ -708,7 +709,8 @@ namespace
                     return false;
                 }
                 Test->TestNull(TEXT("Final departure leaves no fourth visitor"), Flow->GetActiveCustomer());
-                Test->TestEqual(TEXT("Day includes both products sold"), World->GetGameState<AShopGameState>()->GetTakings(), int64(30));
+                Test->TestEqual(TEXT("Three shoppers overlap in the rendered shop"), MaxCustomersObserved, 3);
+                Test->TestEqual(TEXT("Day includes both products sold"), World->GetGameState<AShopGameState>()->GetTakings(), int64(42));
                 AimTarget = Crate;
                 AimHeight = 69;
                 Pawn->SetActorLocation(Crate->GetActorLocation() + FVector(0, -100, 96), false, nullptr, ETeleportType::TeleportPhysics);
@@ -721,8 +723,24 @@ namespace
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopEveningScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
                 }
-                Step = 74;
+                World->GetGameState<AShopGameState>()->ConfirmNoSupplies();
+                Key(EKeys::N, IE_Pressed); Key(EKeys::N, IE_Released);
+                Test->TestTrue(TEXT("Rest warns about unplanned shortages"), Controller->IsRestPromptOpen());
+                Step = 86;
                 NextStep = Now + 0.5;
+                return false;
+            case 86:
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopShortageScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                Step = 87; NextStep = Now + 0.5;
+                return false;
+            case 87:
+                Key(EKeys::F10, IE_Pressed); Key(EKeys::F10, IE_Released);
+                Test->TestFalse(TEXT("Return to planning cancels rest"), Controller->IsRestPromptOpen());
+                Step = 74; NextStep = Now + 0.5;
                 return false;
             case 74:
                 for (TActorIterator<AShopStorageUpgrade> It(World); It; ++It)
@@ -858,6 +876,47 @@ namespace
                 NextStep = Now + 0.2;
                 return false;
             case 46:
+                // A separate stocked-morning fixture verifies physical queue navigation.
+                // Reuse ownership APIs; customers still walk, collect and return unaided.
+                {
+                    APawn* Stocker = World->SpawnActor<APawn>();
+                    UCameraComponent* Eyes = NewObject<UCameraComponent>(Stocker);
+                    Stocker->SetRootComponent(Eyes); Eyes->RegisterComponent(); Eyes->Activate(true);
+                    UShopInteractionComponent* Hands = NewObject<UShopInteractionComponent>(Stocker); Hands->RegisterComponent();
+                    for (int32 Index = 0; Index < 3; ++Index)
+                    {
+                        AShopShelfSlot* Slot = Slots[Index].Get();
+                        Stocker->SetActorLocation(Slot->GetActorLocation() + FVector(0, -100, 10));
+                        UShopBrewingRecipe* Recipe = Station->AvailableRecipes[Index == 1 ? 1 : 0];
+                        AShopPickupItem* Bottle = World->SpawnActor<AShopPickupItem>(Recipe->OutputItemClass,
+                            Stocker->GetActorLocation() + FVector(0, 35, 0), FRotator::ZeroRotator);
+                        Eyes->SetWorldRotation((Bottle->GetActorLocation() + FVector(0, 0, 10) - Eyes->GetComponentLocation()).Rotation());
+                        if (!Test->TestTrue(TEXT("Queue fixture picks up real recipe bottle"), Bottle->PickUp(Hands))) { Stocker->Destroy(); return true; }
+                        Eyes->SetWorldRotation((Slot->GetActorLocation() + FVector(0, 0, 10) - Eyes->GetComponentLocation()).Rotation());
+                        if (!Test->TestTrue(TEXT("Queue fixture stocks through shared placement"), Bottle->PlaceInSlot(Hands, Slot))) { Stocker->Destroy(); return true; }
+                    }
+                    Stocker->Destroy();
+                    AimTarget.Reset();
+                    Pawn->SetActorLocation(FVector(-100, -80, 96), false, nullptr, ETeleportType::TeleportPhysics);
+                    Controller->SetControlRotation((Flow->GetQueuePosition(1) - Camera->GetComponentLocation()).Rotation());
+                    World->GetGameState<AShopGameState>()->OpenShop();
+                    Step = 88; NextStep = Now + 1;
+                    return false;
+                }
+            case 88:
+                if (Flow->GetCustomersInShop() != 3 || !Flow->GetCustomerAt(1) || !Flow->GetCustomerAt(2)
+                    || Flow->GetCustomerAt(1)->Activity != EShopCustomerActivity::Queued
+                    || Flow->GetCustomerAt(2)->Activity != EShopCustomerActivity::Queued
+                    || Till->GetPhase() != EShopTillPhase::MakingChange) return false;
+                Test->TestEqual(TEXT("Only queue front owns the counter"), Till->Customer.Get(), Flow->GetCustomerAt(0));
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopQueueScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                Step = 89; NextStep = Now + 1;
+                return false;
+            case 89:
                 {
                     FString Screenshot;
                     if (!FParse::Value(FCommandLine::Get(), TEXT("ShopCornerScreenshot="), Screenshot)) return true;
@@ -937,6 +996,7 @@ namespace
         int64 CashBeforeSale = 0;
         int32 SalePrice = 0;
         int32 Visits = 0;
+        int32 MaxCustomersObserved = 0;
         int32 SupplyChoiceCycles = 0;
         int32 LeavesBeforeBrew = 0;
         int32 WaterBeforeBrew = 0;

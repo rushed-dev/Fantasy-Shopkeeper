@@ -36,6 +36,16 @@ void AShopHUD::DrawHUD()
 
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
+    if (Controller->IsRestPromptOpen())
+    {
+        DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.94f), CenterX - 310, CenterY - 120, 620, 240);
+        DrawText(TEXT("Tomorrow's supplies look short"), FLinearColor::White, CenterX - 285, CenterY - 95, GEngine->GetMediumFont());
+        DrawText(Controller->GetRestWarningText(), FLinearColor(0.95f, 0.8f, 0.5f), CenterX - 285, CenterY - 55, GEngine->GetMediumFont());
+        DrawText(TEXT("Only stored ingredients, sale-shelf stock and paid orders count."), FLinearColor::White, CenterX - 285, CenterY + 15, GEngine->GetMediumFont());
+        DrawText(TEXT("You can still rest and serve fewer customers tomorrow."), FLinearColor::White, CenterX - 285, CenterY + 40, GEngine->GetMediumFont());
+        DrawText(TEXT("Enter  Rest anyway          F10  Return to planning"), FLinearColor::White, CenterX - 285, CenterY + 85, GEngine->GetMediumFont());
+        return;
+    }
     if (Controller->IsRestartPromptOpen())
     {
         DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.94f), CenterX - 300, CenterY - 90, 600, 180);
@@ -72,7 +82,7 @@ void AShopHUD::DrawHUD()
     }
     for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It)
     {
-        if (const AShopCustomer* Speaker = It->GetActiveCustomer(); Speaker && !Speaker->GetSpokenLine().IsEmpty()
+        if (const AShopCustomer* Speaker = It->GetSpeakingCustomer(); Speaker && !Speaker->GetSpokenLine().IsEmpty()
             && FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), Speaker->GetActorLocation()) < FMath::Square(900.f))
         {
             // Nearby subtitles imply speech without a floating world-space board or input capture.
@@ -85,7 +95,7 @@ void AShopHUD::DrawHUD()
             DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.65f * Opacity), SpeechX - 12, SpeechY - 6, SpeechWidth + 24, SpeechHeight + 12);
             DrawText(Line, FLinearColor(0.96f, 0.89f, 0.72f, Opacity), SpeechX, SpeechY, GEngine->GetMediumFont());
         }
-        const FString Status = It->GetStatusText().ToString();
+        const FString Status = FString::Printf(TEXT("In shop: %d | %s"), It->GetCustomersInShop(), *It->GetStatusText().ToString());
         float Width = 0;
         float Height = 0;
         GetTextSize(Status, Width, Height, GEngine->GetMediumFont());

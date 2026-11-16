@@ -142,7 +142,7 @@ void AShopGameState::UpdateDay()
 {
     if (!HasAuthority() || !bDayInitialized || bChangingEconomy) return;
     const AShopCustomerFlow* Flow = FindFlow(GetWorld());
-    if (!Flow || Flow->GetActiveCustomer()) return;
+    if (!Flow || Flow->GetCustomersInShop() > 0) return;
     if (DayPhase == EShopDayPhase::Closing
         || (DayPhase == EShopDayPhase::Trading && Flow->GetStartedVisits() >= Flow->VisitsPerDay))
     {
@@ -424,7 +424,7 @@ FString AShopGameState::GetDayText() const
     case EShopDayPhase::Trading:
         return FString::Printf(TEXT("Day %d | Trading | %d/%d visits started | Use the door sign to close, skip %d unstarted visits"), Day, Started, Limit, FMath::Max(0, Limit - Started));
     case EShopDayPhase::Closing:
-        return TEXT("Closing | Finish the active customer; no new arrivals. Brew missing stock if needed.");
+        return TEXT("Closing | Finish everyone inside; no new arrivals. Brew missing stock if needed.");
     default:
         return FString::Printf(TEXT("Day %d | Evening | %s"), Day,
             bSuppliesConfirmed ? TEXT("Order confirmed | Rest at the order book") : TEXT("Plan tomorrow at the order book"));
@@ -445,10 +445,15 @@ bool AShopGameState::UnpackDelivery()
     return true;
 }
 
-bool AShopGameState::BeginOvernight()
+bool AShopGameState::BeginOvernight(bool bAcceptShortage)
 {
     if (!HasAuthority() || !bDayInitialized || bChangingEconomy || bOvernight
         || DayPhase != EShopDayPhase::Evening || !bSuppliesConfirmed || Day == MAX_int32 || !CaptureMorning(Day + 1)) return false;
+    if (!bAcceptShortage && !GetRestWarning().IsEmpty())
+    {
+        CheckpointMessage = TEXT("Tomorrow looks short. Review the supplier book or confirm resting anyway.");
+        return false;
+    }
     bOvernight = true;
     for (TActorIterator<AShopDayLighting> It(GetWorld()); It; ++It) It->BeginNight();
     GetWorldTimerManager().SetTimer(OvernightTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
@@ -492,4 +497,27 @@ bool AShopGameState::StartFreshGame()
     CheckpointMessage = bRecovered ? TEXT("New game could not restore its stock. Previous shop preserved.")
         : TEXT("New game could not restore stock. Previous checkpoint remains in its .bak file.");
     return false;
+}
+
+FString AShopGameState::GetRestWarning() const
+{
+    FString Warning;
+    TSet<const AShopBrewingStation*> Checked;
+    for (TActorIterator<AShopSupplyCrate> Desk(GetWorld()); Desk; ++Desk)
+    {
+        const AShopBrewingStation* Station = Desk->Station;
+        if (!IsValid(Station) || Checked.Contains(Station)) continue;
+        Checked.Add(Station);
+        TMap<FName, int64> Needs; int32 Visitors = 0;
+        if (!Desk->GetNextDayNeeds(Needs, Visitors)) continue;
+        TArray<FName> Keys; Needs.GetKeys(Keys); Keys.Sort(FNameLexicalLess());
+        for (FName Key : Keys)
+        {
+            const int64 Available = int64(Station->GetIngredientQuantity(Key))
+                + (DeliveryStation.Get() == Station ? PendingDelivery.FindRef(Key) : 0);
+            const int64 Shortage = FMath::Max<int64>(0, Needs[Key] - Available);
+            if (Shortage > 0) Warning += FString::Printf(TEXT("%s%s: short %lld"), Warning.IsEmpty() ? TEXT("") : TEXT("\n"), *Key.ToString(), Shortage);
+        }
+    }
+    return Warning;
 }

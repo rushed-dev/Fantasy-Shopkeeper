@@ -300,6 +300,7 @@ crate.get_editor_property("crate_mesh").set_static_mesh(crate_mesh)
 crate.get_editor_property("crate_mesh").set_relative_scale3d(unreal.Vector(1, 1, 1))
 
 flow = actor("CustomerFlow", unreal.ShopCustomerFlow, (0, 0, 0))
+flow.set_editor_property("max_concurrent_customers", 3)
 flow.set_editor_property("till", till)
 flow.set_editor_property("customer_class", customer.get_class())
 flow_transform = flow.get_actor_transform()

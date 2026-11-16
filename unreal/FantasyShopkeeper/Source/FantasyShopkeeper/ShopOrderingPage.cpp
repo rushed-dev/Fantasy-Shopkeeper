@@ -32,6 +32,9 @@ void SShopOrderingPage::Construct(const FArguments& Args)
             return FText::FromString(FString::Printf(TEXT("Next trading day: %d visits    |    Purse: %lld bits\n%s"), Visitors,
                 State ? State->GetCash() : 0, bForecast ? TEXT("Need to brew deducts matching bottles on sale shelves.") : TEXT("Recipe forecast unavailable: check the planned customer recipes.")));
         }) ];
+    Content->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
+    [ SNew(STextBlock).Font(Font).ColorAndOpacity(Ink).WrapTextAt(770).Text_Lambda([this]()
+        { return FText::FromString(Desk.IsValid() ? Desk->GetProductPlanText() : FString()); }) ];
     TSharedRef<SGridPanel> Table = SNew(SGridPanel);
     const TCHAR* Headers[] = {TEXT("Ingredient"), TEXT("Stored"), TEXT("Need to brew"), TEXT("Paid / due"), TEXT("Capacity"), TEXT("After order"), TEXT("Short by")};
     for (int32 Column = 0; Column < 7; ++Column)

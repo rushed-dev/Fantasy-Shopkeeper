@@ -76,12 +76,12 @@ void AShopPlayerController::SetupInputComponent()
 
 void AShopPlayerController::HandleSetDown()
 {
-    if (!bRestartPromptOpen && !IsOrderingPageOpen()) ShopInteraction->SetDownHeldItem();
+    if (!bRestartPromptOpen && !bRestPromptOpen && !IsOrderingPageOpen()) ShopInteraction->SetDownHeldItem();
 }
 
 void AShopPlayerController::HandleNextRecipe()
 {
-    if (bRestartPromptOpen || IsOrderingPageOpen()) return;
+    if (bRestartPromptOpen || bRestPromptOpen || IsOrderingPageOpen()) return;
     if (AShopBrewingStation* Station = Cast<AShopBrewingStation>(ShopInteraction->GetInteractionTarget()))
     {
         Station->CycleRecipe(ShopInteraction);
@@ -94,7 +94,7 @@ void AShopPlayerController::HandleNextRecipe()
 
 void AShopPlayerController::HandleInteract()
 {
-    if (bRestartPromptOpen || IsOrderingPageOpen()) return;
+    if (bRestartPromptOpen || bRestPromptOpen || IsOrderingPageOpen()) return;
     if (AShopSupplyCrate* Desk = Cast<AShopSupplyCrate>(ShopInteraction->GetInteractionTarget())) OpenOrderingPage(Desk);
     else ShopInteraction->Interact();
 }
@@ -102,6 +102,16 @@ void AShopPlayerController::HandleInteract()
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight() && Params.Event != IE_Released) return true;
+    if (bRestPromptOpen)
+    {
+        if (Params.Event == IE_Pressed && Params.Key == EKeys::F10) SetRestPrompt(false);
+        else if (Params.Event == IE_Pressed && Params.Key == EKeys::Enter)
+        {
+            if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>()) State->BeginOvernight(true);
+            SetRestPrompt(false);
+        }
+        return Params.Event == IE_Released ? Super::InputKey(Params) : true;
+    }
     if (IsOrderingPageOpen())
     {
         if (Params.Event == IE_Pressed) HandleOrderingKey(Params.Key);
@@ -142,7 +152,7 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
             }
             if (Params.Key == EKeys::N)
             {
-                State->BeginOvernight();
+                RequestRest();
                 return true;
             }
         }
@@ -223,7 +233,7 @@ void AShopPlayerController::SetRestartPrompt(bool bOpen)
 bool AShopPlayerController::OpenOrderingPage(AShopSupplyCrate* Desk)
 {
     const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
-    if (!IsLocalController() || !GetWorld()->GetGameViewport() || bRestartPromptOpen || IsOrderingPageOpen()
+    if (!IsLocalController() || !GetWorld()->GetGameViewport() || bRestartPromptOpen || bRestPromptOpen || IsOrderingPageOpen()
         || !State || !State->IsDayInitialized() || State->IsOvernight() || !IsValid(Desk)
         || ShopInteraction->GetHeldItem() || !ShopInteraction->CanReach(Desk)) return false;
     OrderingDesk = Desk;
@@ -276,4 +286,34 @@ void AShopPlayerController::PlayerTick(float DeltaTime)
         if (!OrderingDesk.IsValid() || !State || State->IsOvernight() || ShopInteraction->GetHeldItem()
             || !ShopInteraction->CanReach(OrderingDesk.Get())) CloseOrderingPage();
     }
+}
+
+bool AShopPlayerController::RequestRest()
+{
+    AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!State || bRestPromptOpen || bRestartPromptOpen || IsOrderingPageOpen() || ShopInteraction->GetHeldItem()) return false;
+    if (State->BeginOvernight()) return true;
+    if (State->CanOrderSupplies() && State->HasConfirmedSupplies() && !State->GetRestWarning().IsEmpty())
+    {
+        SetRestPrompt(true);
+        return true;
+    }
+    return false;
+}
+
+FString AShopPlayerController::GetRestWarningText() const
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    return State ? State->GetRestWarning() : FString();
+}
+
+void AShopPlayerController::SetRestPrompt(bool bOpen)
+{
+    if (bRestPromptOpen == bOpen) return;
+    bRestPromptOpen = bOpen;
+    FlushPressedKeys();
+    SetIgnoreMoveInput(bOpen);
+    SetIgnoreLookInput(bOpen);
+    if (APawn* ControlledPawn = GetPawn())
+        if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent()) Movement->StopMovementImmediately();
 }

@@ -26,6 +26,8 @@ AShopCustomer::AShopCustomer()
     GetCapsuleComponent()->InitCapsuleSize(30, 88);
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
     GetCharacterMovement()->MaxWalkSpeed = 130;
+    GetCharacterMovement()->bUseRVOAvoidance = true;
+    GetCharacterMovement()->AvoidanceConsiderationRadius = 180;
     GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
     GetCharacterMovement()->bOrientRotationToMovement = true;
     GetCharacterMovement()->RotationRate = FRotator(0, 360, 0);
@@ -171,7 +173,7 @@ bool AShopCustomer::BeginCollecting()
 bool AShopCustomer::TryCollectItem(AShopPickupItem* Item)
 {
     if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed()
-        || HasCompletedSale() || PriceBits <= 0 || ShopInteraction->GetHeldItem() || !IsEligibleStock(Item))
+        || HasResolvedVisit() || PriceBits <= 0 || ShopInteraction->GetHeldItem() || !IsEligibleStock(Item))
     {
         return false;
     }
@@ -344,14 +346,15 @@ void AShopCustomer::Tick(float DeltaSeconds)
         }
         else if (FVector::Dist2D(GetActorLocation(), CheckoutLocation) < 20)
         {
-            Activity = EShopCustomerActivity::ReadyToPay;
+            Activity = bCheckoutAllowed ? EShopCustomerActivity::ReadyToPay : EShopCustomerActivity::Queued;
+            if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
         }
         else if (JourneyTime > 3)
         {
             ReturnToCheckout();
         }
     }
-    if (Activity == EShopCustomerActivity::ReadyToPay && !ShopInteraction->GetHeldItem() && !HasGoodsOnCounter())
+    if ((Activity == EShopCustomerActivity::ReadyToPay || Activity == EShopCustomerActivity::Queued) && !ShopInteraction->GetHeldItem() && !HasGoodsOnCounter())
     {
         Activity = EShopCustomerActivity::Browsing;
     }
@@ -389,6 +392,8 @@ bool AShopCustomer::Interact_Implementation(UShopInteractionComponent* Interacto
 
 FText AShopCustomer::GetInteractionPrompt() const
 {
+    if (Activity == EShopCustomerActivity::Queued)
+        return FText::Format(NSLOCTEXT("Shop", "CustomerQueued", "Waiting in line with {0}"), RequestedProductName);
     if (Activity == EShopCustomerActivity::Arriving)
     {
         return NSLOCTEXT("Shop", "CustomerArriving", "Coming in to browse");
@@ -456,4 +461,18 @@ float AShopCustomer::GetSpeechOpacity() const
 {
     if (SpokenLine.IsEmpty()) return 0;
     return FMath::Clamp(FMath::Min(SpeechRemaining / 0.4f, (SpeechDuration - SpeechRemaining) / 0.15f), 0.f, 1.f);
+}
+
+void AShopCustomer::SetQueueDestination(const FVector& Destination, bool bFront)
+{
+    if (!HasAuthority() || HasResolvedVisit() || Destination.ContainsNaN()) return;
+    if (CheckoutLocation.Equals(Destination, 0.1f) && bCheckoutAllowed == bFront) return;
+    CheckoutLocation = Destination;
+    bCheckoutAllowed = bFront;
+    if (Activity == EShopCustomerActivity::Arriving)
+    {
+        VisitDestination = Destination;
+        MoveTo(Destination);
+    }
+    else if (ShopInteraction->GetHeldItem()) ReturnToCheckout();
 }

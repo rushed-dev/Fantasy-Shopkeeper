@@ -28,7 +28,7 @@ struct FShopCustomerOrder
     TSubclassOf<AShopCustomer> CustomerClass;
 };
 
-// One visit at a time keeps a waiting order and its checkout bound together.
+// Bounded arrivals share a FIFO checkout; only its front owns the till.
 UCLASS(Blueprintable)
 class FANTASYSHOPKEEPER_API AShopCustomerFlow : public AActor
 {
@@ -46,6 +46,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "1", ClampMax = "100"))
     int32 VisitsPerDay = 3;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "1", ClampMax = "3"))
+    int32 MaxConcurrentCustomers = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "80"))
+    float QueueSpacing = 100;
+
+    int32 GetCustomersInShop() const;
+    AShopCustomer* GetCustomerAt(int32 Index) const;
+    AShopCustomer* GetSpeakingCustomer() const;
+    FVector GetQueuePosition(int32 Index) const;
     int32 GetStartedVisits() const { return StartedVisits; }
 
     UFUNCTION(BlueprintPure, Category = "Shop|Customers")
@@ -96,7 +106,9 @@ private:
     int32 CompletedVisits = 0;
     int32 StartedVisits = 0;
     float WaitTime = 0;
-    bool bVisitCounted = false;
     bool bStartingVisit = false;
-    bool bOwnsActiveCustomer = false;
+    UPROPERTY(Transient) TArray<TObjectPtr<AShopCustomer>> Customers;
+    TSet<TWeakObjectPtr<AShopCustomer>> CountedVisits;
+    TMap<TWeakObjectPtr<AShopCustomer>, float> DepartureTimes;
+    void RefreshQueue();
 };

@@ -32,6 +32,8 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     FString GetPlanningText() const;
+    FString GetProductPlanText() const;
+    bool GetNextDayProducts(TMap<FName, int32>& Products, int32& Visitors) const;
     bool GetNextDayNeeds(TMap<FName, int64>& Needs, int32& Visitors) const;
     FText GetOrderStatus() const { return GetBlockReason(); }
     bool CanSubmitOrder() const;

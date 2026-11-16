@@ -1,6 +1,7 @@
 #include "ShopSupplyControl.h"
 #include "ShopSupplyCrate.h"
 #include "ShopGameState.h"
+#include "ShopPlayerController.h"
 #include "ShopInteractionComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -111,7 +112,9 @@ bool AShopSupplyControl::Interact_Implementation(UShopInteractionComponent* Inte
     case EShopSupplyControl::Pack: return Desk->CycleOffer(Interactor);
     case EShopSupplyControl::Less: return Desk->ChangeQuantity(Interactor, -1);
     case EShopSupplyControl::More: return Desk->ChangeQuantity(Interactor, 1);
-    case EShopSupplyControl::Rest: return State->BeginOvernight();
+    case EShopSupplyControl::Rest:
+        if (AShopPlayerController* Controller = Cast<AShopPlayerController>(Interactor->GetOwner())) return Controller->RequestRest();
+        return State->BeginOvernight();
     default: return false;
     }
 }
