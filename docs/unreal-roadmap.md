@@ -6,9 +6,9 @@ This roadmap follows the [production GDD](game-design-document.md) and [engine e
 
 ## Current Unreal checkpoint
 
-The shared repository now contains the Unreal 5.8.4 project, native interaction and item ownership, safe surface set-down, two ingredient-checked recipes, walking customers, manual totals/change, repeating visits and paid immediate ingredient replenishment. Dawn Tonic and Moonlit Ink have separate data assets and physical bottle presentations. An original procedural kit dresses the interior. Nineteen automated regressions cover the gameplay boundaries and a three-visit keyboard workflow through both products. The new repeating loop, art and sounds await the user's hands-on playtest.
+The shared repository now contains the Unreal 5.8.4 project, native interaction and item ownership, safe surface set-down, two ingredient-checked recipes, walking customers, manual totals/change, repeating visits and paid immediate ingredient replenishment. Dawn Tonic and Moonlit Ink have separate data assets and physical bottle presentations. An original procedural kit dresses the interior. Twenty-six automated regressions cover the gameplay boundaries and a three-visit keyboard workflow through both products. The new repeating loop, art and sounds await the user's hands-on playtest.
 
-Recipe prices, tender, supplier quantities, storage capacity and immediate delivery are prototype tuning decisions. The Unreal session currently restarts its stock, money and visits when play starts again. Day phases, scheduled deliveries, persistent checkpoints and the story slice are subsequent milestones. The older Godot implementation already explores those systems and supplies scenario references for the Unreal port.
+Recipe prices, tender, supplier quantities, storage capacity and immediate delivery are prototype tuning decisions. Unreal now has explicit preparation, finite trading, closing and evening, with versioned morning checkpoints for cash, ingredients and physical stock. Reopening rolls back to the saved morning. Scheduled deliveries, mid-day save-and-quit and the story slice remain subsequent milestones. The older Godot implementation already explores those systems and supplies scenario references for the Unreal port.
 
 ## Recommended engine
 
@@ -74,9 +74,10 @@ Work in the order below. Finish and play the completion check before expanding s
 
 ### 3. Make a dependable repeating day
 
-- [ ] Add explicit preparation, trading, closing and evening phases with fixed customer opportunities and unlimited thinking time.
+- [x] Add explicit preparation, trading, closing and evening phases with fixed customer opportunities and unlimited thinking time.
 - [ ] Add supplier purchases, next-morning deliveries, shelf prices, daily expenses and disclosed recovery finance.
-- [ ] Implement versioned morning checkpoints, then production save-and-quit for pending work and the current phase.
+- [x] Implement versioned morning checkpoints for cash, ingredients, shelf stock, loose items and brewing output.
+- [ ] Add production save-and-quit for pending work and the current phase.
 - [ ] Preserve ingredient stock, batch progress, physical items, active baskets, payment/change, finances and pending deliveries together.
 - [ ] Exercise interrupted brewing, pending checkout, repeated close/day-advance actions and reloads around deliveries. Preserve invalid saves and report the problem.
 

@@ -65,8 +65,6 @@ assert any(isinstance(a, unreal.NavMeshBoundsVolume) for a in all_actors), "Cust
 till = next(a for a in all_actors if isinstance(a, unreal.ShopTill))
 assert till.get_editor_property("till_mesh").static_mesh.get_name() == "SM_CheckoutCounter"
 assert till.get_editor_property("customer") == customer
-checkout_offset = customer.get_actor_location() - till.get_actor_location()
-assert checkout_offset.x ** 2 + checkout_offset.y ** 2 < 150 ** 2
 assert till.get_editor_property("physical_counter")
 for material_name in ("Copper", "Silver", "Brass"):
     assert unreal.load_asset(f"/Game/Shop/Art/Materials/M_{material_name}").get_editor_property("used_with_instanced_static_meshes")
@@ -82,6 +80,10 @@ assert len(crate.get_editor_property("offers")) == 3
 assert {str(k): v for k, v in crate.get_editor_property("delivery").items()} == {"Moonleaf": 6, "Spring Water": 3}
 flow = next(a for a in all_actors if isinstance(a, unreal.ShopCustomerFlow))
 assert flow.get_editor_property("till") == till
+assert flow.get_editor_property("checkout_follows_till")
+checkout_offset = flow.get_editor_property("till_checkout_offset")
+assert checkout_offset.x ** 2 + checkout_offset.y ** 2 < 150 ** 2
+assert 1 <= flow.get_editor_property("visits_per_day") <= 100
 assert flow.get_editor_property("customer_class") == customer.get_class()
 assert sum(a.get_actor_label().startswith("Art_Floor_") for a in all_actors) == 66
 assert sum(a.get_actor_label().startswith("Art_Ceiling_") for a in all_actors) == 66

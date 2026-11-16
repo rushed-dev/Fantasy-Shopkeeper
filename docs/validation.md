@@ -1,3 +1,17 @@
+# Unreal shop days and checkpoints — 2026-11-16
+
+Implemented preparation, explicit opening, a configurable finite visitor allocation, closing that waits for the active customer, evening totals and explicit next-morning advancement. O opens/closes; N advances with empty hands. Morning snapshots replace cash, ingredients and physical items together, including shelf gaps, loose stock and brewing output. Immediate supply purchases remain unchanged; no daily expenses or delayed deliveries are introduced.
+
+- `Tools/check.ps1`: **26 tests passed, 0 automation warnings**. Final report: `unreal/FantasyShopkeeper/Saved/Automation/Interaction-20261116-081559-327`. Includes repeated transitions, active-customer closing, finite visits, whole-economy restoration, subsequent purchases, stale checkout rejection, fresh-state startup, exact shelf positions, loose/output stock, malformed versions/products/quantities/destinations, duplicate slot records, truncated/corrupted files, invalid-file preservation, held-stock blocking, a locked destination and restoration attempts during brewing.
+- Rendered keyboard workflow: **passed without warnings**, completing three walking visits and advancing to morning two. Evening shows 42 bits in takings, 24 spent on supplies and 18 closing cash. Inspected HUD captures: `Saved/ArtReview/day-evening.png` and `day-morning.png`; checkout capture: `day-till.png`. Report: `Saved/Automation/DayRendered`.
+- Windows Development packaging: **passed**. New build: `builds/unreal-day-loop/Windows/FantasyShopkeeper.exe`. The prior `unreal-interaction` build remains intact. Automatic startup and reopening used an isolated `Saved/PackageSmoke` directory; reopening preserved the checkpoint bytes and modification time. Logs: `Saved/Logs/DayPackageLaunch.log` and `DayPackageRestore.log`.
+- The current working map already differed from the supplied clean checkpoint. It has four shelf sections rather than ten, and its moved counter had a stale customer waypoint. Customer flow now follows a configurable counter-local offset by default, verified through the walking workflow. The map file was neither edited nor committed by this change. The asset validator passed its mesh checks but stopped at its ten-section baseline assertion; this known map-layout discrepancy remains recorded in `Saved/Logs/DayAssets.log`.
+- No maintained scripts were added. The existing asset checker now checks the counter-relative waypoint configuration. Unreal emitted its existing compiler-version and engine-header deprecation notices during builds; these are distinct from the warning-free gameplay automation reports.
+
+Morning files have a version and payload checksum. Full value validation precedes staged restoration; Windows file replacement preserves the old checkpoint on write failure. Mid-day saves and map-identity migration are not implemented. Invalid saves are preserved and block further writes; moving the file aside while the game is closed explicitly starts fresh. Automated checks do not touch the player's checkpoint. Human playtesting remains with the user.
+
+---
+
 # Fen encounter validation â€” 2026-11-08
 
 Fen is the existing second visitor on both days. Their request and outcome do not add visits, change ordinary basket demand, reserve stock or discount purchases. Reading is opt-in through a ledger note; the question can be deferred until bedtime.
