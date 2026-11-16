@@ -74,7 +74,7 @@ bool AShopBrewingStation::CanReceiveIngredients(const TMap<FName, int32>& Delive
     for (const TPair<FName, int32>& Entry : Delivery)
     {
         const int32 Current = GetIngredientQuantity(Entry.Key);
-        if (Entry.Key.IsNone() || Entry.Value <= 0 || Current < 0
+        if (Entry.Key.IsNone() || !StartingIngredients.Contains(Entry.Key) || Entry.Value <= 0 || Current < 0
             || int64(Current) + Entry.Value > IngredientCapacity)
         {
             return false;

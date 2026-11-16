@@ -121,7 +121,7 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
         }
         return;
     }
-    if (!ActiveCustomer->HasCompletedSale())
+    if (!ActiveCustomer->HasResolvedVisit())
     {
         WaitTime = 0;
         return;
@@ -153,6 +153,12 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
             WaitTime = 0;
         }
     }
+}
+
+bool AShopCustomerFlow::EndUnservedVisit()
+{
+    return HasAuthority() && IsValid(ActiveCustomer)
+        && ActiveCustomer->LeaveWithoutPurchase(GetActorTransform().TransformPosition(Entrance));
 }
 
 void AShopCustomerFlow::ResetMorning()
@@ -205,10 +211,10 @@ FText AShopCustomerFlow::GetStatusText() const
     {
         return NSLOCTEXT("Shop", "CustomerTillStatus", "Customer ready at the till");
     }
-    if (ActiveCustomer->HasCompletedSale())
+    if (ActiveCustomer->HasResolvedVisit())
     {
         return NSLOCTEXT("Shop", "CustomerLeavingStatus", "Customer heading home");
     }
-    return FText::Format(NSLOCTEXT("Shop", "CustomerOrderStatus", "Customer wants {0} ({1} bits)"),
+    return FText::Format(NSLOCTEXT("Shop", "CustomerOrderStatus", "Customer wants {0} ({1} bits) | X: End visit before pickup"),
         ActiveCustomer->RequestedProductName, FText::AsNumber(ActiveCustomer->PriceBits));
 }

@@ -34,21 +34,46 @@ AShopSupplyCrate::AShopSupplyCrate()
     }
 }
 
+bool AShopSupplyCrate::GetOrder(TMap<FName, int32>& Quantities, int64& Cost) const
+{
+    Quantities.Empty();
+    Cost = 0;
+    if (PackCount < 0 || PackCount > 10 || PriceBits <= 0 || Delivery.IsEmpty()) return false;
+    for (const auto& Entry : Delivery)
+    {
+        const int64 Amount = int64(Entry.Value) * PackCount;
+        if (Entry.Key.IsNone() || Entry.Value <= 0 || Amount > MAX_int32) return false;
+        if (PackCount > 0) Quantities.Add(Entry.Key, int32(Amount));
+    }
+    Cost = int64(PriceBits) * PackCount;
+    return true;
+}
+
+bool AShopSupplyCrate::ChangeQuantity(UShopInteractionComponent* Interactor, int32 Delta)
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!HasAuthority() || !State || !State->CanOrderSupplies() || !IsValid(Interactor)
+        || Interactor->GetHeldItem() || !Interactor->CanReach(this) || (Delta != 1 && Delta != -1)) return false;
+    const int32 Next = FMath::Clamp(PackCount + Delta, 0, 10);
+    if (Next == PackCount) return false;
+    PackCount = Next;
+    return true;
+}
+
 FText AShopSupplyCrate::GetBlockReason() const
 {
-    if (!IsValid(Station) || Station->GetWorld() != GetWorld() || PriceBits <= 0 || Delivery.IsEmpty())
-    {
-        return NSLOCTEXT("Shop", "SupplyNotConfigured", "Supply crate needs a brewing station and a valid delivery");
-    }
-    if (!Station->CanReceiveIngredients(Delivery))
-    {
-        return NSLOCTEXT("Shop", "SupplyCapacity", "Ingredient storage is full or unavailable");
-    }
     const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
-    if (!State || State->GetCash() < PriceBits)
-    {
-        return FText::Format(NSLOCTEXT("Shop", "SupplyTooExpensive", "Supplies cost {0} bits | Earn money at the till"), FText::AsNumber(PriceBits));
-    }
+    if (!State || !State->IsDayInitialized() || State->GetDayPhase() != EShopDayPhase::Evening)
+        return FText::FromString(TEXT("Order in the evening | Paid supplies arrive next morning"));
+    if (State->HasConfirmedSupplies()) return FText::FromString(TEXT("Order confirmed | Delivery next morning"));
+    if (PackCount == 0) return FText::GetEmpty();
+    TMap<FName, int32> Quantities;
+    int64 Cost = 0;
+    if (!IsValid(Station) || Station->GetWorld() != GetWorld() || !GetOrder(Quantities, Cost))
+        return FText::FromString(TEXT("Supply order is not configured correctly"));
+    if (!Station->CanReceiveIngredients(Quantities))
+        return FText::FromString(TEXT("Order exceeds ingredient storage | Reduce quantity"));
+    if (State->GetCash() < Cost) return FText::FromString(TEXT("Not enough cash for this order | Reduce quantity"));
     return FText::GetEmpty();
 }
 
@@ -59,6 +84,8 @@ bool AShopSupplyCrate::CycleOffer(UShopInteractionComponent* Interactor)
     {
         return false;
     }
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!State || !State->CanOrderSupplies()) return false;
     int32 Index = Offers.IndexOfByPredicate([this](const FShopSupplyOffer& Offer)
     {
         return Offer.PriceBits == PriceBits && Offer.Ingredients.OrderIndependentCompareEqual(Delivery);
@@ -98,7 +125,7 @@ bool AShopSupplyCrate::Interact_Implementation(UShopInteractionComponent* Intera
     {
         return false;
     }
-    UGameplayStatics::PlaySoundAtLocation(this, DeliverySound, GetActorLocation(), 0.3f);
+    // Delivery audio plays next morning, after the checkpoint commits.
     return true;
 }
 
@@ -108,24 +135,22 @@ FText AShopSupplyCrate::GetInteractionPrompt(UShopInteractionComponent* Interact
     {
         return NSLOCTEXT("Shop", "SupplyHandsFull", "Put down the held item to buy supplies");
     }
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
     const FText BlockReason = GetBlockReason();
-    FText ChoiceHint;
-    if (Offers.Num() > 1)
-    {
-        ChoiceHint = NSLOCTEXT("Shop", "NextSupplyPack", " | R  Next supply pack");
-    }
-    if (!BlockReason.IsEmpty())
-    {
-        return FText::Format(NSLOCTEXT("Shop", "BlockedSupplyChoice", "{0}{1}"), BlockReason, ChoiceHint);
-    }
+    if (!State || State->GetDayPhase() != EShopDayPhase::Evening || State->HasConfirmedSupplies()) return BlockReason;
+    TMap<FName, int32> Quantities;
+    int64 Cost = 0;
+    GetOrder(Quantities, Cost);
     FString Contents;
     TArray<FName> Keys;
     Delivery.GetKeys(Keys);
     Keys.Sort(FNameLexicalLess());
     for (const FName Key : Keys)
-    {
-        Contents += FString::Printf(TEXT(" | %s +%d"), *Key.ToString(), Delivery.FindChecked(Key));
-    }
-    return FText::Format(NSLOCTEXT("Shop", "BuySupplies", "E  Buy supplies ({0} bits){1}{2}"),
-        FText::AsNumber(PriceBits), FText::FromString(Contents), ChoiceHint);
+        Contents += FString::Printf(TEXT(" %s %d/%d (+%lld)"), *Key.ToString(),
+            IsValid(Station) ? Station->GetIngredientQuantity(Key) : 0,
+            IsValid(Station) ? Station->IngredientCapacity : 0, int64(Delivery[Key]) * PackCount);
+    const FString Action = BlockReason.IsEmpty()
+        ? (PackCount == 0 ? TEXT("E Confirm no order") : TEXT("E Pay for tomorrow")) : BlockReason.ToString();
+    return FText::FromString(FString::Printf(TEXT("%s | %d packs / %lld bits\n%s\nR Pack | F Less | T More"),
+        *Action, PackCount, Cost, *Contents));
 }

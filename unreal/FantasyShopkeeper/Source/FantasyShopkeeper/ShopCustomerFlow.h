@@ -41,6 +41,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Shop|Customers")
     bool StartNextVisit();
     void ResetMorning();
+    bool EndUnservedVisit();
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "1", ClampMax = "100"))
     int32 VisitsPerDay = 3;

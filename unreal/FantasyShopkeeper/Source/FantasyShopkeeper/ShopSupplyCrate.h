@@ -28,6 +28,9 @@ class FANTASYSHOPKEEPER_API AShopSupplyCrate : public AActor, public IShopIntera
 
 public:
     AShopSupplyCrate();
+    bool ChangeQuantity(UShopInteractionComponent* Interactor, int32 Delta);
+    int32 GetPackCount() const { return PackCount; }
+    bool GetOrder(TMap<FName, int32>& Quantities, int64& Cost) const;
     virtual bool Interact_Implementation(UShopInteractionComponent* Interactor) override;
 
     UFUNCTION(BlueprintCallable, Category = "Shop|Supplies")
@@ -55,5 +58,6 @@ public:
     TObjectPtr<USoundBase> DeliverySound;
 
 private:
+    int32 PackCount = 1;
     FText GetBlockReason() const;
 };

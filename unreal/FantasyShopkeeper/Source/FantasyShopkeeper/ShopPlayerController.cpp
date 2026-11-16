@@ -12,6 +12,8 @@
 #include "ShopBrewingStation.h"
 #include "ShopSupplyCrate.h"
 #include "ShopGameState.h"
+#include "ShopCustomerFlow.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -104,6 +106,11 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
                 else State->CloseShop();
                 return true;
             }
+            if (Params.Key == EKeys::X)
+            {
+                for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It) It->EndUnservedVisit();
+                return true;
+            }
             if (Params.Key == EKeys::N)
             {
                 State->AdvanceMorning();
@@ -112,6 +119,14 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
         }
     }
     AActor* Target = ShopInteraction->GetInteractionTarget();
+    if (AShopSupplyCrate* Crate = Cast<AShopSupplyCrate>(Target); Crate && Params.Event == IE_Pressed)
+    {
+        if (Params.Key == EKeys::F || Params.Key == EKeys::T)
+        {
+            Crate->ChangeQuantity(ShopInteraction, Params.Key == EKeys::T ? 1 : -1);
+            return true;
+        }
+    }
     AShopTill* Till = Cast<AShopTill>(Target);
     if (AShopTillControl* Control = Cast<AShopTillControl>(Target))
     {

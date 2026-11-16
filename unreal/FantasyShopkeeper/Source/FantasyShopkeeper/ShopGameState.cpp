@@ -14,20 +14,32 @@ void AShopGameState::BeginPlay()
     Cash = FMath::Max<int64>(0, StartingCash);
 }
 
+bool AShopGameState::ConfirmNoSupplies()
+{
+    if (!HasAuthority() || !CanOrderSupplies()) return false;
+    bSuppliesConfirmed = true;
+    CheckpointMessage = TEXT("No supplies ordered. N: Next morning.");
+    return true;
+}
+
 bool AShopGameState::TryBuySupplies(AShopSupplyCrate* Crate)
 {
-    if (bChangingEconomy || !HasAuthority() || !IsValid(Crate) || Crate->IsActorBeingDestroyed()
-        || Crate->GetWorld() != GetWorld() || Crate->PriceBits <= 0 || Cash < Crate->PriceBits
+    if (!HasAuthority() || !CanOrderSupplies() || !IsValid(Crate) || Crate->IsActorBeingDestroyed()
+        || Crate->GetWorld() != GetWorld()) return false;
+    if (Crate->GetPackCount() == 0) return ConfirmNoSupplies();
+    TMap<FName, int32> Delivery;
+    int64 Cost = 0;
+    if (!Crate->GetOrder(Delivery, Cost) || Cash < Cost || SupplySpending > MAX_int64 - Cost
         || !IsValid(Crate->Station) || Crate->Station->GetWorld() != GetWorld()
-        || SupplySpending > MAX_int64 - Crate->PriceBits
-        || !Crate->Station->CanReceiveIngredients(Crate->Delivery))
-    {
-        return false;
-    }
+        || !Crate->Station->CanReceiveIngredients(Delivery)) return false;
     TGuardValue<bool> TransactionGuard(bChangingEconomy, true);
-    Crate->Station->ReceiveIngredients(Crate->Delivery);
-    Cash -= Crate->PriceBits;
-    SupplySpending += Crate->PriceBits;
+    // Snapshot the paid order; later changes to the crate cannot change a delivery.
+    PendingDelivery = Delivery;
+    DeliveryStation = Crate->Station;
+    Cash -= Cost;
+    SupplySpending += Cost;
+    bSuppliesConfirmed = true;
+    CheckpointMessage = TEXT("Order paid. Supplies arrive next morning.");
     return true;
 }
 

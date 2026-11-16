@@ -238,6 +238,20 @@ bool AShopCustomer::BeginVisit(const FVector& Checkout)
     return true;
 }
 
+bool AShopCustomer::LeaveWithoutPurchase(const FVector& Exit)
+{
+    if (!HasAuthority() || HasResolvedVisit() || ShopInteraction->GetHeldItem()
+        || (Activity != EShopCustomerActivity::Arriving && Activity != EShopCustomerActivity::Browsing
+            && Activity != EShopCustomerActivity::Collecting) || Exit.ContainsNaN()) return false;
+    TargetItem = nullptr;
+    bLeavingWithoutPurchase = true;
+    VisitDestination = Exit;
+    Activity = EShopCustomerActivity::Leaving;
+    JourneyTime = 0;
+    MoveTo(Exit);
+    return true;
+}
+
 bool AShopCustomer::BeginDeparture(const FVector& Exit)
 {
     if (!HasAuthority() || !HasCompletedSale() || ShopInteraction->GetHeldItem()
@@ -289,7 +303,7 @@ void AShopCustomer::Tick(float DeltaSeconds)
         }
         return;
     }
-    if (HasCompletedSale())
+    if (HasResolvedVisit())
     {
         return;
     }

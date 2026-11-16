@@ -37,6 +37,8 @@ public:
 
     bool BeginVisit(const FVector& Checkout);
     bool BeginDeparture(const FVector& Exit);
+    bool LeaveWithoutPurchase(const FVector& Exit);
+    bool HasResolvedVisit() const { return HasCompletedSale() || bLeavingWithoutPurchase; }
     bool HasLeftShop() const { return bLeftShop; }
 
     UFUNCTION(BlueprintPure, Category = "Shop|Sale")
@@ -103,4 +105,5 @@ private:
     float JourneyTime = 0;
     FVector VisitDestination = FVector::ZeroVector;
     bool bLeftShop = false;
+    bool bLeavingWithoutPurchase = false;
 };

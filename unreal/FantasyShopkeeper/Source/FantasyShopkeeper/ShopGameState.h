@@ -8,6 +8,7 @@ class AShopCustomer;
 class AShopPickupItem;
 class AShopTill;
 class AShopSupplyCrate;
+class AShopBrewingStation;
 class UShopMorningSave;
 
 UENUM(BlueprintType)
@@ -26,6 +27,9 @@ public:
     bool RestoreMorning();
     void UpdateDay();
     bool CanStartVisit() const;
+    bool ConfirmNoSupplies();
+    bool HasConfirmedSupplies() const { return bSuppliesConfirmed; }
+    bool CanOrderSupplies() const { return bDayInitialized && DayPhase == EShopDayPhase::Evening && !bSuppliesConfirmed && !bChangingEconomy; }
     bool IsDayInitialized() const { return bDayInitialized; }
     bool IsChangingEconomy() const { return bChangingEconomy; }
     EShopDayPhase GetDayPhase() const { return DayPhase; }
@@ -56,6 +60,9 @@ private:
     bool bChangingEconomy = false;
     bool bDayInitialized = false;
     bool bCheckpointBlocked = false;
+    bool bSuppliesConfirmed = false;
+    UPROPERTY(Transient) TWeakObjectPtr<AShopBrewingStation> DeliveryStation;
+    UPROPERTY(Transient) TMap<FName, int32> PendingDelivery;
     EShopDayPhase DayPhase = EShopDayPhase::Preparation;
     int32 Day = 1;
     int64 Takings = 0;

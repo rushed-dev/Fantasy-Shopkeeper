@@ -9,6 +9,7 @@
 #include "ShopShelfSlot.h"
 #include "ShopShelfSection.h"
 #include "ShopTill.h"
+#include "ShopSupplyCrate.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "HAL/FileManager.h"
@@ -149,6 +150,11 @@ void AShopGameState::UpdateDay()
 bool AShopGameState::AdvanceMorning()
 {
     if (!HasAuthority() || !bDayInitialized || bChangingEconomy || DayPhase != EShopDayPhase::Evening || Day == MAX_int32) return false;
+    if (!bSuppliesConfirmed)
+    {
+        CheckpointMessage = TEXT("Confirm tomorrow's order at SUPPLIES first (quantity 0 orders nothing).");
+        return false;
+    }
     TGuardValue<bool> Guard(bChangingEconomy, true);
     UShopMorningSave* Save = CaptureMorning(Day + 1);
     if (!Save)
@@ -156,7 +162,31 @@ bool AShopGameState::AdvanceMorning()
         CheckpointMessage = TEXT("Put down carried items before the next morning.");
         return false;
     }
+    if (!PendingDelivery.IsEmpty())
+    {
+        if (!DeliveryStation.IsValid() || !DeliveryStation->CanReceiveIngredients(PendingDelivery))
+        {
+            CheckpointMessage = TEXT("Make room for the paid delivery before advancing morning.");
+            return false;
+        }
+        for (FShopSavedIngredients& Entry : Save->Ingredients)
+            if (Entry.Station == DeliveryStation->GetName())
+                for (const auto& Quantity : PendingDelivery) Entry.Quantities.FindOrAdd(Quantity.Key) += Quantity.Value;
+    }
+    // Persist the delivered result first. A failed write leaves both the world
+    // and the paid pending order intact, so a retry cannot deliver twice.
     if (!WriteMorning(Save)) return false;
+    if (DeliveryStation.IsValid() && !PendingDelivery.IsEmpty())
+    {
+        DeliveryStation->ReceiveIngredients(PendingDelivery);
+        for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It)
+            if (It->Station == DeliveryStation.Get())
+                UGameplayStatics::PlaySoundAtLocation(this, It->DeliverySound, It->GetActorLocation(), 0.4f);
+    }
+    CheckpointMessage = PendingDelivery.IsEmpty() ? TEXT("Morning ready.") : TEXT("Paid supplies delivered. Morning ready.");
+    PendingDelivery.Empty();
+    DeliveryStation.Reset();
+    bSuppliesConfirmed = false;
     ++Day;
     Takings = SupplySpending = 0;
     DayPhase = EShopDayPhase::Preparation;
@@ -325,6 +355,9 @@ bool AShopGameState::RestoreMorning()
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         for (const FShopSavedIngredients& Entry : Save->Ingredients)
             if (Entry.Station == It->GetName()) It->Ingredients = Entry.Quantities;
+    PendingDelivery.Empty();
+    DeliveryStation.Reset();
+    bSuppliesConfirmed = false;
     Cash = Save->Cash;
     Day = Save->Day;
     Takings = SupplySpending = 0;
@@ -348,6 +381,7 @@ FString AShopGameState::GetDayText() const
     case EShopDayPhase::Closing:
         return TEXT("Closing | Finish the active customer; no new arrivals. Brew missing stock if needed.");
     default:
-        return FString::Printf(TEXT("Day %d | Evening | Takings %lld | Supplies %lld | Cash %lld bits | N: Next morning"), Day, Takings, SupplySpending, Cash);
+        return FString::Printf(TEXT("Day %d | Evening | Takings %lld | Supplies %lld | Cash %lld bits | %s"), Day, Takings, SupplySpending, Cash,
+            bSuppliesConfirmed ? TEXT("Order confirmed | N: Next morning") : TEXT("Order tomorrow at SUPPLIES"));
     }
 }
