@@ -147,6 +147,7 @@ void AShopGameState::UpdateDay()
         || (DayPhase == EShopDayPhase::Trading && Flow->GetStartedVisits() >= Flow->VisitsPerDay))
     {
         DayPhase = EShopDayPhase::Evening;
+        if (Day >= 2 && LanternStory == EShopLanternStory::Accepted) LanternStory = EShopLanternStory::Missed;
     }
 }
 
@@ -196,6 +197,8 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
     UShopMorningSave* Save = NewObject<UShopMorningSave>();
     Save->Day = MorningDay;
     Save->Cash = Cash;
+    Save->LanternStory = uint8(LanternStory);
+    Save->SupplierDebt = SupplierDebt;
     Save->Delivery = MorningDelivery;
     Save->DeliveryStation = MorningDeliveryStation.IsValid() ? MorningDeliveryStation->GetName() : FString();
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
@@ -225,7 +228,11 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
 
 bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
 {
-    if (!Save || (Save->Version < 1 || Save->Version > 4) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
+    if (!Save || (Save->Version < 1 || Save->Version > 5) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
+    if (Save->LanternStory > uint8(EShopLanternStory::Missed)
+        || (Save->SupplierDebt != 0 && Save->SupplierDebt != 18)
+        || (Save->Version < 5 && (Save->LanternStory != 0 || Save->SupplierDebt != 0))
+        || (Save->Day < 3 && Save->LanternStory >= uint8(EShopLanternStory::Fulfilled))) return false;
     TMap<FString, AShopBrewingStation*> Stations;
     // Only current recipe/item classes are trusted; a save cannot instantiate arbitrary actors.
     TMap<FString, TSet<FName>> Products;
@@ -402,6 +409,8 @@ bool AShopGameState::RestoreMorning()
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         if (It->GetName() == Save->DeliveryStation) MorningDeliveryStation = *It;
     Cash = Save->Cash;
+    LanternStory = EShopLanternStory(Save->LanternStory);
+    SupplierDebt = Save->SupplierDebt;
     Day = Save->Day;
     Takings = SupplySpending = UpgradeSpending = 0;
     DayPhase = EShopDayPhase::Preparation;

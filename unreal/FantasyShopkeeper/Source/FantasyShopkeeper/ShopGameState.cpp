@@ -97,6 +97,8 @@ bool AShopGameState::TryCompleteSale(AShopTill* Till)
     Cash += Payment;
     Takings += Payment;
     Customer->PaidBits = Payment;
+    if (Day == 2 && Customer->RegularId == TEXT("Fen") && Customer->RequestedProductId == TEXT("MoonlitInk")
+        && LanternStory == EShopLanternStory::Accepted) LanternStory = EShopLanternStory::Fulfilled;
     Customer->Activity = EShopCustomerActivity::Completed;
     Till->Phase = EShopTillPhase::Complete;
     if (IsValid(Customer))

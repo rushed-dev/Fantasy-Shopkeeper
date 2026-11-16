@@ -29,6 +29,7 @@
 #include "../ShopStorageUpgrade.h"
 #include "../ShopBrewingUpgrade.h"
 #include "../ShopPlayerController.h"
+#include "../ShopStoryLantern.h"
 #include "InputKeyEventArgs.h"
 #include "TimerManager.h"
 #include "Engine/DirectionalLight.h"
@@ -2426,13 +2427,16 @@ bool FShopThreeDayQueueTest::RunTest(const FString& Parameters)
     Ink->IngredientCosts = {{TEXT("Moonleaf"), 1}, {TEXT("Spring Water"), 2}};
     Ink->OutputItemClass = AShopPickupItem::StaticClass();
     Station->AvailableRecipes = {Tonic, Ink};
-    AShopCustomerFlow* Flow = DayFlow(Test); Flow->MaxConcurrentCustomers = 3;
+    AShopCustomerFlow* Flow = DayFlow(Test); Flow->MaxConcurrentCustomers = 3; Flow->bChapterCast = true;
     FShopCustomerOrder InkOrder; InkOrder.ProductId = TEXT("MoonlitInk");
     InkOrder.ProductName = Ink->DisplayName; InkOrder.PriceBits = 18; InkOrder.TenderBits = 50;
     Flow->Orders = {FShopCustomerOrder(), InkOrder};
     AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0)); Crate->Station = Station;
     AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -100, 0));
     State->InitializeDay(File.Path);
+    TestTrue(TEXT("Optional promise accepted without payment"), State->ChooseLanternStory(true));
+    AShopStoryLantern* Lantern = Test.Spawn<AShopStoryLantern>(FVector(500, 500, 0));
+    Lantern->Tick(0); TestFalse(TEXT("Lantern starts unlit"), Lantern->IsLit());
     TestTrue(TEXT("Planning lists the complete product mix"), Crate->GetProductPlanText().Contains(TEXT("2 Dawn Tonic")));
     TestTrue(TEXT("Planning estimates gross sales"), Crate->GetProductPlanText().Contains(TEXT("42 bits")));
     for (int32 Day = 1; Day <= 3; ++Day)
@@ -2473,6 +2477,11 @@ bool FShopThreeDayQueueTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("All three sales resolve exactly once"), Flow->GetCompletedVisits(), 3);
         TestEqual(TEXT("Day closes after the entire queue leaves"), State->GetDayPhase(), EShopDayPhase::Evening);
         TestEqual(TEXT("Daily sales total"), State->GetTakings(), int64(42));
+        if (Day >= 2)
+        {
+            TestEqual(TEXT("Fen's actual paid ink purchase resolves the promise"), State->GetLanternStory(), EShopLanternStory::Fulfilled);
+            Lantern->Tick(0); TestTrue(TEXT("Purchase lights the physical lantern"), Lantern->IsLit());
+        }
         if (Day == 1) TestTrue(TEXT("Day one funds storage"), State->TryBuyStorageUpgrade(Station));
         if (Day == 2)
         {
@@ -2511,6 +2520,7 @@ bool FShopThreeDayQueueTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Loading cannot replay sales or purchases"), State->GetCash(), Cash);
     }
     TestEqual(TEXT("Three-day route leaves 24 bits after both upgrades and supplies"), State->GetCash(), int64(24));
+    TestTrue(TEXT("Chapter is complete without ending ordinary trade"), State->GetChapterText().Contains(TEXT("first three days are complete")));
     TestEqual(TEXT("Morning four leaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 9);
     TestEqual(TEXT("Morning four water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
     TestTrue(TEXT("Both upgrades persist"), Station->HasStorageUpgrade() && Station->HasBatchUpgrade());
@@ -2568,6 +2578,108 @@ bool FShopRestShortageTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Player can explicitly accept a short tomorrow"), State->IsOvernight());
     TestFalse(TEXT("Accepting warning returns input"), Controller->IsMoveInputIgnored());
     TestFalse(TEXT("Repeated rest cannot advance twice"), State->BeginOvernight(true));
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopChapterChoicesTest, "FantasyShopkeeper.Chapter.OptionalChoicesAndInvalidMornings",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopChapterChoicesTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(42); Test.BrewingStation(6, 6); DayFlow(Test);
+    State->InitializeDay(File.Path);
+    UShopMorningSave* Initial = File.Read();
+    TestTrue(TEXT("Declining is allowed"), State->ChooseLanternStory(false));
+    TestFalse(TEXT("Choice cannot be rewritten accidentally"), State->ChooseLanternStory(true));
+    TestEqual(TEXT("Declining costs nothing"), State->GetCash(), int64(42));
+    State->OpenShop(); State->CloseShop(); State->ConfirmNoSupplies();
+    TestTrue(TEXT("Ordinary trade can progress without story"), State->AdvanceMorning());
+    TestTrue(TEXT("Declined choice restores"), State->RestoreMorning());
+    TestEqual(TEXT("Decline persists"), State->GetLanternStory(), EShopLanternStory::Declined);
+    File.Write(Initial); State->RestoreMorning();
+    TestTrue(TEXT("Morning restart rolls back choice"), State->ChooseLanternStory(true));
+    State->OpenShop(); State->CloseShop(); State->ConfirmNoSupplies(); State->AdvanceMorning();
+    State->RestoreMorning();
+    TestEqual(TEXT("Promise persists into collection day"), State->GetLanternStory(), EShopLanternStory::Accepted);
+    State->OpenShop(); State->CloseShop();
+    TestEqual(TEXT("Missed collection resolves without a fine"), State->GetLanternStory(), EShopLanternStory::Missed);
+    TestEqual(TEXT("Missing leaves cash intact"), State->GetCash(), int64(42));
+    State->RestoreMorning();
+    TestEqual(TEXT("Retry day restores unresolved promise"), State->GetLanternStory(), EShopLanternStory::Accepted);
+    UShopMorningSave* Bad = File.Read(); Bad->LanternStory = 255; File.Write(Bad);
+    TestFalse(TEXT("Unknown story state rejected"), State->RestoreMorning());
+    TestEqual(TEXT("Invalid save leaves live choice intact"), State->GetLanternStory(), EShopLanternStory::Accepted);
+    Bad->LanternStory = uint8(EShopLanternStory::Fulfilled); File.Write(Bad);
+    TestFalse(TEXT("Fulfilment before collection day cannot be a morning"), State->RestoreMorning());
+    Bad->Version = 4; Bad->LanternStory = 1; File.Write(Bad);
+    TestFalse(TEXT("Legacy save cannot inject story progress"), State->RestoreMorning());
+    Bad->LanternStory = 0; File.Write(Bad);
+    TestTrue(TEXT("Schema four mornings still load"), State->RestoreMorning());
+    TestFalse(TEXT("Late promise cannot change old mornings"), State->ChooseLanternStory(true));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopCreditTest, "FantasyShopkeeper.Chapter.SupplierCreditAndRepayment",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopCreditTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    AShopCustomerFlow* Flow = DayFlow(Test); Flow->Orders = {FShopCustomerOrder()};
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0)); Crate->Station = Station;
+    State->InitializeDay(File.Path);
+    TestFalse(TEXT("Credit is not same-day supply"), State->UseSupplierCredit());
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Broke and short shop can order on account"), State->UseSupplierCredit());
+    TestEqual(TEXT("Disclosed fixed principal"), State->GetSupplierDebt(), int64(18));
+    TestEqual(TEXT("Credit creates no spendable money"), State->GetCash(), int64(0));
+    TestEqual(TEXT("Credit does not deliver early"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestFalse(TEXT("Repeated credit cannot create parcels"), State->UseSupplierCredit());
+    TestEqual(TEXT("One parcel quantity"), State->GetPendingIngredientQuantity(TEXT("Spring Water")), 6);
+    TestTrue(TEXT("Credit funds a productive morning"), State->GetRestWarning().IsEmpty());
+    TestTrue(TEXT("Debt and parcel checkpoint together"), State->AdvanceMorning());
+    for (int32 Retry = 0; Retry < 2; ++Retry)
+    {
+        TestTrue(TEXT("Load credit morning"), State->RestoreMorning());
+        TestTrue(TEXT("Unpack credited parcel"), State->UnpackDelivery());
+        TestEqual(TEXT("No duplicated ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+        TestEqual(TEXT("No duplicated debt"), State->GetSupplierDebt(), int64(18));
+    }
+    State->OpenShop(); State->CloseShop();
+    TestFalse(TEXT("Cannot repay without money"), State->RepaySupplierCredit());
+    UShopMorningSave* Save = File.Read(); Save->Cash = 18; File.Write(Save); State->RestoreMorning(); State->UnpackDelivery();
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Full repayment charges once"), State->RepaySupplierCredit());
+    TestFalse(TEXT("Repeat repayment rejected"), State->RepaySupplierCredit());
+    TestEqual(TEXT("Principal is cleared"), State->GetSupplierDebt(), int64(0));
+    TestEqual(TEXT("Purse paid exactly 18"), State->GetCash(), int64(0));
+    State->ConfirmNoSupplies(); State->AdvanceMorning(); State->RestoreMorning();
+    TestEqual(TEXT("Repayment persists"), State->GetSupplierDebt(), int64(0));
+    Save = File.Read(); Save->SupplierDebt = 19; File.Write(Save);
+    TestFalse(TEXT("Invalid principal rejected"), State->RestoreMorning());
+    TestEqual(TEXT("Invalid debt cannot change live purse"), State->GetCash(), int64(0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopPreferencesTest, "FantasyShopkeeper.Input.PreferenceBoundsAndGuidance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopPreferencesTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(); Test.BrewingStation(); DayFlow(Test); State->InitializeDay(FString());
+    AShopPlayerController* Controller = Test.Spawn<AShopPlayerController>(FVector::ZeroVector);
+    Controller->SetLookSensitivity(-10); TestEqual(TEXT("Sensitivity lower bound"), Controller->GetLookSensitivity(), 0.25f);
+    Controller->SetLookSensitivity(50); TestEqual(TEXT("Sensitivity upper bound"), Controller->GetLookSensitivity(), 2.f);
+    Controller->SetMasterVolume(-1); TestEqual(TEXT("Volume lower bound"), Controller->GetMasterVolume(), 0.f);
+    Controller->SetMasterVolume(5); TestEqual(TEXT("Volume upper bound"), Controller->GetMasterVolume(), 1.f);
+    TestTrue(TEXT("Preparation teaches required product mix"), Controller->GetGuideText().Contains(TEXT("2 Dawn Tonics")));
+    State->OpenShop(); TestTrue(TEXT("Trading teaches physical payment"), Controller->GetGuideText().Contains(TEXT("PAID")));
+    State->CloseShop(); TestTrue(TEXT("Evening explains morning-only saving"), Controller->GetGuideText().Contains(TEXT("only mornings")));
+    TestTrue(TEXT("Main menu discloses rollback"), Controller->GetMenuText().Contains(TEXT("saved morning")));
     return true;
 }
 

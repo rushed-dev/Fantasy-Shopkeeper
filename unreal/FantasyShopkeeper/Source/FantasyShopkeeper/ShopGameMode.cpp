@@ -7,6 +7,7 @@
 #include "ShopHUD.h"
 #include "ShopGameState.h"
 #include "ShopDayLighting.h"
+#include "ShopStoryLantern.h"
 #include "ShopDoorSign.h"
 #include "ShopSupplyCrate.h"
 #include "ShopStorageUpgrade.h"
@@ -43,6 +44,7 @@ void AShopGameMode::StartPlay()
     {
         State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
         GetWorld()->SpawnActor<AShopDayLighting>();
+        GetWorld()->SpawnActor<AShopStoryLantern>(FVector(405, -365, 175), FRotator::ZeroRotator);
         for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         {
             AShopBrewingUpgrade* Kit = GetWorld()->SpawnActor<AShopBrewingUpgrade>(It->GetActorTransform().TransformPosition(FVector(0, -42, 0)), It->GetActorRotation());

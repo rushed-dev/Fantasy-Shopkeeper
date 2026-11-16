@@ -49,6 +49,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "1", ClampMax = "3"))
     int32 MaxConcurrentCustomers = 1;
 
+    UPROPERTY(EditAnywhere, Category = "Shop|Customers")
+    bool bChapterCast = false;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "80"))
     float QueueSpacing = 100;
 

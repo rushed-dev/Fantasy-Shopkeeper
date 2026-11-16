@@ -149,17 +149,17 @@ FText AShopBrewingStation::GetInteractionPrompt(UShopInteractionComponent* Inter
     {
         RecipeHint = NSLOCTEXT("Shop", "NextRecipeHint", " | R  Next recipe");
     }
-    if (!BlockReason.IsEmpty())
+    FString Costs;
+    if (IsValid(Recipe))
     {
-        const FText Name = IsValid(Recipe) ? Recipe->DisplayName : FText::GetEmpty();
-        return FText::Format(NSLOCTEXT("Shop", "BlockedRecipePrompt", "{0} | {1}{2}"), Name, BlockReason, RecipeHint);
+        TArray<FName> IngredientsSorted; Recipe->IngredientCosts.GetKeys(IngredientsSorted); IngredientsSorted.Sort(FNameLexicalLess());
+        for (FName Ingredient : IngredientsSorted)
+            Costs += FString::Printf(TEXT(" | %s: %d stored / %lld needed"), *Ingredient.ToString(), GetIngredientQuantity(Ingredient), int64(Recipe->IngredientCosts[Ingredient]) * BatchSize);
     }
-    FString Stock;
-    for (const TPair<FName, int32>& Cost : Recipe->IngredientCosts)
-    {
-        Stock += FString::Printf(TEXT(" | %s %d/%d"), *Cost.Key.ToString(), GetIngredientQuantity(Cost.Key), Cost.Value * BatchSize);
-    }
-    return FText::Format(NSLOCTEXT("Shop", "BrewPrompt", "E  Brew {3} x {0}{1}{2}"), Recipe->DisplayName, FText::FromString(Stock), RecipeHint, FText::AsNumber(BatchSize));
+    const FString Name = IsValid(Recipe) ? Recipe->DisplayName.ToString() : TEXT("No recipe");
+    return FText::FromString(FString::Printf(TEXT("%d x %s%s\n%s%s"), BatchSize, *Name, *Costs,
+        BlockReason.IsEmpty() ? TEXT("E  Brew") : *BlockReason.ToString(), *RecipeHint.ToString()));
+
 }
 
 bool AShopBrewingStation::CycleRecipe(UShopInteractionComponent* Interactor)

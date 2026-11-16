@@ -77,6 +77,7 @@ bool AShopCustomerFlow::StartNextVisit()
         Customer->TenderBits = Order.TenderBits;
     }
     Customer->ConfigureVisitPersonality((State ? State->GetDay() - 1 : 0) % 3 + StartedVisits % 3);
+    if (bChapterCast) Customer->ConfigureRegular(StartedVisits % 3, State ? State->GetDay() : 1);
     Customer->FinishSpawning(SpawnTransform);
     if (!IsValid(Customer))
     {

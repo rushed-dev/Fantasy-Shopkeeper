@@ -31,6 +31,8 @@
 #include "../ShopBrewingStation.h"
 #include "../ShopCustomer.h"
 #include "../ShopGameState.h"
+#include "../ShopStoryLantern.h"
+#include "Kismet/GameplayStatics.h"
 #include "../ShopTill.h"
 #include "../ShopDoorSign.h"
 #include "../ShopSupplyControl.h"
@@ -214,7 +216,7 @@ namespace
                     Test->TestEqual(TEXT("Fresh shop starts with six water"), Crate->Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
                     AimTarget = Crate; AimHeight = 69;
                     Pawn->SetActorLocation(Crate->GetActorLocation() + FVector(0, -140, 96), false, nullptr, ETeleportType::TeleportPhysics);
-                    Step = 84; NextStep = Now + 1; return false;
+                    Step = 90; NextStep = Now + 1; return false;
                 }
                 for (TActorIterator<AShopCustomer> It(World); It; ++It)
                 {
@@ -585,6 +587,50 @@ namespace
                 Test->TestFalse(TEXT("Closing book restores movement"), Controller->IsMoveInputIgnored());
                 Step = 30; NextStep = Now + 0.2;
                 return false;
+            case 90:
+                Test->TestTrue(TEXT("F1 menu opens"), Controller->OpenShopMenu());
+                Test->TestTrue(TEXT("Menu pauses the actual world"), UGameplayStatics::IsGamePaused(World));
+                Step = 91; NextStep = Now + 0.5; return false;
+            case 91:
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopMenuScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, true, false);
+                }
+                Step = 92; NextStep = Now + 0.5; return false;
+            case 92:
+                Controller->MenuAction(TEXT("Help"));
+                Test->TestTrue(TEXT("Help explains morning rollback"), Controller->GetMenuText().Contains(TEXT("No mid-day saving")));
+                Step = 93; NextStep = Now + 0.5; return false;
+            case 93:
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopHelpScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, true, false);
+                }
+                Step = 94; NextStep = Now + 0.5; return false;
+            case 94:
+                Controller->MenuAction(TEXT("Main")); Controller->MenuAction(TEXT("Journal"));
+                Step = 95; NextStep = Now + 0.5; return false;
+            case 95:
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopJournalScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, true, false);
+                }
+                Step = 96; NextStep = Now + 0.5; return false;
+            case 96:
+                Controller->MenuAction(TEXT("AcceptStory"));
+                Test->TestEqual(TEXT("Journal accepts Fen's disclosed paid request"), World->GetGameState<AShopGameState>()->GetLanternStory(), EShopLanternStory::Accepted);
+                Controller->MenuAction(TEXT("Main")); Controller->MenuAction(TEXT("Settings"));
+                Controller->SetLookSensitivity(0.75f); Controller->SetMasterVolume(0.5f);
+                Step = 97; NextStep = Now + 0.5; return false;
+            case 97:
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopSettingsScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, true, false);
+                }
+                Step = 98; NextStep = Now + 0.5; return false;
+            case 98:
+                FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::F1, FModifierKeysState(), 0, false, 0, 0));
+                Test->TestFalse(TEXT("Focused menu closes with F1"), Controller->IsShopMenuOpen());
+                Test->TestFalse(TEXT("Resume unpauses the actual world"), UGameplayStatics::IsGamePaused(World));
+                Test->TestFalse(TEXT("Resume restores mouse look"), Controller->IsLookInputIgnored());
+                Controller->SetLookSensitivity(1.f); Controller->SetMasterVolume(0.7f);
+                Step = 84; NextStep = Now + 0.5; return false;
             case 84:
                 Key(EKeys::E, IE_Pressed);
                 Step = 85; NextStep = Now + 0.5;
@@ -917,6 +963,44 @@ namespace
                 Step = 89; NextStep = Now + 1;
                 return false;
             case 89:
+                if (!Flow->GetActiveCustomer())
+                {
+                    if (World->GetGameState<AShopGameState>()->GetDayPhase() != EShopDayPhase::Evening) return false;
+                    Test->TestEqual(TEXT("Rendered paid collection fulfils Fen's promise"), World->GetGameState<AShopGameState>()->GetLanternStory(), EShopLanternStory::Fulfilled);
+                    for (TActorIterator<AShopStoryLantern> It(World); It; ++It)
+                    {
+                        Test->TestTrue(TEXT("Actual shop lantern lights"), It->IsLit());
+                        AimTarget = *It; AimHeight = 0;
+                        Pawn->SetActorLocation(FVector(370, -160, 96), false, nullptr, ETeleportType::TeleportPhysics);
+                    }
+                    Step = 101; NextStep = Now + 1; return false;
+                }
+                if (Till->GetPhase() != EShopTillPhase::MakingChange) return false;
+                AimAt(Till->FindControl(EShopTillControl::Confirm)); AimHeight = 0;
+                Step = 100; NextStep = Now + 0.5; return false;
+            case 100:
+                for (int32 Bit = 0; Bit < Till->Customer->TenderBits - Till->Customer->PriceBits; ++Bit) Till->AddChangeCoin(1);
+                if (!Test->TestTrue(TEXT("Queued shopper pays through guarded checkout"), Till->ConfirmSale(Controller->ShopInteraction))) return true;
+                Step = 89; NextStep = Now + 0.5; return false;
+            case 101:
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopLanternScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, false, false);
+                }
+                Step = 102; NextStep = Now + 0.5; return false;
+            case 102:
+                World->GetGameState<AShopGameState>()->ConfirmNoSupplies();
+                Test->TestTrue(TEXT("Completed collection progresses to day three"), World->GetGameState<AShopGameState>()->AdvanceMorning());
+                World->GetGameState<AShopGameState>()->OpenShop(); World->GetGameState<AShopGameState>()->CloseShop();
+                Controller->OpenShopMenu(TEXT("Chapter"));
+                Step = 103; NextStep = Now + 0.5; return false;
+            case 103:
+                Test->TestTrue(TEXT("Chapter ending remains optional trade"), Controller->GetMenuText().Contains(TEXT("Keep trading")));
+                {
+                    FString Shot; if (FParse::Value(FCommandLine::Get(), TEXT("ShopChapterScreenshot="), Shot)) FScreenshotRequest::RequestScreenshot(Shot, true, false);
+                }
+                Step = 104; NextStep = Now + 0.5; return false;
+            case 104:
+                Controller->CloseShopMenu();
                 {
                     FString Screenshot;
                     if (!FParse::Value(FCommandLine::Get(), TEXT("ShopCornerScreenshot="), Screenshot)) return true;

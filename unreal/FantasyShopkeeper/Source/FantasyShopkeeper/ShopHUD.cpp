@@ -32,7 +32,7 @@ void AShopHUD::DrawHUD()
 
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight()) return;
 
-    if (Controller->IsOrderingPageOpen()) return;
+    if (Controller->IsOrderingPageOpen() || Controller->IsShopMenuOpen()) return;
 
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
@@ -56,7 +56,7 @@ void AShopHUD::DrawHUD()
         DrawText(bFresh ? TEXT("Enter  Start day 1                 F10  Keep playing") : TEXT("Enter  Restart day     F  New game     F10  Keep playing"), FLinearColor::White, CenterX - 275, CenterY + 45, GEngine->GetMediumFont());
         return;
     }
-    DrawText(TEXT("F10  Day / New game"), FLinearColor::White, Canvas->ClipX - 175, 20, GEngine->GetSmallFont());
+    DrawText(TEXT("F1  Menu / Help   F10  Day"), FLinearColor::White, Canvas->ClipX - 210, 20, GEngine->GetSmallFont());
     DrawRect(FLinearColor::White, CenterX - 1.5f, CenterY - 1.5f, 3.0f, 3.0f);
 
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
@@ -86,7 +86,7 @@ void AShopHUD::DrawHUD()
             && FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), Speaker->GetActorLocation()) < FMath::Square(900.f))
         {
             // Nearby subtitles imply speech without a floating world-space board or input capture.
-            const FString Line = FString::Printf(TEXT("Customer: %s"), *Speaker->GetSpokenLine().ToString());
+            const FString Line = FString::Printf(TEXT("%s: %s"), *Speaker->GetCustomerName().ToString(), *Speaker->GetSpokenLine().ToString());
             float SpeechWidth = 0, SpeechHeight = 0;
             GetTextSize(Line, SpeechWidth, SpeechHeight, GEngine->GetMediumFont());
             const float Opacity = Speaker->GetSpeechOpacity();
@@ -104,6 +104,13 @@ void AShopHUD::DrawHUD()
         break;
     }
 
+    const FString Guide = Controller->GetGuideText();
+    if (!Guide.IsEmpty())
+    {
+        float Width = 0, Height = 0; GetTextSize(Guide, Width, Height, GEngine->GetSmallFont());
+        DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.8f), 12, Canvas->ClipY - 62, FMath::Min(Width + 16, Canvas->ClipX - 24), Height + 10);
+        DrawText(Guide, FLinearColor(0.95f, 0.88f, 0.7f), 20, Canvas->ClipY - 57, GEngine->GetSmallFont());
+    }
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
@@ -148,7 +155,8 @@ void AShopHUD::DrawHUD()
     }
     else if (const AShopCustomer* Customer = Cast<AShopCustomer>(Target))
     {
-        Prompt = Customer->GetInteractionPrompt().ToString();
+        Prompt = Customer->GetCustomerName().ToString() + TEXT(" | ") + Customer->GetInteractionPrompt().ToString();
+        if (Customer->RegularId == TEXT("Fen")) Prompt += TEXT(" | E  Lantern request");
     }
     else if (const AShopSupplyCrate* Crate = Cast<AShopSupplyCrate>(Target))
     {

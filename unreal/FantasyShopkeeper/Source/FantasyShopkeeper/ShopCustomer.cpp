@@ -13,6 +13,9 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "ShopGameState.h"
+#include "ShopPlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
 #include "ShopShelfSlot.h"
@@ -56,6 +59,15 @@ AShopCustomer::AShopCustomer()
     PurchasedItemVisual->SetGenerateOverlapEvents(false);
     PurchasedItemVisual->SetCanEverAffectNavigation(false);
     PurchasedItemVisual->SetVisibility(false);
+    RegularBadge = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RegularBadge"));
+    RegularBadge->SetupAttachment(RootComponent);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> BadgeMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+    RegularBadge->SetStaticMesh(BadgeMesh.Object);
+    RegularBadge->SetRelativeLocation(FVector(25, -10, 38));
+    RegularBadge->SetRelativeScale3D(FVector(0.13, 0.06, 0.18));
+    RegularBadge->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RegularBadge->SetCanEverAffectNavigation(false);
+    RegularBadge->SetVisibility(false);
     ShopInteraction = CreateDefaultSubobject<UShopInteractionComponent>(TEXT("ShopInteraction"));
 }
 
@@ -250,7 +262,18 @@ bool AShopCustomer::BeginVisit(const FVector& Checkout)
             NSLOCTEXT("Shop", "RequestWarm", "Hello there. Have you any {0}?"),
             NSLOCTEXT("Shop", "RequestQuiet", "I've come for {0}, if you have some.")
         };
-        QueueSpeech(FText::Format(Requests[DialogueVariation], RequestedProductName), 0.35f + 0.25f * DialogueVariation);
+        FText Line = FText::Format(Requests[DialogueVariation], RequestedProductName);
+        if (RegularId == TEXT("Ivo")) Line = FText::FromString(VisitDay == 1 ? TEXT("Ivo, courier. Dawn Tonic, please. The hills haven't got any shorter.") : TEXT("Morning again! A Dawn Tonic for the road, please."));
+        if (RegularId == TEXT("Fen")) Line = FText::FromString(VisitDay == 1 ? TEXT("Fen, lamplighter. Moonlit Ink, please. I've left a lantern request in your book.") : TEXT("Hello again. Moonlit Ink for tonight's lanterns, please."));
+        if (RegularId == TEXT("Nessa")) Line = FText::FromString(VisitDay == 1 ? TEXT("Nessa, the printer. A Dawn Tonic. These route cards won't print themselves.") : TEXT("Another Dawn Tonic, please. The Lantern Walk cards are nearly ready."));
+        if (VisitDay >= 3 && RegularId == TEXT("Ivo"))
+        {
+            const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+            Line = FText::FromString(State && State->GetLanternStory() == EShopLanternStory::Fulfilled
+                ? TEXT("That lantern of Fen's is a fine sight. A Dawn Tonic for my route, please.")
+                : TEXT("The bakery lent Fen a lantern. Payment in buns, apparently. Dawn Tonic, please."));
+        }
+        QueueSpeech(Line, 0.35f + 0.25f * DialogueVariation);
     }
     CheckoutLocation = Checkout;
     VisitDestination = Checkout;
@@ -387,6 +410,8 @@ void AShopCustomer::Tick(float DeltaSeconds)
 
 bool AShopCustomer::Interact_Implementation(UShopInteractionComponent* Interactor)
 {
+    if (RegularId != TEXT("Fen") || !Interactor || !Interactor->CanReach(this) || Interactor->GetHeldItem()) return false;
+    if (AShopPlayerController* Player = Cast<AShopPlayerController>(Interactor->GetOwner())) return Player->OpenShopMenu(TEXT("Journal"));
     return false;
 }
 
@@ -475,4 +500,20 @@ void AShopCustomer::SetQueueDestination(const FVector& Destination, bool bFront)
         MoveTo(Destination);
     }
     else if (ShopInteraction->GetHeldItem()) ReturnToCheckout();
+}
+
+FText AShopCustomer::GetCustomerName() const
+{
+    return RegularId.IsNone() ? FText::FromString(TEXT("Customer")) : FText::FromName(RegularId);
+}
+
+void AShopCustomer::ConfigureRegular(int32 Index, int32 Day)
+{
+    static const FName Names[] = {TEXT("Ivo"), TEXT("Fen"), TEXT("Nessa")};
+    static const TCHAR* Materials[] = {TEXT("/Game/Shop/Art/Materials/M_SagePaint.M_SagePaint"), TEXT("/Game/Shop/Art/Materials/M_Brass.M_Brass"), TEXT("/Game/Shop/Art/Materials/M_BookCloth.M_BookCloth")};
+    Index = FMath::Clamp(Index, 0, 2);
+    RegularId = Names[Index]; VisitDay = Day;
+    RegularBadge->SetVisibility(true);
+    RegularBadge->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, Materials[Index]));
+    RegularBadge->SetRelativeScale3D(Index == 0 ? FVector(0.16, 0.07, 0.12) : Index == 1 ? FVector(0.11, 0.07, 0.21) : FVector(0.15, 0.07, 0.15));
 }

@@ -84,6 +84,10 @@ void SShopOrderingPage::Construct(const FArguments& Args)
         }) ];
     Content->AddSlot().AutoHeight().Padding(0, 0, 0, 14)
     [ SNew(STextBlock).Font(Font).ColorAndOpacity(Ink).Text(FText::FromString(TEXT("Paid orders arrive next morning. Nothing is delivered today.\nAfter paying, change pack or quantity to place another order."))) ];
+    Content->AddSlot().AutoHeight().Padding(0, 0, 0, 10)
+    [ SNew(SButton).IsFocusable(false).ContentPadding(FMargin(12, 8)).OnClicked_Lambda([this]()
+        { if (Controller.IsValid()) Controller->OpenShopMenu(TEXT("Journal")); return FReply::Handled(); })
+        [ SNew(STextBlock).Text(FText::FromString(TEXT("Requests & supplier account"))).Font(Font) ] ];
     Content->AddSlot().AutoHeight().HAlign(HAlign_Right)
     [ SNew(SButton).IsFocusable(false).ContentPadding(FMargin(16, 8)).OnClicked_Lambda([this]() { return UseKey(EKeys::F10); })
         [ SNew(STextBlock).Text(FText::FromString(TEXT("Close book [F10]"))).Font(Font) ] ];

@@ -30,6 +30,9 @@ class FANTASYSHOPKEEPER_API AShopCustomer : public ACharacter, public IShopInter
 
 public:
     AShopCustomer();
+    void ConfigureRegular(int32 Index, int32 Day);
+    FName RegularId;
+    FText GetCustomerName() const;
     void ConfigureVisitPersonality(int32 Variation);
     void AdvanceConversation(float DeltaSeconds);
     FText GetSpokenLine() const { return SpokenLine; }
@@ -109,6 +112,8 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<AShopPickupItem> TargetItem;
 
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> RegularBadge;
+    int32 VisitDay = 1;
     bool bCheckoutAllowed = true;
     FVector CheckoutLocation = FVector::ZeroVector;
     FVector CollectionLocation = FVector::ZeroVector;

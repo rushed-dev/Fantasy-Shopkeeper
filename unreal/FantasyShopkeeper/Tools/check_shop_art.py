@@ -84,6 +84,7 @@ assert {str(k): v for k, v in crate.get_editor_property("delivery").items()} == 
 flow = next(a for a in all_actors if isinstance(a, unreal.ShopCustomerFlow))
 assert flow.get_editor_property("till") == till
 assert flow.get_editor_property("max_concurrent_customers") == 3
+assert flow.get_editor_property("chapter_cast")
 assert flow.get_editor_property("checkout_follows_till")
 checkout_offset = flow.get_editor_property("till_checkout_offset")
 assert checkout_offset.x ** 2 + checkout_offset.y ** 2 < 150 ** 2

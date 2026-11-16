@@ -18,6 +18,19 @@ class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
 
 public:
     AShopPlayerController();
+    bool CanUseSupplierDesk() const;
+    bool OpenShopMenu(FName Page = TEXT("Main"));
+    void CloseShopMenu();
+    bool IsShopMenuOpen() const { return MenuWidget.IsValid(); }
+    void MenuAction(FName Action);
+    FName GetMenuPage() const { return MenuPage; }
+    FString GetMenuText() const;
+    float GetLookSensitivity() const { return LookSensitivity; }
+    float GetMasterVolume() const { return MasterVolume; }
+    void SetLookSensitivity(float Value);
+    void SetMasterVolume(float Value);
+    FString GetGuideText() const;
+
     bool RequestRest();
     bool IsRestPromptOpen() const { return bRestPromptOpen; }
     FString GetRestWarningText() const;
@@ -45,6 +58,13 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    TSharedPtr<SWidget> MenuWidget;
+    FName MenuPage = TEXT("Main");
+    bool bWelcomeShown = false;
+    bool bChapterShown = false;
+    bool bSettingsLoaded = false;
+    float LookSensitivity = 1.f;
+    float MasterVolume = 0.7f;
     TWeakObjectPtr<AShopSupplyCrate> OrderingDesk;
     TSharedPtr<SWidget> OrderingWidget;
     bool bRestPromptOpen = false;

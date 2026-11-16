@@ -11,6 +11,9 @@ class AShopSupplyCrate;
 class AShopBrewingStation;
 class UShopMorningSave;
 
+UENUM()
+enum class EShopLanternStory : uint8 { Available, Accepted, Declined, Fulfilled, Missed };
+
 UENUM(BlueprintType)
 enum class EShopDayPhase : uint8 { Preparation, Trading, Closing, Evening };
 
@@ -20,6 +23,14 @@ class FANTASYSHOPKEEPER_API AShopGameState : public AGameStateBase
     GENERATED_BODY()
 
 public:
+    bool ChooseLanternStory(bool bAccept);
+    EShopLanternStory GetLanternStory() const { return LanternStory; }
+    FString GetJournalText() const;
+    FString GetChapterText() const;
+    bool CanUseSupplierCredit() const;
+    bool UseSupplierCredit();
+    bool RepaySupplierCredit();
+    int64 GetSupplierDebt() const { return SupplierDebt; }
     void InitializeDay(const FString& SavePath);
     bool OpenShop();
     bool CloseShop();
@@ -70,6 +81,8 @@ private:
 
     UPROPERTY(Transient)
     int64 Cash = 0;
+    EShopLanternStory LanternStory = EShopLanternStory::Available;
+    int64 SupplierDebt = 0;
 
     bool bChangingEconomy = false;
     bool bOvernight = false;
