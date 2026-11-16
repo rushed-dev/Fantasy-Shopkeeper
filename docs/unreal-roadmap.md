@@ -141,3 +141,9 @@ Implemented a 36-bit evening purchase at the bench, with a physical one/three-bo
 ### Ingredient ordering page
 
 Fresh shops now start with six of each ingredient, enough for two Dawn Tonics and one Moonlit Ink. E on the supplier book opens a native Slate page with mouse buttons and keyboard shortcuts for selecting packs, quantity and explicit payment. It forecasts ingredients from the finite customer sequence after deducting sale-shelf stock. Read-only access is available outside evening; the guarded economy and next-morning sealed delivery are unchanged. Existing morning saves retain their quantities.
+
+### Three-day MVP loop and small checkout queue
+
+The production map admits up to three visitors at five-second intervals. They share existing shelf pickup and wait at counter-relative positions in arrival order. One customer owns the till transaction at a time; closing stops arrivals and waits for everyone already inside. No workers or patience penalties are included.
+
+The supplier page displays expected product quantities and gross sales. Rest warns about shortages after accounting for stocked bottles, stored ingredients and paid deliveries; players can return to planning or explicitly accept a short morning. The fresh three-day balance route in the README funds both upgrades and supplies through morning four without changing prices. Automated coverage exercises the real queue, checkout, evening purchases, overnight timers, restoration and delivery unpacking together.

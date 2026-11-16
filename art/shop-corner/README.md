@@ -81,7 +81,7 @@ Run the three installers in that order. The expansion commandlet additionally ne
 
 Five completed one-off interaction, brewing, sale, mannequin and small-till migration scripts have been removed. Their durable Blueprint and recipe assets are committed. Current character and till presentation setup lives in the expansion installer.
 
-Run the 44 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
+Run the 46 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes three sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
 
 Launch `Tools/render_shop_review.py` through editor `-ExecCmds=py <absolute script>` with `-RenderOffscreen`. It uses temporal warm-up frames and writes to `Saved/ArtReview`. Hands-on playtesting belongs to the user.
 
@@ -102,3 +102,5 @@ The native `ShopStorageUpgrade` cabinet sits between the brewing bench and suppl
 `ShopBrewingUpgrade` adds a bench-front wooden purchase/selector plaque and a brass bottling rack using the existing materials and engine cubes. The rack and two additional output markers appear after purchase. These native props do not alter the saved map or generated mesh inventory. The rendered workflow records the bench offer in `batch.png`.
 
 The supplier book opens a parchment-coloured native Slate ordering page. Buttons and R/F/T/Enter adjust and pay for the existing packs; F10 closes it. This uses built-in UI brushes/fonts with no new art files. `install_shop_expansion.py` maintains six Moonleaf and six Water as the placed station's starting ingredients, and `check_shop_art.py` validates those quantities. The rendered workflow captures the page in `ordering.png`.
+
+The current map sets `Max Concurrent Customers` to three. Queue positions follow the counter transform at 100 cm spacing; the installer and asset validator retain this setting. The rendered workflow also checks a stocked shop with two shoppers waiting behind the active checkout.
