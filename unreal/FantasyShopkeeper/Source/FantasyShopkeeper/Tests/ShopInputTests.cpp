@@ -714,6 +714,33 @@ namespace
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopBatchScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
                 }
+                Step = 78;
+                NextStep = Now + 0.5;
+                return false;
+            case 78:
+                Key(EKeys::Escape, IE_Pressed);
+                Key(EKeys::Escape, IE_Released);
+                Test->TestTrue(TEXT("Escape offers restart confirmation"), Controller->IsRestartPromptOpen());
+                Key(EKeys::F, IE_Pressed);
+                Key(EKeys::F, IE_Released);
+                Test->TestTrue(TEXT("New game has a separate confirmation"), Controller->IsFreshGameConfirmation());
+                Step = 79;
+                NextStep = Now + 0.5;
+                return false;
+            case 79:
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopRestartScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                Step = 80;
+                NextStep = Now + 0.5;
+                return false;
+            case 80:
+                Key(EKeys::Escape, IE_Pressed);
+                Key(EKeys::Escape, IE_Released);
+                Test->TestFalse(TEXT("Escape cancels restart"), Controller->IsRestartPromptOpen());
+                Test->TestFalse(TEXT("Cancel restores movement input"), Controller->IsMoveInputIgnored());
                 Step = 28;
                 NextStep = Now + 0.5;
                 return false;

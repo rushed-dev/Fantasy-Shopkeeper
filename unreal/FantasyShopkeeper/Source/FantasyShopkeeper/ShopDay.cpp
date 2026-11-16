@@ -105,6 +105,7 @@ void AShopGameState::InitializeDay(const FString& SavePath)
     // Older maps may still contain a placed demonstration customer.
     for (TActorIterator<AShopCustomer> It(GetWorld()); It; ++It) It->Destroy();
     for (TActorIterator<AShopTill> It(GetWorld()); It; ++It) It->AssignCustomer(nullptr);
+    InitialMorning = CaptureMorning(1);
     if (!CheckpointPath.IsEmpty() && IFileManager::Get().FileExists(*CheckpointPath))
     {
         RestoreMorning();
@@ -328,7 +329,12 @@ bool AShopGameState::WriteMorning(UShopMorningSave* Save)
 
 bool AShopGameState::RestoreMorning()
 {
-    if (!HasAuthority() || bChangingEconomy || bOvernight || !bDayInitialized || CheckpointPath.IsEmpty()) return false;
+    if (!HasAuthority() || bChangingEconomy || bOvernight || !bDayInitialized) return false;
+    if (CheckpointPath.IsEmpty())
+    {
+        CheckpointMessage = TEXT("This session has no saved morning to restart.");
+        return false;
+    }
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         if (It->bBrewing) return false;
     TGuardValue<bool> Guard(bChangingEconomy, true);
@@ -452,4 +458,38 @@ bool AShopGameState::BeginOvernight()
         for (TActorIterator<AShopDayLighting> It(GetWorld()); It; ++It) It->EndNight(bAdvanced);
     }), 3.5f, false);
     return true;
+}
+
+bool AShopGameState::StartFreshGame()
+{
+    if (!HasAuthority() || bChangingEconomy || bOvernight || !bDayInitialized || !InitialMorning || CheckpointPath.IsEmpty()) return false;
+    for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It) if (It->bBrewing) return false;
+    const bool bHadCheckpoint = IFileManager::Get().FileExists(*CheckpointPath);
+    const FString Backup = CheckpointPath + TEXT(".before-new-game-") + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".bak");
+    if (bHadCheckpoint && IFileManager::Get().Copy(*Backup, *CheckpointPath, false) != COPY_OK)
+    {
+        CheckpointMessage = TEXT("Could not back up the current morning. New game cancelled.");
+        return false;
+    }
+    const bool bWasBlocked = bCheckpointBlocked;
+    bCheckpointBlocked = false; // An explicit new game may replace a backed-up invalid save.
+    if (!WriteMorning(InitialMorning))
+    {
+        bCheckpointBlocked = bWasBlocked;
+        return false;
+    }
+    if (RestoreMorning())
+    {
+        CheckpointMessage = TEXT("Fresh day 1 ready. Previous checkpoint backed up beside Morning.sav.");
+        return true;
+    }
+    // RestoreMorning stages products before mutating the world. Recover the old
+    // disk checkpoint too if that staging fails, retaining the backup either way.
+    const FString Recovery = CheckpointPath + TEXT(".recover");
+    const bool bRecovered = bHadCheckpoint && IFileManager::Get().Copy(*Recovery, *Backup, true) == COPY_OK
+        && ReplaceCheckpoint(CheckpointPath, Recovery);
+    bCheckpointBlocked = bWasBlocked || !bRecovered;
+    CheckpointMessage = bRecovered ? TEXT("New game could not restore its stock. Previous shop preserved.")
+        : TEXT("New game could not restore stock. Previous checkpoint remains in its .bak file.");
+    return false;
 }

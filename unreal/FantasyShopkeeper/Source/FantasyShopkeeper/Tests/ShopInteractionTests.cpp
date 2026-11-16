@@ -28,6 +28,8 @@
 #include "../ShopSupplyControl.h"
 #include "../ShopStorageUpgrade.h"
 #include "../ShopBrewingUpgrade.h"
+#include "../ShopPlayerController.h"
+#include "InputKeyEventArgs.h"
 #include "TimerManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
@@ -2264,6 +2266,101 @@ bool FShopBatchInvalidTest::RunTest(const FString& Parameters)
     Save = File.Read(); Save->Ingredients[0].bBatchUpgraded = false; Save->Ingredients[0].BatchSize = 1; File.Write(Save);
     TestFalse(TEXT("Saved batch slots require purchased kit"), State->RestoreMorning());
     TestTrue(TEXT("Invalid stock save preserves live upgrade"), Station->HasBatchUpgrade());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopRestartInputTest, "FantasyShopkeeper.Day.RestartConfirmationAndRollback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopRestartInputTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(100);
+    AShopBrewingStation* Station = Test.BrewingStation();
+    DayFlow(Test);
+    State->InitializeDay(File.Path);
+    AShopPlayerController* Controller = Test.Spawn<AShopPlayerController>(FVector::ZeroVector);
+    auto Press = [&](FKey Key) { Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), Key, IE_Pressed, FPlatformTime::Cycles64())); };
+    Test.AimAt(Station); TestTrue(TEXT("Spend ingredients before restart"), Station->TryBrew(Test.Interaction));
+    Test.AimAt(Station->OutputSlot); TestTrue(TEXT("Hold the day's bottle"), Test.Interaction->Interact());
+    State->OpenShop(); State->CloseShop(); State->TryBuyStorageUpgrade(Station);
+    Press(EKeys::Escape);
+    TestTrue(TEXT("Escape opens confirmation"), Controller->IsRestartPromptOpen());
+    TestEqual(TEXT("Opening confirmation cannot undo purchases"), State->GetCash(), int64(76));
+    TestTrue(TEXT("Movement blocked while confirming"), Controller->IsMoveInputIgnored());
+    Press(EKeys::N);
+    TestFalse(TEXT("Gameplay shortcuts are blocked by confirmation"), State->IsOvernight());
+    Press(EKeys::Escape);
+    TestFalse(TEXT("Escape cancels"), Controller->IsRestartPromptOpen());
+    TestFalse(TEXT("Cancel restores movement"), Controller->IsMoveInputIgnored());
+    TestEqual(TEXT("Cancel preserves ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 4);
+    Press(EKeys::Escape); Press(EKeys::Enter);
+    TestFalse(TEXT("Confirmation closes after restart"), Controller->IsRestartPromptOpen());
+    TestEqual(TEXT("Restart returns to preparation"), State->GetDayPhase(), EShopDayPhase::Preparation);
+    TestEqual(TEXT("Restart restores cash with purchases"), State->GetCash(), int64(100));
+    TestFalse(TEXT("Restart rolls back upgrade"), Station->HasStorageUpgrade());
+    TestEqual(TEXT("Restart restores ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    TestNull(TEXT("Restart clears the old held bottle"), Test.Interaction->GetHeldItem());
+    TestNull(TEXT("Restart does not duplicate output"), Station->OutputSlot->GetOccupyingItem());
+    Press(EKeys::Escape); Press(EKeys::Enter);
+    TestEqual(TEXT("Repeated restart cannot create money"), State->GetCash(), int64(100));
+    FFileHelper::SaveStringToFile(TEXT("invalid morning"), *File.Path);
+    Press(EKeys::Escape); Press(EKeys::Enter);
+    TestEqual(TEXT("Invalid checkpoint preserves live cash"), State->GetCash(), int64(100));
+    TestFalse(TEXT("Failed restart returns input"), Controller->IsMoveInputIgnored());
+    TestTrue(TEXT("Failure is explained"), State->GetCheckpointMessage().Contains(TEXT("Invalid checkpoint")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopFreshGameTest, "FantasyShopkeeper.Day.FreshGameConfirmationBackupAndRetry",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopFreshGameTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(100);
+    AShopBrewingStation* Station = Test.BrewingStation();
+    DayFlow(Test); State->InitializeDay(File.Path);
+    UShopMorningSave* Save = File.Read();
+    Save->Day = 4; Save->Cash = 18;
+    Save->Ingredients[0].Quantities[TEXT("Moonleaf")] = 0;
+    Save->Ingredients[0].bStorageUpgraded = true;
+    Save->Ingredients[0].bBatchUpgraded = true;
+    Save->Ingredients[0].BatchSize = 3;
+    File.Write(Save); State->RestoreMorning();
+    TArray<uint8> PreviousBytes; FFileHelper::LoadFileToArray(PreviousBytes, *File.Path);
+    AShopPlayerController* Controller = Test.Spawn<AShopPlayerController>(FVector::ZeroVector);
+    auto Press = [&](FKey Key) { Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), Key, IE_Pressed, FPlatformTime::Cycles64())); };
+    Press(EKeys::Escape); Press(EKeys::F);
+    TestTrue(TEXT("New game requires its own confirmation"), Controller->IsFreshGameConfirmation());
+    TestEqual(TEXT("Selecting new game leaves day four intact"), State->GetDay(), 4);
+    Press(EKeys::Escape);
+    TestEqual(TEXT("Cancelling new game preserves cash"), State->GetCash(), int64(18));
+    TUniquePtr<FArchive> Lock(IFileManager::Get().CreateFileReader(*File.Path));
+    Press(EKeys::Escape); Press(EKeys::F); Press(EKeys::Enter);
+    TestEqual(TEXT("Write failure leaves old day intact"), State->GetDay(), 4);
+    TestEqual(TEXT("Write failure leaves old ingredients intact"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    Lock.Reset();
+    Press(EKeys::Escape); Press(EKeys::F); Press(EKeys::Enter);
+    TestEqual(TEXT("New game starts day one"), State->GetDay(), 1);
+    TestEqual(TEXT("New game restores authored starting cash"), State->GetCash(), int64(100));
+    TestEqual(TEXT("New game restores starting ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    TestFalse(TEXT("New game clears old storage purchase"), Station->HasStorageUpgrade());
+    TestFalse(TEXT("New game clears old batch purchase"), Station->HasBatchUpgrade());
+    TestEqual(TEXT("New game resets selector"), Station->GetBatchSize(), 1);
+    TestTrue(TEXT("New day one is the persistent checkpoint"), State->RestoreMorning());
+    TestEqual(TEXT("Reopening stays at day one"), State->GetDay(), 1);
+    TArray<FString> Backups;
+    IFileManager::Get().FindFiles(Backups, *(File.Path + TEXT(".before-new-game-*.bak")), true, false);
+    bool bFoundPrevious = false;
+    for (const FString& Name : Backups)
+    {
+        const FString Backup = FPaths::GetPath(File.Path) / Name;
+        TArray<uint8> Bytes; FFileHelper::LoadFileToArray(Bytes, *Backup);
+        bFoundPrevious |= Bytes == PreviousBytes;
+        IFileManager::Get().Delete(*Backup);
+    }
+    TestTrue(TEXT("Previous day four checkpoint backed up byte-for-byte"), bFoundPrevious);
     return true;
 }
 

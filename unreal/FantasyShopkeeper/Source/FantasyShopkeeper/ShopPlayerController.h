@@ -16,6 +16,8 @@ class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
 
 public:
     AShopPlayerController();
+    bool IsFreshGameConfirmation() const { return bFreshGameConfirmation; }
+    bool IsRestartPromptOpen() const { return bRestartPromptOpen; }
     virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shop")
@@ -33,6 +35,9 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    bool bRestartPromptOpen = false;
+    bool bFreshGameConfirmation = false;
+    void SetRestartPrompt(bool bOpen);
     void HandleInteract();
     void HandleNextRecipe();
     void HandleSetDown();

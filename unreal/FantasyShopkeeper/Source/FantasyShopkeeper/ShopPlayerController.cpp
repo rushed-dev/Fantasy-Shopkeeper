@@ -74,11 +74,12 @@ void AShopPlayerController::SetupInputComponent()
 
 void AShopPlayerController::HandleSetDown()
 {
-    ShopInteraction->SetDownHeldItem();
+    if (!bRestartPromptOpen) ShopInteraction->SetDownHeldItem();
 }
 
 void AShopPlayerController::HandleNextRecipe()
 {
+    if (bRestartPromptOpen) return;
     if (AShopBrewingStation* Station = Cast<AShopBrewingStation>(ShopInteraction->GetInteractionTarget()))
     {
         Station->CycleRecipe(ShopInteraction);
@@ -91,12 +92,36 @@ void AShopPlayerController::HandleNextRecipe()
 
 void AShopPlayerController::HandleInteract()
 {
-    ShopInteraction->Interact();
+    if (!bRestartPromptOpen) ShopInteraction->Interact();
 }
 
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight() && Params.Event != IE_Released) return true;
+    if (Params.Event == IE_Pressed && Params.Key == EKeys::Escape)
+    {
+        SetRestartPrompt(!bRestartPromptOpen);
+        return true;
+    }
+    if (bRestartPromptOpen)
+    {
+        if (Params.Event == IE_Pressed && Params.Key == EKeys::F)
+        {
+            bFreshGameConfirmation = true;
+            return true;
+        }
+        if (Params.Event == IE_Pressed && Params.Key == EKeys::Enter)
+        {
+            if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
+            {
+                if (bFreshGameConfirmation) State->StartFreshGame();
+                else State->RestoreMorning();
+            }
+            SetRestartPrompt(false);
+        }
+        // Releases still reach Enhanced Input so held controls cannot stick.
+        return Params.Event == IE_Released ? Super::InputKey(Params) : true;
+    }
     if (Params.Event == IE_Pressed)
     {
         if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
@@ -170,4 +195,16 @@ void AShopPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
         }
     }
     Super::EndPlay(EndPlayReason);
+}
+
+void AShopPlayerController::SetRestartPrompt(bool bOpen)
+{
+    if (bRestartPromptOpen == bOpen) return;
+    bRestartPromptOpen = bOpen;
+    bFreshGameConfirmation = false;
+    FlushPressedKeys();
+    SetIgnoreMoveInput(bOpen);
+    SetIgnoreLookInput(bOpen);
+    if (APawn* ControlledPawn = GetPawn())
+        if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent()) Movement->StopMovementImmediately();
 }

@@ -30,6 +30,7 @@ public:
     int32 GetDeliveredQuantity(FName Ingredient) const { return MorningDelivery.FindRef(Ingredient); }
     bool HasDelivery() const { return !MorningDelivery.IsEmpty(); }
     bool RestoreMorning();
+    bool StartFreshGame();
     void UpdateDay();
     bool CanStartVisit() const;
     bool ConfirmNoSupplies();
@@ -84,6 +85,7 @@ private:
     int64 Takings = 0;
     int64 SupplySpending = 0;
     int64 UpgradeSpending = 0;
+    UPROPERTY(Transient) TObjectPtr<UShopMorningSave> InitialMorning;
     FString CheckpointPath;
     FString CheckpointMessage;
     UShopMorningSave* CaptureMorning(int32 MorningDay) const;
