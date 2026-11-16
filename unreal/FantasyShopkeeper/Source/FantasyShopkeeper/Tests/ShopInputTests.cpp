@@ -501,6 +501,9 @@ namespace
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopPaidScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
                 }
+                Step = 73; NextStep = Now + 0.2;
+                return false;
+            case 73:
                 AimAt(Till->FindControl(EShopTillControl::Confirm)); AimHeight = 0;
                 Step = 27; NextStep = Now + 0.2;
                 return false;

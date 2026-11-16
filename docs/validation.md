@@ -1,3 +1,16 @@
+# Tactile checkout presentation — 2026-11-16
+
+Checkout now presents the carried bottle through a 0.45-second hand-to-mat motion and a placement sound, followed by staggered payment coin drops/clinks. A collision-free visual copy handles the gesture while the real item retains its reserved checkout-slot ownership. Completion or cancellation restores the real item's visibility. Change coins settle into controlled mat positions; denomination pitches, louder placement clinks and lower return tones reuse the existing original audio cues.
+
+Manual change counting remains authoritative. Incorrect change writes a short ledger note without revealing the required amount. Successful payment produces a stamp gesture, soft thunk, confirmation chime and green PAID receipt; repeating confirmation cannot overwrite the successful receipt or repeat payment. Movement, mouse look, reach checks and guarded transactions remain intact. This is object animation, not bespoke hand/finger animation or free coin physics. No assets, maps or sound files were changed, and no scripts were added.
+
+- Local build and gameplay: **34 passed, 0 automation warnings**, report `Saved/Automation/Gameplay-20261116-173237-488`; log `Saved/Logs/CheckoutPolishChecks.log`. Added checks cover animation progress, reserved ownership, single visibility, exactly-once tender clinks, cancellation, manual-change rejection, preserved paid feedback and the stamp returning to rest. Existing multi-day, save/load and transaction guards pass.
+- Rendered keyboard workflow: **1 passed, 0 automation warnings**, report `Saved/Automation/Rendered-20261116-173813-788`; log `Saved/Logs/CheckoutPolishRendered.log`. Inspected settled counter and paid-receipt captures under `Saved/ArtReview/20261116-173813-788`. The extra receipt capture waits for its frame before restoring aim to the stamp for the repeated-confirmation check.
+- Asset validation: **34 meshes, 87 collision hulls, four shelf sections / 32 positions, two window openings, four pendants; 0 errors and 0 warnings**, log `Saved/Logs/Assets-20261116-173346-369.log`. All seven maintained Python tools parse.
+- Windows package: **passed**, `builds/unreal-checkout-polish/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/CheckoutPolishPackage.log`. Automatic startup and reopening used isolated `Saved/CheckoutPolishSmoke` data and preserved the morning checkpoint hash and timestamp, with no launch/restore warnings or errors. Packaging recovered from a stale Zen lock and reported the existing compiler preferred-version notice; engine-header deprecation notices remain build-only.
+
+All runs used the local build tooling. Audio event timing is covered by automation; perceived loudness, balance and hands-on feel remain for the user's playtest.
+
 # Physical evening planning, night and morning deliveries — 2026-11-16
 
 Implemented an order book on the supplier crate with tomorrow's visitor count, takings, supply spending, cash, stored ingredients, pending paid quantities and the selected order. Reachable PACK / LESS / MORE / REST tabs use E; R/F/T and N remain shortcuts. Orders still use the existing guarded debit and duplicate-confirmation protection. Evening totals live on the book, and supply prompts sit below the physical labels.

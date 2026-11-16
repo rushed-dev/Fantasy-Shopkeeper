@@ -81,7 +81,7 @@ Run the three installers in that order. The expansion commandlet additionally ne
 
 Five completed one-off interaction, brewing, sale, mannequin and small-till migration scripts have been removed. Their durable Blueprint and recipe assets are committed. Current character and till presentation setup lives in the expansion installer.
 
-Run the 33 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
+Run the 34 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
 
 Launch `Tools/render_shop_review.py` through editor `-ExecCmds=py <absolute script>` with `-RenderOffscreen`. It uses temporal warm-up frames and writes to `Saved/ArtReview`. Hands-on playtesting belongs to the user.
 
@@ -93,3 +93,6 @@ The entrance open/closed sign is a native `ShopDoorSign` actor using the shared 
 
 
 The supplier crate now supports a native cream-paper order book with flat PACK, LESS, MORE and REST tabs. These use the existing cube and material kit, with text on the page rather than a floating planning panel. A smaller instance of the existing supply-crate mesh appears beside the entrance for paid morning deliveries, and disappears after E unpacks its contents. The map and the 34-mesh asset inventory are unchanged. The overnight wind/cricket cue is original deterministic synthesis in `ShopDayLighting`, with no imported media or additional tool script.
+
+
+Checkout presentation now moves a collision-free visual copy from the customer's carried bottle pose to the reserved counter position over 0.45 seconds. The actual item retains its shared slot ownership and becomes visible when the copy settles; cancellation restores its visibility. Tender coins fall into controlled dish positions with staggered clinks, change coins settle on the mat, and the PAID stamp moves after a committed sale. Existing original bottle-placement, coin and sale sounds are reused with revised gains and denomination/return pitches. No new media, meshes or tool scripts were added. This is a kinematic object gesture, not bespoke arm/finger animation or free coin physics.
