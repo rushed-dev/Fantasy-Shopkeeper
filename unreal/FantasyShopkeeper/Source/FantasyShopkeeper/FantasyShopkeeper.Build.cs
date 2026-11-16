@@ -8,7 +8,7 @@ public class FantasyShopkeeper : ModuleRules
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AIModule", "NavigationSystem" });
         if (Target.bBuildEditor)
         {
-            PrivateDependencyModuleNames.Add("UnrealEd");
+            PrivateDependencyModuleNames.AddRange(new[] { "UnrealEd", "Slate", "SlateCore" });
         }
     }
 }

@@ -98,7 +98,7 @@ void AShopPlayerController::HandleInteract()
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight() && Params.Event != IE_Released) return true;
-    if (Params.Event == IE_Pressed && Params.Key == EKeys::Escape)
+    if (Params.Event == IE_Pressed && Params.Key == EKeys::F10)
     {
         SetRestartPrompt(!bRestartPromptOpen);
         return true;

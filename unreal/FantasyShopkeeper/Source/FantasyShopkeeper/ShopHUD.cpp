@@ -41,10 +41,10 @@ void AShopHUD::DrawHUD()
         DrawText(bFresh ? TEXT("Start a fresh shop on day 1?") : TEXT("Restart this morning?"), FLinearColor::White, CenterX - 275, CenterY - 65, GEngine->GetMediumFont());
         DrawText(bFresh ? TEXT("All progress resets to the starting shop and ingredients.") : TEXT("Today's sales, brewing, orders and upgrades will be undone."), FLinearColor(0.9f, 0.8f, 0.55f), CenterX - 275, CenterY - 25, GEngine->GetMediumFont());
         DrawText(bFresh ? TEXT("Your previous morning checkpoint will be backed up.") : TEXT("Cash, ingredients and bottles return to the saved morning."), FLinearColor::White, CenterX - 275, CenterY, GEngine->GetMediumFont());
-        DrawText(bFresh ? TEXT("Enter  Start day 1                 Esc  Keep playing") : TEXT("Enter  Restart day     F  New game     Esc  Keep playing"), FLinearColor::White, CenterX - 275, CenterY + 45, GEngine->GetMediumFont());
+        DrawText(bFresh ? TEXT("Enter  Start day 1                 F10  Keep playing") : TEXT("Enter  Restart day     F  New game     F10  Keep playing"), FLinearColor::White, CenterX - 275, CenterY + 45, GEngine->GetMediumFont());
         return;
     }
-    DrawText(TEXT("Esc  Day / New game"), FLinearColor::White, Canvas->ClipX - 175, 20, GEngine->GetSmallFont());
+    DrawText(TEXT("F10  Day / New game"), FLinearColor::White, Canvas->ClipX - 175, 20, GEngine->GetSmallFont());
     DrawRect(FLinearColor::White, CenterX - 1.5f, CenterY - 1.5f, 3.0f, 3.0f);
 
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())

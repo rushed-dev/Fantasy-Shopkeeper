@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Editor.h"
+#include "Kismet2/DebuggerCommands.h"
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -718,9 +719,12 @@ namespace
                 NextStep = Now + 0.5;
                 return false;
             case 78:
-                Key(EKeys::Escape, IE_Pressed);
-                Key(EKeys::Escape, IE_Released);
-                Test->TestTrue(TEXT("Escape offers restart confirmation"), Controller->IsRestartPromptOpen());
+                // Controller injection alone misses editor shortcuts such as Esc/Stop PIE.
+                Test->TestFalse(TEXT("Editor play commands do not consume recovery key during play"),
+                    FPlayWorldCommands::GlobalPlayWorldActions->ProcessCommandBindings(EKeys::F10, FModifierKeysState(), false));
+                Key(EKeys::F10, IE_Pressed);
+                Key(EKeys::F10, IE_Released);
+                Test->TestTrue(TEXT("F10 offers restart confirmation"), Controller->IsRestartPromptOpen());
                 Key(EKeys::F, IE_Pressed);
                 Key(EKeys::F, IE_Released);
                 Test->TestTrue(TEXT("New game has a separate confirmation"), Controller->IsFreshGameConfirmation());
@@ -737,9 +741,9 @@ namespace
                 NextStep = Now + 0.5;
                 return false;
             case 80:
-                Key(EKeys::Escape, IE_Pressed);
-                Key(EKeys::Escape, IE_Released);
-                Test->TestFalse(TEXT("Escape cancels restart"), Controller->IsRestartPromptOpen());
+                Key(EKeys::F10, IE_Pressed);
+                Key(EKeys::F10, IE_Released);
+                Test->TestFalse(TEXT("F10 cancels restart"), Controller->IsRestartPromptOpen());
                 Test->TestFalse(TEXT("Cancel restores movement input"), Controller->IsMoveInputIgnored());
                 Step = 28;
                 NextStep = Now + 0.5;

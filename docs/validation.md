@@ -1,3 +1,13 @@
+# Recovery shortcut in Play-in-Editor — 2026-11-16
+
+Changed the recovery menu toggle and cancellation from Escape to F10. Unreal Editor reserves Escape for Stop Play Session before the game controller receives it. F10 opens recovery options; F then Enter starts a fresh day 1, Enter alone restarts the morning, and F10 cancels. The editor's Escape binding is unchanged.
+
+The previous controller-injected workflow did not exercise editor interception. The rendered workflow now checks `FPlayWorldCommands::GlobalPlayWorldActions->ProcessCommandBindings` for F10 during active PIE before invoking the game's input, then verifies confirmation and cancellation. Unreal's F10 Step Over command is gated to debugger breakpoints; it does not consume the key during ordinary play. Slate dependencies are editor-only for this regression.
+
+- Local gameplay: **43 passed, 0 automation warnings**, `Saved/Automation/Gameplay-20261116-194920-925`; log `Saved/Logs/RecoveryKeyChecks.log`.
+- Rendered workflow with editor-routing regression: **1 passed, 0 automation warnings**, `Saved/Automation/Rendered-20261116-195250-652`; log `Saved/Logs/RecoveryKeyRouting.log`. The F10 confirmation wording was also inspected in `Saved/ArtReview/20261116-195057-036/restart.png` from the initial rendered pass.
+- Local Windows package: **passed**, `builds/unreal-recovery-key/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/RecoveryKeyPackage.log`. Isolated `Saved/RecoveryKeySmoke` startup/reopening preserved the checkpoint hash and timestamp without warnings/errors. No player saves or editor shortcut preferences were modified.
+
 # Day restart and fresh day-one recovery — 2026-11-16
 
 Esc opens recovery options. Enter restarts the current saved morning. F switches to a separate fresh-game confirmation, where Enter starts day 1 and Esc cancels. Movement, look and trading inputs are blocked while confirming; key releases still reach Enhanced Input. Recovery is unavailable during the overnight transition.
