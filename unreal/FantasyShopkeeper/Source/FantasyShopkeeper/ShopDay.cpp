@@ -204,6 +204,8 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
         Entry.Station = It->GetName();
         Entry.Quantities = It->Ingredients;
         Entry.bStorageUpgraded = It->HasStorageUpgrade();
+        Entry.bBatchUpgraded = It->HasBatchUpgrade();
+        Entry.BatchSize = It->GetBatchSize();
         Save->Ingredients.Add(Entry);
     }
     for (TActorIterator<AShopPickupItem> It(GetWorld()); It; ++It)
@@ -222,7 +224,7 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
 
 bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
 {
-    if (!Save || (Save->Version < 1 || Save->Version > 3) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
+    if (!Save || (Save->Version < 1 || Save->Version > 4) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
     TMap<FString, AShopBrewingStation*> Stations;
     // Only current recipe/item classes are trusted; a save cannot instantiate arbitrary actors.
     TMap<FString, TSet<FName>> Products;
@@ -244,6 +246,8 @@ bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
         AShopBrewingStation* const* Station = Stations.Find(Entry.Station);
         if (!Station || SeenStations.Contains(Entry.Station) || Entry.Quantities.Num() != (*Station)->StartingIngredients.Num()) return false;
         if (Save->Version < 3 && Entry.bStorageUpgraded) return false;
+        if ((Save->Version < 4 && Entry.bBatchUpgraded) || (Entry.BatchSize != 1 && Entry.BatchSize != 3)
+            || (!Entry.bBatchUpgraded && Entry.BatchSize != 1)) return false;
         const int32 Capacity = (*Station)->CapacityForUpgrade(Entry.bStorageUpgraded);
         if (Capacity <= 0) return false;
         SeenStations.Add(Entry.Station);
@@ -276,6 +280,13 @@ bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
         {
             AShopShelfSlot* const* Slot = Slots.Find(Entry.Slot);
             if (!Slot || Occupied.Contains(Entry.Slot)) return false;
+            for (const auto& Station : Stations)
+                for (int32 Index = 1; Index < 3; ++Index)
+                    if (*Slot == Station.Value->GetBatchOutput(Index))
+                    {
+                        const FShopSavedIngredients* Saved = Save->Ingredients.FindByPredicate([&Station](const FShopSavedIngredients& Ingredient) { return Ingredient.Station == Station.Key; });
+                        if (!Saved || !Saved->bBatchUpgraded) return false;
+                    }
             Occupied.Add(Entry.Slot);
             if (AShopShelfSection* Section = (*Slot)->GetSection())
             {
@@ -371,6 +382,9 @@ bool AShopGameState::RestoreMorning()
             if (Entry.Station == It->GetName())
             {
                 It->bStorageUpgraded = Entry.bStorageUpgraded;
+                It->bBatchUpgraded = Entry.bBatchUpgraded;
+                It->BatchSize = Entry.BatchSize;
+                It->RefreshBatchOutputs();
                 It->Ingredients = Entry.Quantities;
             }
     PendingDelivery.Empty();

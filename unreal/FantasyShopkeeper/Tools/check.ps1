@@ -59,14 +59,14 @@ if ($Action -eq 'Editor') {
 }
 
 $testFilter = 'FantasyShopkeeper.'
-$expectedTests = 38
+$expectedTests = 41
 $renderArguments = @('-nullrhi')
 if ($Action -eq 'Rendered') {
     $testFilter = 'FantasyShopkeeper.Interaction.ShopMapKeyboardWorkflow'
     $expectedTests = 1
     $reviewPath = Join-Path $projectRoot "Saved/ArtReview/$runId"
     New-Item -ItemType Directory -Force -Path $reviewPath | Out-Null
-    $renderArguments = @('-RenderOffscreen', "-ShopStorageScreenshot=$reviewPath/storage.png", "-ShopSignScreenshot=$reviewPath/sign.png", "-ShopTillScreenshot=$reviewPath/counter.png", "-ShopPaidScreenshot=$reviewPath/paid.png", "-ShopEveningScreenshot=$reviewPath/evening.png", "-ShopMorningScreenshot=$reviewPath/morning.png", "-ShopNightScreenshot=$reviewPath/night.png")
+    $renderArguments = @('-RenderOffscreen', "-ShopBatchScreenshot=$reviewPath/batch.png", "-ShopStorageScreenshot=$reviewPath/storage.png", "-ShopSignScreenshot=$reviewPath/sign.png", "-ShopTillScreenshot=$reviewPath/counter.png", "-ShopPaidScreenshot=$reviewPath/paid.png", "-ShopEveningScreenshot=$reviewPath/evening.png", "-ShopMorningScreenshot=$reviewPath/morning.png", "-ShopNightScreenshot=$reviewPath/night.png")
 }
 & $editor $projectFile "-ExecCmds=Automation RunTests $testFilter" '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$reportPath" @localEditorArguments @renderArguments -unattended -nosound -nosplash "-abslog=$logPath"
 if ($LASTEXITCODE -ne 0) { throw "Unreal test process failed with exit code $LASTEXITCODE. See $logPath" }

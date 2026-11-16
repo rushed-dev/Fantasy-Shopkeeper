@@ -33,6 +33,8 @@ public:
     void UpdateDay();
     bool CanStartVisit() const;
     bool ConfirmNoSupplies();
+    static constexpr int32 BatchUpgradePrice = 36;
+    bool TryBuyBatchUpgrade(AShopBrewingStation* Station);
     static constexpr int32 StorageUpgradePrice = 24;
     bool TryBuyStorageUpgrade(AShopBrewingStation* Station);
     int64 GetUpgradeSpending() const { return UpgradeSpending; }

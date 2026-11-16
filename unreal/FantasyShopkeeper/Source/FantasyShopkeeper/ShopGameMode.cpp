@@ -10,6 +10,8 @@
 #include "ShopDoorSign.h"
 #include "ShopSupplyCrate.h"
 #include "ShopStorageUpgrade.h"
+#include "ShopBrewingUpgrade.h"
+#include "ShopBrewingStation.h"
 #include "ShopSupplyControl.h"
 #include "EngineUtils.h"
 #include "UObject/ConstructorHelpers.h"
@@ -41,6 +43,11 @@ void AShopGameMode::StartPlay()
     {
         State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
         GetWorld()->SpawnActor<AShopDayLighting>();
+        for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
+        {
+            AShopBrewingUpgrade* Kit = GetWorld()->SpawnActor<AShopBrewingUpgrade>(It->GetActorTransform().TransformPosition(FVector(0, -42, 0)), It->GetActorRotation());
+            if (Kit) Kit->Configure(*It);
+        }
         for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It)
         {
             AShopSupplyControl* Parcel = GetWorld()->SpawnActor<AShopSupplyControl>(FVector(350, -320, 0), FRotator::ZeroRotator);

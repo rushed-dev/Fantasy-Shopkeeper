@@ -120,3 +120,19 @@ bool AShopGameState::TryBuyStorageUpgrade(AShopBrewingStation* Station)
     CheckpointMessage = TEXT("Extra ingredient drawers fitted. Saved with the next morning.");
     return true;
 }
+
+bool AShopGameState::TryBuyBatchUpgrade(AShopBrewingStation* Station)
+{
+    if (!HasAuthority() || !CanOrderSupplies() || !IsValid(Station) || Station->IsActorBeingDestroyed()
+        || Station->GetWorld() != GetWorld() || Station->HasBatchUpgrade() || Station->bBrewing
+        || !IsValid(Station->GetBatchOutput(1)) || !IsValid(Station->GetBatchOutput(2))
+        || Cash < BatchUpgradePrice || UpgradeSpending > MAX_int64 - BatchUpgradePrice) return false;
+    TGuardValue<bool> Guard(bChangingEconomy, true);
+    Cash -= BatchUpgradePrice;
+    UpgradeSpending += BatchUpgradePrice;
+    Station->bBatchUpgraded = true;
+    Station->BatchSize = 3;
+    Station->RefreshBatchOutputs();
+    CheckpointMessage = TEXT("Batch bottling kit fitted. Saved with the next morning.");
+    return true;
+}

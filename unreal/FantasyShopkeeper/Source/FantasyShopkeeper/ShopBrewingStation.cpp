@@ -1,6 +1,7 @@
 #include "ShopBrewingStation.h"
 
 #include "Components/ArrowComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "ShopBrewingRecipe.h"
@@ -53,6 +54,23 @@ void AShopBrewingStation::BeginPlay()
 {
     Super::BeginPlay();
     Ingredients = StartingIngredients;
+    // Stable identities exist before checkpoint restoration, even before purchase.
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        FActorSpawnParameters Params;
+        Params.Name = FName(*FString::Printf(TEXT("%s_BatchOutput%d"), *GetName(), Index + 1));
+        Params.Owner = this;
+        AShopShelfSlot* Slot = GetWorld()->SpawnActor<AShopShelfSlot>(
+            GetActorTransform().TransformPosition(FVector(Index == 0 ? -18 : 18, -42, 0)), GetActorRotation(), Params);
+        if (Slot)
+        {
+            Slot->bAvailableForSale = false;
+            Slot->InteractionBox->SetBoxExtent(FVector(12, 12, 14));
+            Slot->SlotMarker->SetRelativeScale3D(FVector(0.24, 0.24, 0.01));
+        }
+        ExtraOutputs.Add(Slot);
+    }
+    RefreshBatchOutputs();
     if (IsValid(OutputSlot))
     {
         OutputSlot->bAvailableForSale = false;
@@ -101,16 +119,18 @@ FText AShopBrewingStation::GetBlockReason() const
     {
         return NSLOCTEXT("Shop", "MissingBrewOutput", "No output slot configured");
     }
-    if (OutputSlot->GetOccupyingItem())
+    for (int32 Index = 0; Index < (bBatchUpgraded ? 3 : 1); ++Index)
     {
-        return NSLOCTEXT("Shop", "BrewOutputBlocked", "Clear the brewing output slot");
+        const AShopShelfSlot* Slot = GetBatchOutput(Index);
+        if (!IsValid(Slot) || Slot->GetWorld() != GetWorld() || Slot->IsActorBeingDestroyed() || Slot->GetOccupyingItem())
+            return NSLOCTEXT("Shop", "BrewOutputBlocked", "Clear all brewing output positions");
     }
     for (const TPair<FName, int32>& Cost : Recipe->IngredientCosts)
     {
-        if (GetIngredientQuantity(Cost.Key) < Cost.Value)
+        if (int64(GetIngredientQuantity(Cost.Key)) < int64(Cost.Value) * BatchSize)
         {
             return FText::Format(NSLOCTEXT("Shop", "MissingIngredient", "Need {0} ({1}/{2})"),
-                FText::FromName(Cost.Key), FText::AsNumber(GetIngredientQuantity(Cost.Key)), FText::AsNumber(Cost.Value));
+                FText::FromName(Cost.Key), FText::AsNumber(GetIngredientQuantity(Cost.Key)), FText::AsNumber(int64(Cost.Value) * BatchSize));
         }
     }
     return FText::GetEmpty();
@@ -136,9 +156,9 @@ FText AShopBrewingStation::GetInteractionPrompt(UShopInteractionComponent* Inter
     FString Stock;
     for (const TPair<FName, int32>& Cost : Recipe->IngredientCosts)
     {
-        Stock += FString::Printf(TEXT(" | %s %d/%d"), *Cost.Key.ToString(), GetIngredientQuantity(Cost.Key), Cost.Value);
+        Stock += FString::Printf(TEXT(" | %s %d/%d"), *Cost.Key.ToString(), GetIngredientQuantity(Cost.Key), Cost.Value * BatchSize);
     }
-    return FText::Format(NSLOCTEXT("Shop", "BrewPrompt", "E  Brew {0}{1}{2}"), Recipe->DisplayName, FText::FromString(Stock), RecipeHint);
+    return FText::Format(NSLOCTEXT("Shop", "BrewPrompt", "E  Brew {3} x {0}{1}{2}"), Recipe->DisplayName, FText::FromString(Stock), RecipeHint, FText::AsNumber(BatchSize));
 }
 
 bool AShopBrewingStation::CycleRecipe(UShopInteractionComponent* Interactor)
@@ -180,38 +200,43 @@ bool AShopBrewingStation::TryBrew(UShopInteractionComponent* Interactor)
     // Construction scripts can call back into the station while an item spawns.
     TGuardValue<bool> BrewingGuard(bBrewing, true);
     UShopBrewingRecipe* BatchRecipe = Recipe;
-    AShopShelfSlot* BatchOutput = OutputSlot;
+    const int32 Count = BatchSize;
+    TArray<AShopShelfSlot*> Outputs;
+    for (int32 Index = 0; Index < Count; ++Index) Outputs.Add(GetBatchOutput(Index));
     const TMap<FName, int32> Costs = Recipe->IngredientCosts;
     const FName ProductId = Recipe->ProductId;
     const FText ProductName = Recipe->DisplayName;
     const TSubclassOf<AShopPickupItem> OutputClass = Recipe->OutputItemClass;
-    const FTransform OutputTransform(OutputSlot->PlacementPoint->GetComponentQuat(), OutputSlot->PlacementPoint->GetComponentLocation());
-    AShopPickupItem* Product = GetWorld()->SpawnActorDeferred<AShopPickupItem>(Recipe->OutputItemClass, OutputTransform);
-    if (!IsValid(Product))
+    TArray<AShopPickupItem*> Products;
+    auto Rollback = [&Products]()
     {
+        for (AShopPickupItem* Product : Products) if (IsValid(Product)) Product->Destroy();
         return false;
-    }
-    Product->FinishSpawning(OutputTransform);
-
-    // Commit ingredients only after a live product has acquired its output slot.
-    if (!IsValid(Product))
+    };
+    for (AShopShelfSlot* Slot : Outputs)
     {
-        return false;
+        if (!IsValid(Slot)) return Rollback();
+        const FTransform Transform(Slot->PlacementPoint->GetComponentQuat(), Slot->PlacementPoint->GetComponentLocation());
+        AShopPickupItem* Product = GetWorld()->SpawnActorDeferred<AShopPickupItem>(OutputClass, Transform);
+        if (!IsValid(Product)) return Rollback();
+        Products.Add(Product);
+        Product->FinishSpawning(Transform);
     }
-    Product->ProductId = ProductId;
-    Product->DisplayName = ProductName;
-    if (IsActorBeingDestroyed() || !IsValid(BatchRecipe) || Recipe != BatchRecipe || OutputSlot != BatchOutput
+    // Construction callbacks must not change the quoted recipe, batch or outputs.
+    if (IsActorBeingDestroyed() || !IsValid(BatchRecipe) || Recipe != BatchRecipe || BatchSize != Count
         || BatchRecipe->ProductId != ProductId || !BatchRecipe->DisplayName.EqualTo(ProductName)
         || BatchRecipe->OutputItemClass != OutputClass || !BatchRecipe->IngredientCosts.OrderIndependentCompareEqual(Costs)
-        || !GetBlockReason().IsEmpty() || !Product->PlaceAtSlot(BatchOutput))
+        || !GetBlockReason().IsEmpty()) return Rollback();
+    for (int32 Index = 0; Index < Count; ++Index)
     {
-        Product->Destroy();
-        return false;
+        if (Outputs[Index] != GetBatchOutput(Index) || !IsValid(Products[Index])) return Rollback();
+        Products[Index]->ProductId = ProductId;
+        Products[Index]->DisplayName = ProductName;
+        if (!Products[Index]->PlaceAtSlot(Outputs[Index])) return Rollback();
     }
+    // Only fully placed batches consume ingredients. Each bottle retains ordinary ownership.
     for (const TPair<FName, int32>& Cost : Costs)
-    {
-        Ingredients.FindChecked(Cost.Key) -= Cost.Value;
-    }
+        Ingredients.FindChecked(Cost.Key) -= int32(int64(Cost.Value) * Count);
     UGameplayStatics::PlaySoundAtLocation(this, BatchRecipe->BrewSound, GetActorLocation(), 0.4f);
     return true;
 }
@@ -221,4 +246,28 @@ int32 AShopBrewingStation::CapacityForUpgrade(bool bUpgraded) const
 {
     if (IngredientCapacity <= 0 || (bUpgraded && IngredientCapacity > MAX_int32 / 2)) return 0;
     return bUpgraded ? IngredientCapacity * 2 : IngredientCapacity;
+}
+
+AShopShelfSlot* AShopBrewingStation::GetBatchOutput(int32 Index) const
+{
+    return Index == 0 ? OutputSlot.Get() : (ExtraOutputs.IsValidIndex(Index - 1) ? ExtraOutputs[Index - 1].Get() : nullptr);
+}
+
+void AShopBrewingStation::RefreshBatchOutputs()
+{
+    for (AShopShelfSlot* Slot : ExtraOutputs)
+        if (IsValid(Slot))
+        {
+            Slot->SetActorHiddenInGame(!bBatchUpgraded);
+            Slot->SetActorEnableCollision(bBatchUpgraded);
+        }
+}
+
+bool AShopBrewingStation::CycleBatchSize(UShopInteractionComponent* Interactor)
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed() || bBrewing || !bBatchUpgraded
+        || (State && (State->IsChangingEconomy() || State->IsOvernight())) || !IsValid(Interactor) || Interactor->GetHeldItem()) return false;
+    BatchSize = BatchSize == 3 ? 1 : 3;
+    return true;
 }

@@ -33,6 +33,7 @@
 #include "../ShopDoorSign.h"
 #include "../ShopSupplyControl.h"
 #include "../ShopStorageUpgrade.h"
+#include "../ShopBrewingUpgrade.h"
 #include "../ShopTillControl.h"
 #include "../ShopShelfSection.h"
 #include "../ShopCustomerFlow.h"
@@ -691,6 +692,26 @@ namespace
                 {
                     FString Screenshot;
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopStorageScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                Step = 76;
+                NextStep = Now + 0.5;
+                return false;
+            case 76:
+                for (TActorIterator<AShopBrewingUpgrade> It(World); It; ++It)
+                {
+                    AimTarget = *It;
+                    AimHeight = -12;
+                    Pawn->SetActorLocation(It->GetActorLocation() + FVector(0, -140, 0), false, nullptr, ETeleportType::TeleportPhysics);
+                    break;
+                }
+                Step = 77;
+                NextStep = Now + 1;
+                return false;
+            case 77:
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopBatchScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
                 }
                 Step = 28;

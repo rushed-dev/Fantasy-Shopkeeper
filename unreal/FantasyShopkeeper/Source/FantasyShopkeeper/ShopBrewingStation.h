@@ -16,6 +16,10 @@ class FANTASYSHOPKEEPER_API AShopBrewingStation : public AActor, public IShopInt
 
 public:
     AShopBrewingStation();
+    bool HasBatchUpgrade() const { return bBatchUpgraded; }
+    int32 GetBatchSize() const { return BatchSize; }
+    AShopShelfSlot* GetBatchOutput(int32 Index) const;
+    void RefreshBatchOutputs();
     bool HasStorageUpgrade() const { return bStorageUpgraded; }
     int32 GetIngredientCapacity() const { return CapacityForUpgrade(bStorageUpgraded); }
     int32 CapacityForUpgrade(bool bUpgraded) const;
@@ -64,6 +68,8 @@ protected:
 private:
     friend class AShopGameState;
     friend class AShopSupplyCrate;
+    friend class AShopBrewingUpgrade;
+    bool CycleBatchSize(UShopInteractionComponent* Interactor);
     bool CanReceiveIngredients(const TMap<FName, int32>& Delivery) const;
     void ReceiveIngredients(const TMap<FName, int32>& Delivery);
     FText GetBlockReason() const;
@@ -71,6 +77,9 @@ private:
     UPROPERTY(Transient)
     TMap<FName, int32> Ingredients;
 
+    UPROPERTY(Transient) TArray<TObjectPtr<AShopShelfSlot>> ExtraOutputs;
+    bool bBatchUpgraded = false;
+    int32 BatchSize = 1;
     bool bBrewing = false;
     bool bStorageUpgraded = false;
 };

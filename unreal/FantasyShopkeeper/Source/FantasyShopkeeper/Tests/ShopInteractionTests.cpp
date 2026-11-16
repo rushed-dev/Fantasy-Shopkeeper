@@ -27,6 +27,7 @@
 #include "../ShopDoorSign.h"
 #include "../ShopSupplyControl.h"
 #include "../ShopStorageUpgrade.h"
+#include "../ShopBrewingUpgrade.h"
 #include "TimerManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
@@ -2091,6 +2092,178 @@ bool FShopStorageUpgradeInvalidTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Legacy morning restores without upgrade"), State->RestoreMorning());
         TestEqual(TEXT("Legacy capacity is the authored base"), Station->GetIngredientCapacity(), 30);
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopBatchPurchaseTest, "FantasyShopkeeper.Brewing.BatchPurchaseAndMorningPersistence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopBatchPurchaseTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(100);
+    AShopBrewingStation* Station = Test.BrewingStation(12, 12);
+    DayFlow(Test);
+    AShopBrewingUpgrade* Kit = Test.Spawn<AShopBrewingUpgrade>(FVector(-100, 0, 22));
+    Kit->Configure(Station);
+    auto AimKit = [&]() { Test.Camera->SetWorldRotation((Kit->GetActorLocation() + FVector(0, -16, -12) - Test.Camera->GetComponentLocation()).Rotation()); };
+    State->InitializeDay(File.Path);
+    AimKit();
+    TestFalse(TEXT("Preparation cannot buy the kit"), Test.Interaction->Interact());
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Physical kit purchase succeeds"), Test.Interaction->Interact());
+    TestEqual(TEXT("Kit costs 36 bits"), State->GetCash(), int64(64));
+    TestEqual(TEXT("Kit spending is recorded"), State->GetUpgradeSpending(), int64(36));
+    TestEqual(TEXT("Purchase selects three bottles"), Station->GetBatchSize(), 3);
+    TestFalse(TEXT("Guard rejects a second purchase"), State->TryBuyBatchUpgrade(Station));
+    TestTrue(TEXT("The paid selector changes to one"), Test.Interaction->Interact());
+    TestEqual(TEXT("Single bottle remains available"), Station->GetBatchSize(), 1);
+    TestEqual(TEXT("Selector never charges again"), State->GetCash(), int64(64));
+    TestTrue(TEXT("Uncheckpointed purchase rolls back"), State->RestoreMorning());
+    TestFalse(TEXT("Old morning removes the kit"), Station->HasBatchUpgrade());
+    TestEqual(TEXT("Rollback refunds together"), State->GetCash(), int64(100));
+    State->OpenShop(); State->CloseShop();
+    AimKit(); TestTrue(TEXT("Purchase after rollback succeeds"), Test.Interaction->Interact());
+    Test.AimAt(Station);
+    TestTrue(TEXT("Three bottles brewed before morning"), Station->TryBrew(Test.Interaction));
+    State->ConfirmNoSupplies();
+    TUniquePtr<FArchive> Lock(IFileManager::Get().CreateFileReader(*File.Path));
+    TestFalse(TEXT("Failed write retains evening kit and batch"), State->AdvanceMorning());
+    Lock.Reset();
+    TestTrue(TEXT("Retry saves kit and all outputs"), State->AdvanceMorning());
+    for (int32 Retry = 0; Retry < 2; ++Retry)
+    {
+        TestTrue(TEXT("Batch morning restores"), State->RestoreMorning());
+        TestTrue(TEXT("Purchased kit persists"), Station->HasBatchUpgrade());
+        TestEqual(TEXT("Selected batch persists"), Station->GetBatchSize(), 3);
+        TestEqual(TEXT("No repeated purchase debit"), State->GetCash(), int64(64));
+        TestEqual(TEXT("No repeated ingredient debit"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+        int32 Count = 0;
+        for (TActorIterator<AShopPickupItem> It(Test.World); It; ++It) ++Count;
+        TestEqual(TEXT("Restoring never duplicates batch bottles"), Count, 3);
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            AShopPickupItem* Item = Station->GetBatchOutput(Index)->GetOccupyingItem();
+            if (TestNotNull(TEXT("Every output restores ownership"), Item))
+                TestEqual(TEXT("Bottle belongs to its own output"), Item->GetCurrentSlot(), Station->GetBatchOutput(Index));
+        }
+        Station->GetBatchOutput(1)->GetOccupyingItem()->Destroy();
+    }
+    AimKit();
+    TestTrue(TEXT("Restored selector can choose one bottle"), Test.Interaction->Interact());
+    State->OpenShop(); State->CloseShop(); State->ConfirmNoSupplies();
+    TestTrue(TEXT("Single selection checkpoints with remaining output"), State->AdvanceMorning());
+    TestTrue(TEXT("Single selection restores"), State->RestoreMorning());
+    TestEqual(TEXT("Chosen single mode persists on upgraded station"), Station->GetBatchSize(), 1);
+    for (int32 Index = 0; Index < 3; ++Index)
+        if (AShopPickupItem* Item = Station->GetBatchOutput(Index)->GetOccupyingItem()) Item->Destroy();
+    Test.AimAt(Station);
+    TestTrue(TEXT("Upgraded station can still brew a single bottle"), Station->TryBrew(Test.Interaction));
+    TestEqual(TEXT("Single mode charges one recipe"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 4);
+    TestNull(TEXT("Single mode leaves extra rack empty"), Station->GetBatchOutput(1)->GetOccupyingItem());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopBatchAtomicTest, "FantasyShopkeeper.Brewing.BatchCostsAndAtomicRollback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopBatchAtomicTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(100);
+    AShopBrewingStation* Station = Test.BrewingStation(12, 12);
+    Test.Evening(State);
+    TestTrue(TEXT("Buy batch kit"), State->TryBuyBatchUpgrade(Station));
+    Test.AimAt(Station);
+    int32 Spawned = 0;
+    bool Nested = false;
+    FDelegateHandle Handler = Test.World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateLambda([&](AActor* Actor)
+    {
+        if (Actor->IsA<AShopPickupItem>())
+        {
+            Nested |= Station->TryBrew(Test.Interaction);
+            if (++Spawned == 2) Actor->Destroy();
+        }
+    }));
+    TestFalse(TEXT("Failure on second bottle rolls back entire batch"), Station->TryBrew(Test.Interaction));
+    Test.World->RemoveOnActorSpawnedHandler(Handler);
+    TestFalse(TEXT("Callbacks cannot start a nested batch"), Nested);
+    TestEqual(TEXT("Failed batch spends no ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 12);
+    for (int32 Index = 0; Index < 3; ++Index) TestNull(TEXT("No partial output survives"), Station->GetBatchOutput(Index)->GetOccupyingItem());
+    TestTrue(TEXT("Retry brews exactly three tonics"), Station->TryBrew(Test.Interaction));
+    TestEqual(TEXT("Three tonics cost six leaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    TestEqual(TEXT("Three tonics cost three water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 9);
+    TestFalse(TEXT("Repeated brew cannot replace occupied outputs"), Station->TryBrew(Test.Interaction));
+    Station->OutputSlot->GetOccupyingItem()->Destroy();
+    TestFalse(TEXT("Partial collection still blocks brewing"), Station->TryBrew(Test.Interaction));
+    for (int32 Index = 1; Index < 3; ++Index)
+    {
+        AShopPickupItem* Item = Station->GetBatchOutput(Index)->GetOccupyingItem();
+        TestFalse(TEXT("Batch rack stock is not for sale"), Station->GetBatchOutput(Index)->IsAvailableForSale());
+        Test.Pawn->SetActorLocation(Station->GetBatchOutput(Index)->GetActorLocation() + FVector(0, -100, 0));
+        Test.AimAt(Station->GetBatchOutput(Index));
+        TestTrue(TEXT("Batch bottle uses shared pickup"), Test.Interaction->Interact());
+        TestEqual(TEXT("Bottle moves to the player's hand"), Test.Interaction->GetHeldItem(), Item);
+        Item->Destroy();
+    }
+    Test.Pawn->SetActorLocation(FVector::ZeroVector);
+    Station->Recipe->ProductId = TEXT("MoonlitInk");
+    Station->Recipe->IngredientCosts = {{TEXT("Moonleaf"), 1}, {TEXT("Spring Water"), 2}};
+    Test.AimAt(Station);
+    TestTrue(TEXT("Batch works for ink too"), Station->TryBrew(Test.Interaction));
+    TestEqual(TEXT("Ink charges three leaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 3);
+    TestEqual(TEXT("Ink charges six water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 3);
+    for (int32 Index = 0; Index < 3; ++Index) Station->GetBatchOutput(Index)->GetOccupyingItem()->Destroy();
+    TestFalse(TEXT("Insufficient water rejects the whole batch"), Station->TryBrew(Test.Interaction));
+    Station->Recipe->IngredientCosts[TEXT("Moonleaf")] = MAX_int32;
+    TestFalse(TEXT("Scaled costs cannot overflow"), Station->TryBrew(Test.Interaction));
+    TestEqual(TEXT("Rejected batches preserve ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 3);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopBatchInvalidTest, "FantasyShopkeeper.Brewing.BatchInvalidSavesAndPurchaseGuards",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopBatchInvalidTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(35);
+    AShopBrewingStation* Station = Test.BrewingStation();
+    DayFlow(Test); State->InitializeDay(File.Path); State->OpenShop(); State->CloseShop();
+    TestFalse(TEXT("Insufficient cash rejects kit"), State->TryBuyBatchUpgrade(Station));
+    TestEqual(TEXT("Rejected kit preserves cash"), State->GetCash(), int64(35));
+    UShopMorningSave* Save = File.Read();
+    Save->Cash = 100;
+    for (int32 Version : {1, 2, 3})
+    {
+        Save->Version = Version; Save->Ingredients[0].bBatchUpgraded = true; File.Write(Save);
+        TestFalse(TEXT("Old schema cannot claim batch upgrade"), State->RestoreMorning());
+        Save->Ingredients[0].bBatchUpgraded = false; File.Write(Save);
+        TestTrue(TEXT("Legacy save retains single brewing"), State->RestoreMorning());
+        TestEqual(TEXT("Old save batch size"), Station->GetBatchSize(), 1);
+    }
+    Save->Version = 4;
+    for (int32 Size : {0, 2, MAX_int32})
+    {
+        Save->Ingredients[0].bBatchUpgraded = true; Save->Ingredients[0].BatchSize = Size; File.Write(Save);
+        TestFalse(TEXT("Malformed batch selection rejected"), State->RestoreMorning());
+        TestEqual(TEXT("Invalid save leaves cash intact"), State->GetCash(), int64(100));
+    }
+    Save->Ingredients[0].bBatchUpgraded = false; Save->Ingredients[0].BatchSize = 3; File.Write(Save);
+    TestFalse(TEXT("Unpurchased kit cannot select three"), State->RestoreMorning());
+    Save->Ingredients[0].BatchSize = 1; File.Write(Save); State->RestoreMorning();
+    State->OpenShop(); State->CloseShop();
+    AShopBrewingUpgrade* Kit = Test.Spawn<AShopBrewingUpgrade>(FVector(-500, 0, 22)); Kit->Configure(Station);
+    TestFalse(TEXT("Remote kit purchase rejected"), Kit->Interact_Implementation(Test.Interaction));
+    Kit->SetActorLocation(FVector(-100, 0, 22));
+    AShopPickupItem* Item = Test.Spawn<AShopPickupItem>(FVector(100, -100, 0)); Test.AimAt(Item); Test.Interaction->Interact();
+    TestFalse(TEXT("Full hands reject kit purchase"), Kit->Interact_Implementation(Test.Interaction));
+    Item->Destroy();
+    TestTrue(TEXT("Valid purchase succeeds"), State->TryBuyBatchUpgrade(Station));
+    Test.AimAt(Station); TestTrue(TEXT("Batch produces stock"), Station->TryBrew(Test.Interaction));
+    State->ConfirmNoSupplies(); State->AdvanceMorning();
+    Save = File.Read(); Save->Ingredients[0].bBatchUpgraded = false; Save->Ingredients[0].BatchSize = 1; File.Write(Save);
+    TestFalse(TEXT("Saved batch slots require purchased kit"), State->RestoreMorning());
+    TestTrue(TEXT("Invalid stock save preserves live upgrade"), Station->HasBatchUpgrade());
     return true;
 }
 

@@ -23,6 +23,8 @@ struct FShopSavedIngredients
     UPROPERTY() FString Station;
     UPROPERTY() TMap<FName, int32> Quantities;
     UPROPERTY() bool bStorageUpgraded = false;
+    UPROPERTY() bool bBatchUpgraded = false;
+    UPROPERTY() int32 BatchSize = 1;
 };
 
 UCLASS()
@@ -32,7 +34,7 @@ class UShopMorningSave : public USaveGame
 public:
     static bool Encode(UShopMorningSave* Save, TArray<uint8>& Bytes);
     static UShopMorningSave* Decode(const TArray<uint8>& Bytes);
-    UPROPERTY() int32 Version = 3;
+    UPROPERTY() int32 Version = 4;
     UPROPERTY() int32 Day = 1;
     UPROPERTY() int64 Cash = 0;
     UPROPERTY() TArray<FShopSavedIngredients> Ingredients;
