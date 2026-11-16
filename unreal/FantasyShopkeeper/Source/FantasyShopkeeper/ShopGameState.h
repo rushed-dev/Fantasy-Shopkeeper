@@ -27,6 +27,7 @@ public:
     void UpdateDay();
     bool CanStartVisit() const;
     bool IsDayInitialized() const { return bDayInitialized; }
+    bool IsChangingEconomy() const { return bChangingEconomy; }
     EShopDayPhase GetDayPhase() const { return DayPhase; }
     int32 GetDay() const { return Day; }
     int64 GetTakings() const { return Takings; }

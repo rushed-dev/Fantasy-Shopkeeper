@@ -274,6 +274,8 @@ bool AShopGameState::WriteMorning(UShopMorningSave* Save)
 bool AShopGameState::RestoreMorning()
 {
     if (!HasAuthority() || bChangingEconomy || !bDayInitialized || CheckpointPath.IsEmpty()) return false;
+    for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
+        if (It->bBrewing) return false;
     TGuardValue<bool> Guard(bChangingEconomy, true);
     TArray<uint8> Bytes;
     const int64 Size = IFileManager::Get().FileSize(*CheckpointPath);

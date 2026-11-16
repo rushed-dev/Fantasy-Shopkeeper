@@ -22,6 +22,10 @@
 #include "../ShopSupplyCrate.h"
 #include "../ShopCustomerFlow.h"
 #include "../ShopShelfSection.h"
+#include "../ShopMorningSave.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 
 namespace
 {
@@ -838,6 +842,7 @@ bool FShopCustomerFlowTest::RunTest(const FString& Parameters)
     AShopCustomerFlow* Flow = Test.World->SpawnActorDeferred<AShopCustomerFlow>(AShopCustomerFlow::StaticClass(), Transform);
     Flow->Till = Till;
     Flow->CustomerClass = AShopCustomer::StaticClass();
+    Flow->bCheckoutFollowsTill = false;
     Flow->Entrance = FVector(-140, 140, 0);
     Flow->Checkout = Buyer->GetActorLocation();
     Flow->VisitInterval = 0;
@@ -983,6 +988,7 @@ bool FShopCustomerOrdersTest::RunTest(const FString& Parameters)
     AShopTill* Till = Test.Spawn<AShopTill>(FVector(0, 84, 0));
     AShopCustomerFlow* Flow = Test.Spawn<AShopCustomerFlow>(FVector::ZeroVector);
     Flow->Till = Till;
+    Flow->bCheckoutFollowsTill = false;
     Flow->Entrance = FVector(-140, 140, 0);
     Flow->Checkout = FVector(0, 140, 0);
     Flow->VisitInterval = 0;
@@ -1243,6 +1249,269 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
     AShopTillControl* Control = Till->FindControl(EShopTillControl::Confirm);
     Till->Destroy();
     TestFalse(TEXT("Removing the counter removes its interaction controls"), IsValid(Control));
+    return true;
+}
+
+namespace
+{
+    AShopCustomerFlow* DayFlow(FInteractionWorld& Test)
+    {
+        AShopCustomerFlow* Flow = Test.Spawn<AShopCustomerFlow>(FVector::ZeroVector);
+        Flow->Till = Test.Spawn<AShopTill>(FVector(0, 84, 0));
+        Flow->CustomerClass = AShopCustomer::StaticClass();
+        Flow->bCheckoutFollowsTill = false;
+    Flow->Entrance = FVector(-140, 140, 0);
+        Flow->Checkout = FVector(0, 140, 0);
+        Flow->VisitInterval = Flow->DepartureDelay = 0;
+        return Flow;
+    }
+
+    struct FCheckpointFile
+    {
+        FString Path = FPaths::ProjectSavedDir() / TEXT("Automation") / (FGuid::NewGuid().ToString() + TEXT(".sav"));
+        ~FCheckpointFile() { IFileManager::Get().Delete(*Path); IFileManager::Get().Delete(*(Path + TEXT(".tmp"))); }
+        UShopMorningSave* Read()
+        {
+            TArray<uint8> Bytes;
+            FFileHelper::LoadFileToArray(Bytes, *Path);
+            return UShopMorningSave::Decode(Bytes);
+        }
+        void Write(UShopMorningSave* Save)
+        {
+            TArray<uint8> Bytes;
+            UShopMorningSave::Encode(Save, Bytes);
+            FFileHelper::SaveArrayToFile(Bytes, *Path);
+        }
+    };
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopDayTransitionsTest, "FantasyShopkeeper.Day.TransitionsAndFiniteVisits",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopDayTransitionsTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopCustomerFlow* Flow = DayFlow(Test);
+    Flow->VisitsPerDay = 1;
+    State->InitializeDay(FString());
+    TestFalse(TEXT("Preparation blocks arrivals"), Flow->StartNextVisit());
+    TestFalse(TEXT("Cannot skip preparation straight to tomorrow"), State->AdvanceMorning());
+    TestTrue(TEXT("Explicit opening"), State->OpenShop());
+    TestFalse(TEXT("Opening twice rejected"), State->OpenShop());
+    TestTrue(TEXT("Finite allocation starts"), Flow->StartNextVisit());
+    AShopCustomer* Buyer = Flow->GetActiveCustomer();
+    if (!TestNotNull(TEXT("Active buyer"), Buyer)) return false;
+    Buyer->SetActorLocation(Flow->Checkout);
+    Buyer->Tick(0);
+    TestTrue(TEXT("Close with an active customer"), State->CloseShop());
+    TestFalse(TEXT("Repeated close rejected"), State->CloseShop());
+    TestEqual(TEXT("Closing waits for buyer"), State->GetDayPhase(), EShopDayPhase::Closing);
+    TestFalse(TEXT("Closing blocks new arrivals"), Flow->StartNextVisit());
+    TestFalse(TEXT("Cannot sleep through an obligation"), State->AdvanceMorning());
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
+    AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+    TestTrue(TEXT("Missing stock can still be brewed during closing"), IsValid(Item));
+    TestTrue(TEXT("Closing buyer collects"), Test.CollectAndReturn(Buyer, Item));
+    AShopTill* Till = Flow->Till;
+    Test.AimAt(Till);
+    TestTrue(TEXT("Closing checkout starts"), Till->BeginCheckout(Test.Interaction));
+    Till->SubmitTotal(TEXT("12"));
+    for (int32 Coin = 0; Coin < 8; ++Coin) Till->AddChangeCoin(1);
+    TestTrue(TEXT("Closing sale commits"), Till->ConfirmSale(Test.Interaction));
+    TestEqual(TEXT("Takings count net price only"), State->GetTakings(), int64(12));
+    Flow->Tick(0);
+    Buyer->SetActorLocation(Flow->Entrance);
+    Buyer->Tick(0);
+    Flow->Tick(0);
+    Flow->Tick(0);
+    TestEqual(TEXT("Departure completes closing"), State->GetDayPhase(), EShopDayPhase::Evening);
+    TestNull(TEXT("Finite day does not wrap forever"), Flow->GetActiveCustomer());
+    TestTrue(TEXT("Next morning commits"), State->AdvanceMorning());
+    TestFalse(TEXT("Repeated next morning rejected"), State->AdvanceMorning());
+    TestEqual(TEXT("Day advances once"), State->GetDay(), 2);
+    TestEqual(TEXT("Closing cash preserved"), State->GetCash(), int64(12));
+    TestEqual(TEXT("New daily totals reset"), State->GetTakings(), int64(0));
+    TestTrue(TEXT("Can open another day"), State->OpenShop());
+    TestTrue(TEXT("New day replenishes visitor allocation"), Flow->StartNextVisit());
+    Flow->GetActiveCustomer()->Destroy();
+    Flow->Tick(0);
+    TestEqual(TEXT("Exhausted finite allocation ends automatically"), State->GetDayPhase(), EShopDayPhase::Evening);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopMorningRestoreTest, "FantasyShopkeeper.Day.MorningRestoresWholeEconomy",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(50);
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopCustomerFlow* Flow = DayFlow(Test);
+    AShopShelfSection* Section = Test.Spawn<AShopShelfSection>(FVector(120, -80, 0));
+    TestNotNull(TEXT("Prepare shelf stock"), Test.BrewAndStock(Station, Section->GetSlot(0)));
+    TestNotNull(TEXT("Prepare second shelf position"), Test.BrewAndStock(Station, Section->GetSlot(1)));
+    Test.AimAt(Section);
+    TestTrue(TEXT("Leave a gap in the shelf"), Test.Interaction->Interact());
+    AShopPickupItem* Loose = Test.Interaction->GetHeldItem();
+    Test.Interaction->ReleaseHeldItem();
+    if (Loose) Loose->SetActorLocation(FVector(400, 400, 0));
+    Test.AimAt(Station);
+    TestTrue(TEXT("Prepare output stock"), Station->TryBrew(Test.Interaction));
+    State->InitializeDay(File.Path);
+    if (!TestNotNull(TEXT("Real disk checkpoint written"), File.Read())) return false;
+    const int32 Leaves = Station->GetIngredientQuantity(TEXT("Moonleaf"));
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
+    Crate->Station = Station;
+    Test.AimAt(Crate);
+    TestTrue(TEXT("Paid preparation replenishment"), Test.Interaction->Interact());
+    TestEqual(TEXT("Supply spending tracked"), State->GetSupplySpending(), int64(12));
+    State->OpenShop();
+    Flow->StartNextVisit();
+    AShopCustomer* Buyer = Flow->GetActiveCustomer();
+    if (!TestNotNull(TEXT("Buyer spawned"), Buyer)) return false;
+    Buyer->SetActorLocation(Flow->Checkout);
+    Buyer->Tick(0);
+    TestTrue(TEXT("Buyer collects saved stock"), Test.CollectAndReturn(Buyer, Section->GetSlot(1)->GetOccupyingItem()));
+    AShopTill* Till = Flow->Till;
+    Test.AimAt(Till);
+    Till->BeginCheckout(Test.Interaction);
+    Till->SubmitTotal(TEXT("12"));
+    for (int32 Coin = 0; Coin < 8; ++Coin) Till->AddChangeCoin(1);
+    TestTrue(TEXT("Sale before restore"), Till->ConfirmSale(Test.Interaction));
+    TestEqual(TEXT("Cash reflects purchase and sale"), State->GetCash(), int64(50));
+    for (int32 Retry = 0; Retry < 3; ++Retry)
+    {
+        TestTrue(TEXT("Restore can repeat without adding anything"), State->RestoreMorning());
+        TestEqual(TEXT("Morning cash replaced"), State->GetCash(), int64(50));
+        TestEqual(TEXT("Purchase delivery rolled back"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves);
+        TestEqual(TEXT("Exactly one saved shelf bottle"), Section->GetStockCount(), 1);
+        TestNotNull(TEXT("Output bottle restored"), Station->OutputSlot->GetOccupyingItem());
+        int32 Count = 0;
+        for (TActorIterator<AShopPickupItem> It(Test.World); It; ++It) ++Count;
+        TestEqual(TEXT("No stock duplication"), Count, 3);
+        TestNull(TEXT("Empty first position preserved"), Section->GetSlot(0)->GetOccupyingItem());
+        TestNotNull(TEXT("Exact second position preserved"), Section->GetSlot(1)->GetOccupyingItem());
+        TestEqual(TEXT("Section lock rebuilt"), Section->GetLockedProductId(), FName(TEXT("DawnTonic")));
+        TestNull(TEXT("Old visit discarded"), Flow->GetActiveCustomer());
+        TestEqual(TEXT("Pending receipt cleared"), Till->GetPhase(), EShopTillPhase::Idle);
+        TestFalse(TEXT("Old sale cannot be replayed"), Till->ConfirmSale(Test.Interaction));
+        TestEqual(TEXT("Daily spending reset"), State->GetSupplySpending(), int64(0));
+    }
+    Test.AimAt(Crate);
+    TestTrue(TEXT("Fresh purchase works after load"), Test.Interaction->Interact());
+    State->OpenShop();
+    State->CloseShop();
+    TestTrue(TEXT("Morning saves paid supplies and unsold stock"), State->AdvanceMorning());
+    TestTrue(TEXT("Reload next morning"), State->RestoreMorning());
+    TestEqual(TEXT("Day two restored"), State->GetDay(), 2);
+    TestEqual(TEXT("Paid cost not replayed"), State->GetCash(), int64(38));
+    TestEqual(TEXT("Delivery not replayed"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves + 6);
+    // A replacement GameState simulates startup against the same stable map actors.
+    State->Destroy();
+    State = Test.ShopState(999);
+    State->InitializeDay(File.Path);
+    TestEqual(TEXT("New session restores disk cash"), State->GetCash(), int64(38));
+    TestEqual(TEXT("New session restores day"), State->GetDay(), 2);
+    TestEqual(TEXT("New session preserves shelf stock"), Section->GetStockCount(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopInvalidMorningTest, "FantasyShopkeeper.Day.InvalidSavesArePreserved",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopInvalidMorningTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(25);
+    AShopBrewingStation* Station = Test.BrewingStation();
+    DayFlow(Test);
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
+    Test.BrewAndStock(Station, Shelf);
+    State->InitializeDay(File.Path);
+    UShopMorningSave* Valid = File.Read();
+    if (!TestNotNull(TEXT("Fixture checkpoint"), Valid)) return false;
+    auto Reject = [&](UShopMorningSave* Bad)
+    {
+        File.Write(Bad);
+        TArray<uint8> Before, After;
+        FFileHelper::LoadFileToArray(Before, *File.Path);
+        TestFalse(TEXT("Invalid save rejected"), State->RestoreMorning());
+        TestEqual(TEXT("Rejected restore keeps money"), State->GetCash(), int64(25));
+        TestNotNull(TEXT("Rejected restore keeps stock"), Shelf->GetOccupyingItem());
+        State->OpenShop();
+        State->CloseShop();
+        TestFalse(TEXT("Invalid file cannot be overwritten by morning advance"), State->AdvanceMorning());
+        FFileHelper::LoadFileToArray(After, *File.Path);
+        TestTrue(TEXT("Invalid file preserved byte for byte"), Before == After);
+        File.Write(Valid);
+        TestTrue(TEXT("Corrected checkpoint can restore"), State->RestoreMorning());
+    };
+    UShopMorningSave* Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Version = 999; Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Cash = -1; Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Ingredients[0].Quantities[TEXT("Moonleaf")] = 31; Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    const FShopSavedStock DuplicateStock = Bad->Stock[0];
+    Bad->Stock.Add(DuplicateStock); Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Stock[0].Slot = TEXT("MissingShelf"); Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Stock[0].ItemClass = TEXT("/Script/Engine.Actor"); Reject(Bad);
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Stock[0].Product = TEXT("UnknownProduct"); Reject(Bad);
+    TArray<uint8> Bytes;
+    UShopMorningSave::Encode(Valid, Bytes);
+    Bytes.Last() ^= 1;
+    FFileHelper::SaveArrayToFile(Bytes, *File.Path);
+    TestFalse(TEXT("Corrupt payload rejected before Unreal deserialization"), State->RestoreMorning());
+    Bytes.SetNum(12);
+    FFileHelper::SaveArrayToFile(Bytes, *File.Path);
+    TestFalse(TEXT("Truncated file rejected"), State->RestoreMorning());
+    State->Destroy();
+    State = Test.ShopState(25);
+    State->InitializeDay(File.Path);
+    TestTrue(TEXT("Invalid startup reports the issue"), State->GetCheckpointMessage().Contains(TEXT("Invalid")));
+    TestEqual(TEXT("Invalid startup retains default cash"), State->GetCash(), int64(25));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopMorningFailureTest, "FantasyShopkeeper.Day.HeldStockAndWriteFailure",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopMorningFailureTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    DayFlow(Test);
+    State->InitializeDay(File.Path);
+    State->OpenShop();
+    State->CloseShop();
+    Test.AimAt(Station);
+    bool NestedRestore = true;
+    const FDelegateHandle Handle = Test.World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateLambda([&](AActor* Actor)
+    {
+        if (Actor->IsA<AShopPickupItem>()) NestedRestore = State->RestoreMorning();
+    }));
+    TestTrue(TEXT("Brew commits while a callback attempts restoration"), Station->TryBrew(Test.Interaction));
+    Test.World->RemoveOnActorSpawnedHandler(Handle);
+    TestFalse(TEXT("Cannot restore halfway through consuming ingredients"), NestedRestore);
+    Test.AimAt(Station->OutputSlot);
+    TestTrue(TEXT("Hold a finished brew"), Test.Interaction->Interact());
+    TestFalse(TEXT("Held stock blocks sleep"), State->AdvanceMorning());
+    TestEqual(TEXT("Blocked sleep keeps day"), State->GetDay(), 1);
+    TestTrue(TEXT("Put brew back"), Test.Interaction->Interact());
+    // A real file lock tests failure without logging an expected filesystem warning.
+    TUniquePtr<FArchive> Lock(IFileManager::Get().CreateFileReader(*File.Path));
+    TestFalse(TEXT("Locked destination blocks advancement"), State->AdvanceMorning());
+    TestEqual(TEXT("Write failure retains evening"), State->GetDayPhase(), EShopDayPhase::Evening);
+    Lock.Reset();
+    TestTrue(TEXT("Retry after failure succeeds"), State->AdvanceMorning());
+    TestEqual(TEXT("Retry advances exactly once"), State->GetDay(), 2);
     return true;
 }
 

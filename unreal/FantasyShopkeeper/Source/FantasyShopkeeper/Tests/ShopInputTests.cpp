@@ -54,7 +54,7 @@ namespace
         virtual bool Update() override
         {
             const double Now = FPlatformTime::Seconds();
-            if (Now - Started > 150.0)
+            if (Now - Started > 180.0)
             {
                 Test->AddError(FString::Printf(TEXT("Shop E-key workflow timed out at step %d. Customer activity=%d position=%s held=%s"),
                     Step, Customer.IsValid() ? static_cast<int32>(Customer->Activity) : -1,
@@ -199,6 +199,12 @@ namespace
                 {
                     Test->AddError(TEXT("Shop map needs a customer flow and supply crate"));
                     return true;
+                }
+                if (AShopGameState* DayState = World->GetGameState<AShopGameState>(); DayState && DayState->IsDayInitialized())
+                {
+                    Test->TestEqual(TEXT("Map starts in preparation"), DayState->GetDayPhase(), EShopDayPhase::Preparation);
+                    Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), EKeys::O, IE_Pressed, FPlatformTime::Cycles64()));
+                    Test->TestTrue(TEXT("Opening permits the first visit"), Flow->StartNextVisit());
                 }
                 for (TActorIterator<AShopCustomer> It(World); It; ++It)
                 {
@@ -520,16 +526,9 @@ namespace
                 ++Visits;
                 if (Visits >= 3)
                 {
-                    FString Screenshot;
-                    if (!FParse::Value(FCommandLine::Get(), TEXT("ShopCornerScreenshot="), Screenshot))
-                    {
-                        return true;
-                    }
                     AimTarget.Reset();
-                    Pawn->SetActorLocation(FVector(400, 70, 160), false, nullptr, ETeleportType::TeleportPhysics);
-                    Controller->SetControlRotation((FVector(665, 370, 120) - Camera->GetComponentLocation()).Rotation());
-                    Step = 32;
-                    NextStep = Now + 3;
+                    Step = 44;
+                    NextStep = Now + 0.2;
                     return false;
                 }
                 break;
@@ -643,6 +642,42 @@ namespace
                 Step = 25;
                 NextStep = Now + 0.2;
                 return false;
+            case 44:
+                if (World->GetGameState<AShopGameState>()->GetDayPhase() != EShopDayPhase::Evening)
+                {
+                    NextStep = Now + 0.2;
+                    return false;
+                }
+                Test->TestNull(TEXT("Final departure leaves no fourth visitor"), Flow->GetActiveCustomer());
+                Test->TestEqual(TEXT("Day includes all three sales"), World->GetGameState<AShopGameState>()->GetTakings(), int64(42));
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopEveningScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
+                }
+                break;
+            case 45:
+                Key(EKeys::N, IE_Pressed);
+                Key(EKeys::N, IE_Released);
+                Test->TestEqual(TEXT("N advances to morning two"), World->GetGameState<AShopGameState>()->GetDay(), 2);
+                Test->TestEqual(TEXT("Next morning requires explicit reopening"), World->GetGameState<AShopGameState>()->GetDayPhase(), EShopDayPhase::Preparation);
+                Test->TestNull(TEXT("Preparation has no customer"), Flow->GetActiveCustomer());
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopMorningScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
+                }
+                break;
+            case 46:
+                {
+                    FString Screenshot;
+                    if (!FParse::Value(FCommandLine::Get(), TEXT("ShopCornerScreenshot="), Screenshot)) return true;
+                    Pawn->SetActorLocation(FVector(400, 70, 160), false, nullptr, ETeleportType::TeleportPhysics);
+                    Controller->SetControlRotation((FVector(665, 370, 120) - Camera->GetComponentLocation()).Rotation());
+                    Step = 32;
+                    NextStep = Now + 3;
+                    return false;
+                }
             case 40:
                 Key(EKeys::R, IE_Pressed);
                 break;

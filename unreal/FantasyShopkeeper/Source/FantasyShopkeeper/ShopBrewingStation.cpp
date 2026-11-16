@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "ShopBrewingRecipe.h"
+#include "ShopGameState.h"
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
 #include "ShopShelfSlot.h"
@@ -168,6 +169,8 @@ bool AShopBrewingStation::Interact_Implementation(UShopInteractionComponent* Int
 
 bool AShopBrewingStation::TryBrew(UShopInteractionComponent* Interactor)
 {
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (State && State->IsChangingEconomy()) return false;
     if (!HasAuthority() || bBrewing || !IsValid(Interactor) || Interactor->GetHeldItem() || !Interactor->CanReach(this)
         || !HasActorBegunPlay() || !GetBlockReason().IsEmpty())
     {
