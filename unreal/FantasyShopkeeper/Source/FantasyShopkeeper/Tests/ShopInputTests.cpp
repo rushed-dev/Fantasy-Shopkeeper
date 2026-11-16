@@ -115,7 +115,16 @@ namespace
                 const bool bCustomer = Target->IsA<AShopCustomer>();
                 AimHeight = bCustomer ? 0.0f : 12.0f;
                 const float Distance = Target->GetActorLocation().Z < 50 ? 100.f : 140.f;
-                const FVector Approach(Target->GetActorLocation().X, Target->GetActorLocation().Y - Distance, Pawn->GetSimpleCollisionHalfHeight() + 2.5);
+                AShopTill* CheckoutTarget = Cast<AShopTill>(Target);
+                if (AShopTillControl* Control = Cast<AShopTillControl>(Target))
+                {
+                    CheckoutTarget = Control->GetTill();
+                }
+                const FVector Offset = CheckoutTarget
+                    ? CheckoutTarget->GetActorTransform().TransformVectorNoScale(FVector(0, -Distance, 0))
+                    : FVector(0, -Distance, 0);
+                const FVector Approach(Target->GetActorLocation().X + Offset.X, Target->GetActorLocation().Y + Offset.Y,
+                    Pawn->GetSimpleCollisionHalfHeight() + 2.5);
                 Pawn->SetActorLocation(Approach, false, nullptr, ETeleportType::TeleportPhysics);
                 const FVector AimPoint = Target->GetActorLocation() + FVector(0, 0, AimHeight);
                 Controller->SetControlRotation((AimPoint - Camera->GetComponentLocation()).Rotation());
@@ -207,6 +216,13 @@ namespace
                     Item = *It;
                     break;
                 }
+                if (!Item.IsValid())
+                {
+                    // The saved shop may have no loose stock. Use its real
+                    // recipe presentation for the pickup/transfer fixture.
+                    Item = World->SpawnActor<AShopPickupItem>(Station->Recipe->OutputItemClass,
+                        FVector(150, 350, 100), FRotator::ZeroRotator);
+                }
                 for (TActorIterator<AShopShelfSlot> It(World); It; ++It)
                 {
                     if (It->IsAvailableForSale() && *It != Station->OutputSlot
@@ -229,7 +245,7 @@ namespace
                 });
                 if (!Item.IsValid() || Slots.Num() < 2)
                 {
-                    Test->AddError(TEXT("Shop map must contain a native item and two native slots"));
+                    Test->AddError(FString::Printf(TEXT("Shop map fixture is incomplete: item=%s sale-section-first-slots=%d"), *GetNameSafe(Item.Get()), Slots.Num()));
                     return true;
                 }
                 Customer->RequestedProductId = TEXT("InputFixturePending");
@@ -403,11 +419,19 @@ namespace
                 AimAt(Till.Get());
                 break;
             case 21:
+                Test->AddInfo(FString::Printf(TEXT("Till start target=%s till=%s root=%s camera=%s customer=%s phase=%d feedback=%s"),
+                    *GetNameSafe(Controller->ShopInteraction->GetInteractionTarget()), *GetNameSafe(Till.Get()),
+                    *Till->GetActorLocation().ToString(), *Camera->GetComponentLocation().ToString(),
+                    *GetNameSafe(Till->Customer), static_cast<int32>(Till->GetPhase()), *Till->GetFeedback().ToString()));
                 Key(EKeys::E, IE_Pressed);
                 break;
             case 22:
                 Key(EKeys::E, IE_Released);
-                Test->TestTrue(TEXT("E starts checkout on the counter"), Till->GetPhase() == EShopTillPhase::EnteringTotal);
+                if (!Test->TestTrue(TEXT("E starts checkout on the counter"), Till->GetPhase() == EShopTillPhase::EnteringTotal))
+                {
+                    Test->AddInfo(FString::Printf(TEXT("Till rejection: %s; target=%s"), *Till->GetFeedback().ToString(), *GetNameSafe(Controller->ShopInteraction->GetInteractionTarget())));
+                    return true;
+                }
                 Test->TestFalse(TEXT("Physical checkout preserves mouse look"), Controller->IsLookInputIgnored());
                 Test->TestFalse(TEXT("Physical checkout preserves movement"), Controller->IsMoveInputIgnored());
                 Key(EKeys::One, IE_Pressed);

@@ -8,7 +8,7 @@
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
 #include "ShopShelfSlot.h"
-#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
 
 AShopShelfSection::AShopShelfSection()
 {
@@ -27,11 +27,6 @@ AShopShelfSection::AShopShelfSection()
     PositionMarkers->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     PositionMarkers->SetCastShadow(false);
     PositionMarkers->SetCanEverAffectNavigation(false);
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> Ring(TEXT("/Game/Shop/Art/Meshes/SM_StockMarkerRing"));
-    if (Ring.Succeeded())
-    {
-        PositionMarkers->SetStaticMesh(Ring.Object);
-    }
     ProductLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ProductLabel"));
     ProductLabel->SetupAttachment(RootComponent);
     ProductLabel->SetRelativeLocation(FVector(0, -26, -8));
@@ -49,6 +44,10 @@ FVector AShopShelfSection::GetSlotOffset(int32 Index) const
 void AShopShelfSection::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
+    if (!PositionMarkers->GetStaticMesh())
+    {
+        PositionMarkers->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Shop/Art/Meshes/SM_StockMarkerRing")));
+    }
     PositionMarkers->ClearInstances();
     for (int32 Index = 0; Index < 8; ++Index)
     {

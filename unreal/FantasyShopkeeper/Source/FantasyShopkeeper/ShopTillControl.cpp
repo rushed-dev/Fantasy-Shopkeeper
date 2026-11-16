@@ -22,7 +22,7 @@ AShopTillControl::AShopTillControl()
     Visual->SetCanEverAffectNavigation(false);
     Label = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
     Label->SetupAttachment(RootComponent);
-    Label->SetRelativeLocation(FVector(0, 0, 3));
+    Label->SetRelativeLocation(FVector(0, 0, 1.6));
     Label->SetRelativeRotation(FRotator(90, -90, 0));
     Label->SetHorizontalAlignment(EHTA_Center);
     Label->SetVerticalAlignment(EVRTA_TextCenter);

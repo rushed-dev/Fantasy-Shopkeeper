@@ -81,7 +81,7 @@ def create_material(name, settings):
         emission = color_node(material, (0.025, 0.12, 0.26))
         MATERIALS.connect_material_property(emission, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     if name == "WarmPlaster":
-        MATERIALS.set_material_usage(material, unreal.MaterialUsage.MATUSAGE_NANITE)
+        MATERIALS.set_base_material_usage(material, unreal.MaterialUsage.MATUSAGE_NANITE)
     MATERIALS.recompile_material(material)
     LIBRARY.save_loaded_asset(material)
     return material
@@ -118,6 +118,9 @@ for name, expected in MANIFEST["assets"].items():
         raise RuntimeError(f"Missing imported static mesh {name}")
     for index, slot in enumerate(mesh.get_editor_property("static_materials")):
         slot_name = str(slot.get_editor_property("imported_material_slot_name"))
+        # Reimport preserves legacy slots even after their geometry is removed.
+        if slot_name == "WindowGlow":
+            slot_name = "WindowGlass"
         mesh.set_material(index, materials[slot_name])
     count = MESHES.get_convex_collision_count(mesh)
     if count != expected["collision_hulls"]:

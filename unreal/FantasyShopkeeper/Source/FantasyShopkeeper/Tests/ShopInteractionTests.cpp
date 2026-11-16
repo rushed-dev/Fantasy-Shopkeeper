@@ -1212,6 +1212,7 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
             return false;
         }
         Test.Camera->SetWorldRotation((Control->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
+        TestEqual(TEXT("The aimed physical control is the actual trace target"), Test.Interaction->GetInteractionTarget(), static_cast<AActor*>(Control));
         return Test.Interaction->Interact();
     };
     TestFalse(TEXT("Coins cannot be counted before the pouch is accepted"), Press(EShopTillControl::AddCoin, 1));
@@ -1235,7 +1236,10 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Sale credits the price once"), State->GetCash(), int64(12));
     TestFalse(TEXT("Physical confirmation cannot repeat payment"), Press(EShopTillControl::Confirm));
     Test.Camera->SetWorldLocation(FVector(0, -600, 155));
-    TestFalse(TEXT("Physical controls reject remote input"), Press(EShopTillControl::Digit, 1));
+    AShopTillControl* RemoteKey = Till->FindControl(EShopTillControl::Digit, 1);
+    Test.Camera->SetWorldRotation((RemoteKey->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
+    TestNull(TEXT("Distant physical controls are outside the trace"), Test.Interaction->GetInteractionTarget());
+    TestFalse(TEXT("Physical controls reject remote input"), IShopInteractable::Execute_Interact(RemoteKey, Test.Interaction));
     AShopTillControl* Control = Till->FindControl(EShopTillControl::Confirm);
     Till->Destroy();
     TestFalse(TEXT("Removing the counter removes its interaction controls"), IsValid(Control));

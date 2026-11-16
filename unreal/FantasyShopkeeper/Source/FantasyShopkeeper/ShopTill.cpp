@@ -304,10 +304,10 @@ void AShopTill::BuildControls()
     for (int32 Digit = 1; Digit <= 9; ++Digit)
     {
         Add(EShopTillControl::Digit, Digit, FVector(-34 + ((Digit - 1) % 3) * 12, -26 + ((Digit - 1) / 3) * 12, 103),
-            FVector(5, 5, 3), KeyMesh, FString::FromInt(Digit));
+            FVector(4.5, 4.5, 2), KeyMesh, FString::FromInt(Digit));
     }
-    Add(EShopTillControl::Digit, 0, FVector(-22, 10, 103), FVector(5, 5, 3), KeyMesh, TEXT("0"));
-    Add(EShopTillControl::Clear, 0, FVector(-34, 10, 103), FVector(5, 5, 3), KeyMesh, TEXT("C"));
+    Add(EShopTillControl::Digit, 0, FVector(-22, 10, 103), FVector(4.5, 4.5, 2), KeyMesh, TEXT("0"));
+    Add(EShopTillControl::Clear, 0, FVector(-34, 10, 103), FVector(4.5, 4.5, 2), KeyMesh, TEXT("C"));
     Add(EShopTillControl::Confirm, 0, FVector(55, -34, 103), FVector(13, 7, 3), KeyMesh, TEXT("SALE"));
     Add(EShopTillControl::AcceptPayment, 0, FVector(50, 24, 112), FVector(14, 12, 14), PouchMesh, TEXT(""));
     if (AShopTillControl* Pouch = FindControl(EShopTillControl::AcceptPayment))
@@ -324,7 +324,7 @@ void AShopTill::BuildControls()
         UStaticMesh* Mesh = CoinMeshes.IsValidIndex(Index) ? CoinMeshes[Index].Get() : nullptr;
         Add(EShopTillControl::AddCoin, Denominations[Index], FVector(-65, -24 + Index * 24, 103), FVector(9, 9, 4), Mesh,
             FString::FromInt(Denominations[Index]));
-        Add(EShopTillControl::RemoveCoin, Denominations[Index], FVector(12 + Index * 18, -8, 103), FVector(8, 12, 8), nullptr, TEXT(""));
+        Add(EShopTillControl::RemoveCoin, Denominations[Index], FVector(12 + Index * 18, -8, 103), FVector(8, 18, 8), nullptr, TEXT(""));
         ChangeVisuals[Index]->SetStaticMesh(Mesh);
         TenderVisuals[Index]->SetStaticMesh(Mesh);
     }
