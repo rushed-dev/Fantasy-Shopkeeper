@@ -42,7 +42,7 @@ The meshes and materials are under `/Game/Shop/Art`. `/Game/Shop/Native/BP_DawnT
 
 `Art_ApothecaryShelving` has four eight-slot sections at 20, 60, 100 and 140 cm. These are the shop's only stock sections, providing 32 positions; the two retail tables and their former six stock sections have been removed. A section fills front-left to right, then back-left to right. Its first product determines the accepted type until empty. Customers share the item pickup operation and free a position before payment.
 
-The whole checkout table is `BP_ShopTill`, with native world-space controls. The kit includes the counter, key, open leather pouch, and copper/silver/brass coins stamped 1/10/100. Payment coins appear in the pouch and change coins in three tray lanes. Each denomination displays up to 48 coins and always shows its exact count. Counting and returning coins use the authoritative till transaction. Confirmation credits cash once.
+The whole checkout table is `BP_ShopTill`, with a flat leather-bound ledger, written number grid, stitched change mat, ceramic payment dish and wooden-handled brass PAID stamp. Small paper slips record tender and counted change. Copper/silver/brass coins retain their 1/10/100 denominations; controlled stacks and mat lanes use the existing guarded transaction. The former floating ticket board and raised keypad are removed. Legacy asset names `SM_TillKey` and `SM_CoinPouch` now contain the stamp and dish to preserve Blueprint references. The kit has 34 meshes and 87 collision hulls (the counter's former upright ticket hull is removed).
 
 The larger checkout counter is moved inward from the entrance wall and faces into the room, with a matching customer waypoint and a verified entrance route.
 
@@ -81,6 +81,10 @@ Run the three installers in that order. The expansion commandlet additionally ne
 
 Five completed one-off interaction, brewing, sale, mannequin and small-till migration scripts have been removed. Their durable Blueprint and recipe assets are committed. Current character and till presentation setup lives in the expansion installer.
 
-Run the 26 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes three visits and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
+Run the 29 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
 
 Launch `Tools/render_shop_review.py` through editor `-ExecCmds=py <absolute script>` with `-RenderOffscreen`. It uses temporal warm-up frames and writes to `Saved/ArtReview`. Hands-on playtesting belongs to the user.
+
+For a focused mesh revision, set `SHOP_ART_ASSETS=SM_CheckoutCounter,SM_TillKey,SM_CoinPouch` in the process environment before running `model_shop_corner.py` and `install_shop_art.py`. Modelling updates those FBXs plus the complete source scene and manifest; studio preview renders are skipped. Importing updates only those meshes using existing materials and does not rewrite Blueprints or the map. Unset the variable for a full regeneration. Runtime rendering is the review source for this partial workflow.
+
+`ShopDayLighting` fades sunlight, sky illumination and the two exterior window fills into evening while leaving the pendants lit. Advancing to morning adds a short camera fade. Lighting follows explicit shop phases without a real-time trading deadline.

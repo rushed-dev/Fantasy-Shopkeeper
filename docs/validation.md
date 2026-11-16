@@ -1,4 +1,20 @@
-# Unreal shop days and checkpoints � 2026-11-16
+# Evening supplies, lighting and ledger — 2026-11-16
+
+Evening orders now debit once and deliver only after the next morning checkpoint commits. Quantity zero explicitly orders nothing. Failed writes retain the paid order for retry; restoring a morning rolls back both the order and its debit. Suppliers accept orders only in evening, with R for pack, F/T for quantity and E to confirm. X can end an unserved visit before stock pickup, preventing a stock shortage from blocking closing. Farming and foraging remain deferred.
+
+The shop fades into night over four seconds at evening, retaining pendant light. Explicit morning advancement adds a 2.5-second fade and restores daylight. A flat ledger, written number grid, ceramic payment dish, change mat and PAID stamp replace the raised keys and floating ticket board. Existing keyboard checkout, free movement, mouse look and guarded payment remain available.
+
+- `Tools/check.ps1`: **29 passed, 0 automation warnings**. Report: `Saved/Automation/Interaction-20261116-111226-354`. New coverage includes evening-only ordering, quantities, zero orders, delayed ingredients, immutable paid quantities, insufficient capacity, save-write failure and retry, repeated restoration without duplicated money or ingredients, phase lighting and unserved visits without invented payments or lost stock. Existing save corruption, ownership and exact-change regressions remain passing.
+- Rendered keyboard workflow: **passed without warnings**, selling both products, closing, paying for an evening order and receiving it in morning two. Report: `Saved/Automation/LedgerRenderedRelease`; inspected captures: `Saved/ArtReview/ledger-till.png`, `ledger-evening.png` and `ledger-morning.png`. Evening shows 30 bits takings; the 12-bit order leaves 18 bits on morning two. Visual review caught and corrected the FBX countertop mirroring, and verified flat ledger/control alignment, dark exterior windows and restored morning daylight.
+- Final asset validator: **34 meshes, 87 collision hulls, four sections / 32 stock positions, two window openings and four pendants; 0 errors and 0 warnings**. Log: `Saved/Logs/LedgerAssetsFinal.log`. The removed upright ticket accounts for one fewer hull. The approved map layout remains unchanged.
+- Windows Development package: **passed**, `builds/unreal-evening-ledger/Windows/FantasyShopkeeper.exe`. Log: `Saved/Logs/LedgerPackage.log`. Automatic startup and reopening passed using isolated `Saved/LedgerPackageSmoke` data; the 2,336-byte checkpoint retained its hash and modification time. Logs: `LedgerPackageLaunch.log` and `LedgerPackageRestore.log`, without warnings or errors.
+- The seven maintained Python tools parse successfully. Selected-mesh regeneration/reimport uses `SHOP_ART_ASSETS`, updates no map or Blueprint assets, and adds no scripts. Final Unreal import completed without warnings/errors; Blender emitted existing API deprecation and sandbox thumbnail-cache notices while successfully exporting the selected FBX files and source scene.
+
+Morning save schema remains compatible: pending orders belong to the unsaved day, while the saved morning contains delivered ingredients and their already-debited cash. No mid-day save or delivery animation is claimed. The player performs manual playtesting; automated checks do not assess subjective handling or sound mix.
+
+The entries below describe earlier checkpoints and are retained as historical evidence.
+
+# Unreal shop days and checkpoints — 2026-11-16
 
 Implemented preparation, explicit opening, a configurable finite visitor allocation, closing that waits for the active customer, evening totals and explicit next-morning advancement. O opens/closes; N advances with empty hands. Morning snapshots replace cash, ingredients and physical items together, including shelf gaps, loose stock and brewing output. Immediate supply purchases remain unchanged; no daily expenses or delayed deliveries are introduced.
 
