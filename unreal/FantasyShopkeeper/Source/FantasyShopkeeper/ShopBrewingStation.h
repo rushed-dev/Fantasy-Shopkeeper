@@ -16,6 +16,9 @@ class FANTASYSHOPKEEPER_API AShopBrewingStation : public AActor, public IShopInt
 
 public:
     AShopBrewingStation();
+    bool HasStorageUpgrade() const { return bStorageUpgraded; }
+    int32 GetIngredientCapacity() const { return CapacityForUpgrade(bStorageUpgraded); }
+    int32 CapacityForUpgrade(bool bUpgraded) const;
 
     virtual bool Interact_Implementation(UShopInteractionComponent* Interactor) override;
 
@@ -69,4 +72,5 @@ private:
     TMap<FName, int32> Ingredients;
 
     bool bBrewing = false;
+    bool bStorageUpgraded = false;
 };

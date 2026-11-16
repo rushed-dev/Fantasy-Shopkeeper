@@ -105,3 +105,18 @@ bool AShopGameState::TryCompleteSale(AShopTill* Till)
     }
     return true;
 }
+
+
+bool AShopGameState::TryBuyStorageUpgrade(AShopBrewingStation* Station)
+{
+    if (!HasAuthority() || !CanOrderSupplies() || !IsValid(Station) || Station->IsActorBeingDestroyed()
+        || Station->GetWorld() != GetWorld() || Station->HasStorageUpgrade() || Station->bBrewing
+        || Station->CapacityForUpgrade(true) <= 0 || Cash < StorageUpgradePrice
+        || UpgradeSpending > MAX_int64 - StorageUpgradePrice) return false;
+    TGuardValue<bool> Guard(bChangingEconomy, true);
+    Cash -= StorageUpgradePrice;
+    UpgradeSpending += StorageUpgradePrice;
+    Station->bStorageUpgraded = true;
+    CheckpointMessage = TEXT("Extra ingredient drawers fitted. Saved with the next morning.");
+    return true;
+}

@@ -9,6 +9,7 @@
 #include "ShopDayLighting.h"
 #include "ShopDoorSign.h"
 #include "ShopSupplyCrate.h"
+#include "ShopStorageUpgrade.h"
 #include "ShopSupplyControl.h"
 #include "EngineUtils.h"
 #include "UObject/ConstructorHelpers.h"
@@ -44,6 +45,8 @@ void AShopGameMode::StartPlay()
         {
             AShopSupplyControl* Parcel = GetWorld()->SpawnActor<AShopSupplyControl>(FVector(350, -320, 0), FRotator::ZeroRotator);
             if (Parcel) Parcel->Configure(*It, EShopSupplyControl::Delivery);
+            AShopStorageUpgrade* Storage = GetWorld()->SpawnActor<AShopStorageUpgrade>(It->GetActorLocation() + FVector(-85, 0, 0), FRotator::ZeroRotator);
+            if (Storage) Storage->Configure(It->Station);
             break;
         }
         if (!TActorIterator<AShopDoorSign>(GetWorld()))

@@ -67,7 +67,7 @@ int32 AShopBrewingStation::GetIngredientQuantity(FName IngredientId) const
 bool AShopBrewingStation::CanReceiveIngredients(const TMap<FName, int32>& Delivery) const
 {
     if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed() || bBrewing
-        || Delivery.IsEmpty() || IngredientCapacity <= 0)
+        || Delivery.IsEmpty() || GetIngredientCapacity() <= 0)
     {
         return false;
     }
@@ -75,7 +75,7 @@ bool AShopBrewingStation::CanReceiveIngredients(const TMap<FName, int32>& Delive
     {
         const int32 Current = GetIngredientQuantity(Entry.Key);
         if (Entry.Key.IsNone() || !StartingIngredients.Contains(Entry.Key) || Entry.Value <= 0 || Current < 0
-            || int64(Current) + Entry.Value > IngredientCapacity)
+            || int64(Current) + Entry.Value > GetIngredientCapacity())
         {
             return false;
         }
@@ -214,4 +214,11 @@ bool AShopBrewingStation::TryBrew(UShopInteractionComponent* Interactor)
     }
     UGameplayStatics::PlaySoundAtLocation(this, BatchRecipe->BrewSound, GetActorLocation(), 0.4f);
     return true;
+}
+
+
+int32 AShopBrewingStation::CapacityForUpgrade(bool bUpgraded) const
+{
+    if (IngredientCapacity <= 0 || (bUpgraded && IngredientCapacity > MAX_int32 / 2)) return 0;
+    return bUpgraded ? IngredientCapacity * 2 : IngredientCapacity;
 }

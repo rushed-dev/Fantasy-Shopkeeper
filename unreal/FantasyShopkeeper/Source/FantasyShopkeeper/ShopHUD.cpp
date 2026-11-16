@@ -13,6 +13,7 @@
 #include "ShopTill.h"
 #include "ShopDoorSign.h"
 #include "ShopSupplyControl.h"
+#include "ShopStorageUpgrade.h"
 #include "ShopTillControl.h"
 #include "ShopSupplyCrate.h"
 #include "ShopCustomerFlow.h"
@@ -82,7 +83,11 @@ void AShopHUD::DrawHUD()
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
-    if (const AShopSupplyControl* SupplyControl = Cast<AShopSupplyControl>(Target))
+    if (const AShopStorageUpgrade* Storage = Cast<AShopStorageUpgrade>(Target))
+    {
+        Prompt = Interaction->GetHeldItem() ? TEXT("Put down the held item to buy storage") : Storage->GetInteractionPrompt().ToString();
+    }
+    else if (const AShopSupplyControl* SupplyControl = Cast<AShopSupplyControl>(Target))
     {
         Prompt = Interaction->GetHeldItem() ? TEXT("Put down the held item first") : SupplyControl->GetInteractionPrompt().ToString();
     }
@@ -143,7 +148,7 @@ void AShopHUD::DrawHUD()
         float Width = 0.0f;
         float Height = 0.0f;
         GetTextSize(Prompt, Width, Height, GEngine->GetMediumFont());
-        const bool bReadingSupplies = Target && (Target->IsA<AShopSupplyCrate>() || Target->IsA<AShopSupplyControl>());
+        const bool bReadingSupplies = Target && (Target->IsA<AShopSupplyCrate>() || Target->IsA<AShopSupplyControl>() || Target->IsA<AShopStorageUpgrade>());
         const float PromptY = bReadingSupplies ? Canvas->ClipY - Height - 30.f : CenterY + 28.f;
         DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), CenterX - Width * 0.5f - 10.0f, PromptY - 6.f, Width + 20.0f, Height + 12.0f);
         DrawText(Prompt, FLinearColor::White, CenterX - Width * 0.5f, PromptY, GEngine->GetMediumFont());

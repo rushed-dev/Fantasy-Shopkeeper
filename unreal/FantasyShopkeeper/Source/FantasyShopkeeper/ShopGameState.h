@@ -33,6 +33,9 @@ public:
     void UpdateDay();
     bool CanStartVisit() const;
     bool ConfirmNoSupplies();
+    static constexpr int32 StorageUpgradePrice = 24;
+    bool TryBuyStorageUpgrade(AShopBrewingStation* Station);
+    int64 GetUpgradeSpending() const { return UpgradeSpending; }
     bool CanReceiveOrder(AShopBrewingStation* Station, const TMap<FName, int32>& Additional) const;
     int32 GetPendingIngredientQuantity(FName Ingredient) const { return PendingDelivery.FindRef(Ingredient); }
     bool HasConfirmedSupplies() const { return bSuppliesConfirmed; }
@@ -78,6 +81,7 @@ private:
     int32 Day = 1;
     int64 Takings = 0;
     int64 SupplySpending = 0;
+    int64 UpgradeSpending = 0;
     FString CheckpointPath;
     FString CheckpointMessage;
     UShopMorningSave* CaptureMorning(int32 MorningDay) const;

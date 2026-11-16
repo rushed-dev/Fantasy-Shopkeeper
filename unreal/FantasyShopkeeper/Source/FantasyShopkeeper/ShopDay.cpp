@@ -184,7 +184,7 @@ bool AShopGameState::AdvanceMorning()
     bSuppliesConfirmed = false;
     for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It) It->ResetOrder();
     ++Day;
-    Takings = SupplySpending = 0;
+    Takings = SupplySpending = UpgradeSpending = 0;
     DayPhase = EShopDayPhase::Preparation;
     if (AShopCustomerFlow* Flow = FindFlow(GetWorld())) Flow->ResetMorning();
     return true;
@@ -203,6 +203,7 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
         FShopSavedIngredients Entry;
         Entry.Station = It->GetName();
         Entry.Quantities = It->Ingredients;
+        Entry.bStorageUpgraded = It->HasStorageUpgrade();
         Save->Ingredients.Add(Entry);
     }
     for (TActorIterator<AShopPickupItem> It(GetWorld()); It; ++It)
@@ -221,7 +222,7 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
 
 bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
 {
-    if (!Save || (Save->Version != 1 && Save->Version != 2) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
+    if (!Save || (Save->Version < 1 || Save->Version > 3) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
     TMap<FString, AShopBrewingStation*> Stations;
     // Only current recipe/item classes are trusted; a save cannot instantiate arbitrary actors.
     TMap<FString, TSet<FName>> Products;
@@ -242,9 +243,12 @@ bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
     {
         AShopBrewingStation* const* Station = Stations.Find(Entry.Station);
         if (!Station || SeenStations.Contains(Entry.Station) || Entry.Quantities.Num() != (*Station)->StartingIngredients.Num()) return false;
+        if (Save->Version < 3 && Entry.bStorageUpgraded) return false;
+        const int32 Capacity = (*Station)->CapacityForUpgrade(Entry.bStorageUpgraded);
+        if (Capacity <= 0) return false;
         SeenStations.Add(Entry.Station);
         for (const auto& Quantity : Entry.Quantities)
-            if (!(*Station)->StartingIngredients.Contains(Quantity.Key) || Quantity.Value < 0 || Quantity.Value > (*Station)->IngredientCapacity) return false;
+            if (!(*Station)->StartingIngredients.Contains(Quantity.Key) || Quantity.Value < 0 || Quantity.Value > Capacity) return false;
     }
     if (Save->Version == 1 && (!Save->Delivery.IsEmpty() || !Save->DeliveryStation.IsEmpty())) return false;
     if (Save->Delivery.IsEmpty() != Save->DeliveryStation.IsEmpty()) return false;
@@ -256,7 +260,7 @@ bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
         if (!Stored) return false;
         for (const auto& Entry : Save->Delivery)
             if (!(*Station)->StartingIngredients.Contains(Entry.Key) || Entry.Value <= 0
-                || int64(Stored->Quantities.FindRef(Entry.Key)) + Entry.Value > (*Station)->IngredientCapacity) return false;
+                || int64(Stored->Quantities.FindRef(Entry.Key)) + Entry.Value > (*Station)->CapacityForUpgrade(Stored->bStorageUpgraded)) return false;
     }
     const auto Slots = GatherSlots(GetWorld());
     TSet<FString> Occupied;
@@ -364,7 +368,11 @@ bool AShopGameState::RestoreMorning()
     }
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         for (const FShopSavedIngredients& Entry : Save->Ingredients)
-            if (Entry.Station == It->GetName()) It->Ingredients = Entry.Quantities;
+            if (Entry.Station == It->GetName())
+            {
+                It->bStorageUpgraded = Entry.bStorageUpgraded;
+                It->Ingredients = Entry.Quantities;
+            }
     PendingDelivery.Empty();
     DeliveryStation.Reset();
     bSuppliesConfirmed = false;
@@ -375,7 +383,7 @@ bool AShopGameState::RestoreMorning()
         if (It->GetName() == Save->DeliveryStation) MorningDeliveryStation = *It;
     Cash = Save->Cash;
     Day = Save->Day;
-    Takings = SupplySpending = 0;
+    Takings = SupplySpending = UpgradeSpending = 0;
     DayPhase = EShopDayPhase::Preparation;
     bCheckpointBlocked = false;
     CheckpointMessage = TEXT("Morning restored. All later stock and cash changes rolled back together.");

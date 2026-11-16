@@ -26,6 +26,7 @@
 #include "../ShopDayLighting.h"
 #include "../ShopDoorSign.h"
 #include "../ShopSupplyControl.h"
+#include "../ShopStorageUpgrade.h"
 #include "TimerManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
@@ -1982,6 +1983,114 @@ bool FShopCustomerDialogueVariationsTest::RunTest(const FString& Parameters)
     First->BeginVisit(First->GetActorLocation()); Reloaded->BeginVisit(Reloaded->GetActorLocation());
     First->AdvanceConversation(1.f); Reloaded->AdvanceConversation(1.f);
     TestEqual(TEXT("Same visit selection restores the same wording"), First->GetSpokenLine().ToString(), Reloaded->GetSpokenLine().ToString());
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopStorageUpgradeTest, "FantasyShopkeeper.Supplies.StorageUpgradePurchaseAndMorningPersistence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopStorageUpgradeTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(200);
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    DayFlow(Test);
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
+    Crate->Station = Station;
+    AShopStorageUpgrade* Storage = Test.Spawn<AShopStorageUpgrade>(FVector(-100, -80, 0));
+    Storage->Configure(Station);
+    State->InitializeDay(File.Path);
+    Test.AimAt(Storage);
+    TestFalse(TEXT("Storage is purchased only during evening planning"), Test.Interaction->Interact());
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Physical cabinet purchase succeeds"), Test.Interaction->Interact());
+    TestEqual(TEXT("Upgrade debits exactly 24 bits"), State->GetCash(), int64(176));
+    TestEqual(TEXT("Upgrade spending is distinct from supplies"), State->GetUpgradeSpending(), int64(24));
+    TestEqual(TEXT("Ingredient capacity doubles"), Station->GetIngredientCapacity(), 60);
+    TestTrue(TEXT("Additional drawers become visible"), Storage->IsExpansionVisible());
+    TestFalse(TEXT("Repeat E cannot buy twice"), Test.Interaction->Interact());
+    TestTrue(TEXT("Uncheckpointed upgrade rolls back with the day"), State->RestoreMorning());
+    Storage->Tick(0);
+    TestEqual(TEXT("Rollback restores cash"), State->GetCash(), int64(200));
+    TestEqual(TEXT("Rollback restores base capacity"), Station->GetIngredientCapacity(), 30);
+    TestFalse(TEXT("Rollback hides extra drawers"), Storage->IsExpansionVisible());
+    State->OpenShop(); State->CloseShop();
+    Test.AimAt(Crate);
+    for (int32 Index = 0; Index < 5; ++Index) Crate->ChangeQuantity(Test.Interaction, 1);
+    TestFalse(TEXT("Six bundles exceed ordinary storage"), Test.Interaction->Interact());
+    Test.AimAt(Storage);
+    TestTrue(TEXT("Upgrade can be repurchased after full rollback"), Test.Interaction->Interact());
+    Test.AimAt(Crate);
+    TestTrue(TEXT("Expanded storage permits six paid bundles"), Test.Interaction->Interact());
+    TestEqual(TEXT("Purchase and order debits remain separate"), State->GetCash(), int64(104));
+    TUniquePtr<FArchive> Lock(IFileManager::Get().CreateFileReader(*File.Path));
+    TestFalse(TEXT("Failed checkpoint leaves evening intact"), State->AdvanceMorning());
+    TestTrue(TEXT("Failed write retains purchased upgrade for retry"), Station->HasStorageUpgrade());
+    Lock.Reset();
+    TestTrue(TEXT("Morning commits upgrade and sealed delivery"), State->AdvanceMorning());
+    for (int32 Retry = 0; Retry < 2; ++Retry)
+    {
+        TestTrue(TEXT("Upgraded morning restores"), State->RestoreMorning());
+        TestEqual(TEXT("Capacity survives load"), Station->GetIngredientCapacity(), 60);
+        TestEqual(TEXT("Loading never repeats upgrade or order debit"), State->GetCash(), int64(104));
+        TestEqual(TEXT("Sealed delivery remains separate"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+        TestTrue(TEXT("Large saved delivery fits restored capacity"), State->UnpackDelivery());
+        TestEqual(TEXT("Delivered stock exceeds old capacity safely"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 36);
+        TestFalse(TEXT("Repeated unpack cannot duplicate upgraded stock"), State->UnpackDelivery());
+    }
+    TestEqual(TEXT("Daily upgrade spending resets at morning"), State->GetUpgradeSpending(), int64(0));
+    State->OpenShop(); State->CloseShop();
+    Test.AimAt(Storage);
+    TestFalse(TEXT("Restored upgrade cannot be purchased again"), Test.Interaction->Interact());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopStorageUpgradeInvalidTest, "FantasyShopkeeper.Supplies.StorageUpgradeRejectionAndLegacySave",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopStorageUpgradeInvalidTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(23);
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    DayFlow(Test);
+    AShopStorageUpgrade* Storage = Test.Spawn<AShopStorageUpgrade>(FVector(-100, 0, 0));
+    Storage->Configure(Station);
+    State->InitializeDay(File.Path);
+    State->OpenShop(); State->CloseShop();
+    Test.AimAt(Storage);
+    TestFalse(TEXT("Insufficient cash cannot buy capacity"), Test.Interaction->Interact());
+    TestEqual(TEXT("Rejected upgrade leaves cash intact"), State->GetCash(), int64(23));
+    UShopMorningSave* Save = File.Read();
+    Save->Cash = 50; File.Write(Save); State->RestoreMorning();
+    State->OpenShop(); State->CloseShop();
+    Storage->SetActorLocation(FVector(-500, 0, 0));
+    TestFalse(TEXT("Cannot buy remotely"), Storage->Interact_Implementation(Test.Interaction));
+    Storage->SetActorLocation(FVector(-100, 0, 0));
+    AShopPickupItem* Held = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+    Test.AimAt(Held); Test.Interaction->Interact(); Test.AimAt(Storage);
+    TestFalse(TEXT("Full hands cannot buy storage"), Test.Interaction->Interact());
+    Held->Destroy();
+    Station->IngredientCapacity = MAX_int32;
+    TestFalse(TEXT("Doubling cannot overflow capacity"), Test.Interaction->Interact());
+    Station->IngredientCapacity = 30;
+    TestTrue(TEXT("Valid purchase succeeds"), Test.Interaction->Interact());
+    Save = File.Read();
+    Save->Ingredients[0].Quantities[TEXT("Moonleaf")] = 31;
+    File.Write(Save);
+    TestFalse(TEXT("Unupgraded save cannot use live upgraded capacity"), State->RestoreMorning());
+    TestEqual(TEXT("Invalid save preserves current upgrade"), Station->GetIngredientCapacity(), 60);
+    TestEqual(TEXT("Invalid save preserves cash"), State->GetCash(), int64(26));
+    Save->Ingredients[0].Quantities[TEXT("Moonleaf")] = 0;
+    for (int32 Version : {1, 2})
+    {
+        Save->Version = Version; Save->Ingredients[0].bStorageUpgraded = true; File.Write(Save);
+        TestFalse(TEXT("Old schemas cannot claim a new upgrade"), State->RestoreMorning());
+        Save->Ingredients[0].bStorageUpgraded = false; File.Write(Save);
+        TestTrue(TEXT("Legacy morning restores without upgrade"), State->RestoreMorning());
+        TestEqual(TEXT("Legacy capacity is the authored base"), Station->GetIngredientCapacity(), 30);
+    }
     return true;
 }
 

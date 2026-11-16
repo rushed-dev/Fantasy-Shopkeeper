@@ -200,8 +200,8 @@ FString AShopSupplyCrate::GetPlanningText() const
     GetOrder(Quantities, Cost);
     const int32 Leaves = Station ? Station->GetIngredientQuantity(TEXT("Moonleaf")) : 0;
     const int32 Water = Station ? Station->GetIngredientQuantity(TEXT("Spring Water")) : 0;
-    return FString::Printf(TEXT("TOMORROW - %d visitors\nTakings %lld / Supplies %lld\nPurse %lld bits\n             Stored  Ordered\nMoonleaf     %d       %d\nWater        %d       %d\n\nAdd %d leaf / %d water\n%d packs : %lld bits\n%s"),
-        Visitors, State->GetTakings(), State->GetSupplySpending(), State->GetCash(), Leaves,
+    return FString::Printf(TEXT("TOMORROW - %d visitors\nTakings %lld / Supplies %lld\nPurse %lld / Upgrades %lld\n             Stored  Ordered\nMoonleaf     %d       %d\nWater        %d       %d\n\nAdd %d leaf / %d water\n%d packs : %lld bits\n%s"),
+        Visitors, State->GetTakings(), State->GetSupplySpending(), State->GetCash(), State->GetUpgradeSpending(), Leaves,
         State->GetPendingIngredientQuantity(TEXT("Moonleaf")), Water, State->GetPendingIngredientQuantity(TEXT("Spring Water")),
         Quantities.FindRef(TEXT("Moonleaf")), Quantities.FindRef(TEXT("Spring Water")), PackCount, Cost,
         State->GetDayPhase() != EShopDayPhase::Evening ? TEXT("Orders taken in the evening")
