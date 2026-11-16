@@ -56,9 +56,10 @@ private:
     friend class AShopShelfSlot;
     friend class UShopInteractionComponent;
     friend class AShopBrewingStation;
+    friend class AShopGameState;
 
     void ReleaseFromCarrier();
-    bool PlaceAtSlot(AShopShelfSlot* DestinationSlot);
+    bool PlaceAtSlot(AShopShelfSlot* DestinationSlot, bool bRestoreMorning = false);
 
     UPROPERTY(Transient)
     TObjectPtr<AShopShelfSlot> CurrentSlot;

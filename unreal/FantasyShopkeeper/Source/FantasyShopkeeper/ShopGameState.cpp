@@ -19,6 +19,7 @@ bool AShopGameState::TryBuySupplies(AShopSupplyCrate* Crate)
     if (bChangingEconomy || !HasAuthority() || !IsValid(Crate) || Crate->IsActorBeingDestroyed()
         || Crate->GetWorld() != GetWorld() || Crate->PriceBits <= 0 || Cash < Crate->PriceBits
         || !IsValid(Crate->Station) || Crate->Station->GetWorld() != GetWorld()
+        || SupplySpending > MAX_int64 - Crate->PriceBits
         || !Crate->Station->CanReceiveIngredients(Crate->Delivery))
     {
         return false;
@@ -26,6 +27,7 @@ bool AShopGameState::TryBuySupplies(AShopSupplyCrate* Crate)
     TGuardValue<bool> TransactionGuard(bChangingEconomy, true);
     Crate->Station->ReceiveIngredients(Crate->Delivery);
     Cash -= Crate->PriceBits;
+    SupplySpending += Crate->PriceBits;
     return true;
 }
 
@@ -39,7 +41,7 @@ bool AShopGameState::TryCompleteSale(AShopTill* Till)
     AShopPickupItem* Item = Till->QuotedItem.Get();
     if (bChangingEconomy || !HasAuthority() || !IsValid(Customer) || Customer->GetWorld() != GetWorld()
         || Customer->IsActorBeingDestroyed() || Customer->HasCompletedSale() || Customer->RequestedProductId.IsNone()
-        || Customer->PriceBits <= 0 || Cash > MAX_int64 - Customer->PriceBits
+        || Customer->PriceBits <= 0 || Cash > MAX_int64 - Customer->PriceBits || Takings > MAX_int64 - Customer->PriceBits
         || !IsValid(Item) || Item->IsActorBeingDestroyed() || Item->GetWorld() != GetWorld()
         || Item->ProductId != Customer->RequestedProductId
         || Item->GetCarrier() != Customer->ShopInteraction || Customer->ShopInteraction->GetHeldItem() != Item
@@ -60,6 +62,7 @@ bool AShopGameState::TryCompleteSale(AShopTill* Till)
         return false;
     }
     Cash += Payment;
+    Takings += Payment;
     Customer->PaidBits = Payment;
     Customer->Activity = EShopCustomerActivity::Completed;
     Till->Phase = EShopTillPhase::Complete;

@@ -11,6 +11,8 @@
 #include "InputKeyEventArgs.h"
 #include "ShopBrewingStation.h"
 #include "ShopSupplyCrate.h"
+#include "ShopGameState.h"
+#include "Engine/World.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -92,6 +94,23 @@ void AShopPlayerController::HandleInteract()
 
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
+    if (Params.Event == IE_Pressed)
+    {
+        if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
+        {
+            if (Params.Key == EKeys::O)
+            {
+                if (State->GetDayPhase() == EShopDayPhase::Preparation) State->OpenShop();
+                else State->CloseShop();
+                return true;
+            }
+            if (Params.Key == EKeys::N)
+            {
+                State->AdvanceMorning();
+                return true;
+            }
+        }
+    }
     AActor* Target = ShopInteraction->GetInteractionTarget();
     AShopTill* Till = Cast<AShopTill>(Target);
     if (AShopTillControl* Control = Cast<AShopTillControl>(Target))

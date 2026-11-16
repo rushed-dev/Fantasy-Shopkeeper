@@ -40,6 +40,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Shop|Customers")
     bool StartNextVisit();
+    void ResetMorning();
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "1", ClampMax = "100"))
+    int32 VisitsPerDay = 3;
+
+    int32 GetStartedVisits() const { return StartedVisits; }
 
     UFUNCTION(BlueprintPure, Category = "Shop|Customers")
     AShopCustomer* GetActiveCustomer() const;
@@ -64,6 +70,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (MakeEditWidget = "true"))
     FVector Checkout = FVector(250, 0, 88);
 
+    // Keep checkout aligned when the counter is moved without rerunning an installer.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers")
+    bool bCheckoutFollowsTill = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers")
+    FVector TillCheckoutOffset = FVector(0, 100, 88);
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Customers", meta = (ClampMin = "0"))
     float VisitInterval = 5;
 
@@ -80,6 +93,7 @@ private:
     TObjectPtr<AShopCustomer> ActiveCustomer;
 
     int32 CompletedVisits = 0;
+    int32 StartedVisits = 0;
     float WaitTime = 0;
     bool bVisitCounted = false;
     bool bStartingVisit = false;

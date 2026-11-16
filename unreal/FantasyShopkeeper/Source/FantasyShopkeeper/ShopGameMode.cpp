@@ -7,6 +7,7 @@
 #include "ShopHUD.h"
 #include "ShopGameState.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Misc/Paths.h"
 
 AShopGameMode::AShopGameMode()
 {
@@ -30,4 +31,8 @@ void AShopGameMode::StartPlay()
         Navigation->Build();
     }
     Super::StartPlay();
+    if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
+    {
+        State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
+    }
 }

@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "ShopCustomer.h"
 #include "ShopTill.h"
+#include "ShopGameState.h"
 
 AShopCustomerFlow::AShopCustomerFlow()
 {
@@ -30,6 +31,11 @@ void AShopCustomerFlow::BeginPlay()
 
 bool AShopCustomerFlow::StartNextVisit()
 {
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (State && State->IsDayInitialized() && (!State->CanStartVisit() || StartedVisits >= VisitsPerDay))
+    {
+        return false;
+    }
     if (!HasAuthority() || !HasActorBegunPlay() || IsActorBeingDestroyed() || bStartingVisit
         || IsValid(ActiveCustomer) || !IsValid(Till) || Till->IsActorBeingDestroyed()
         || Till->GetWorld() != GetWorld() || IsValid(Till->Customer))
@@ -49,12 +55,14 @@ bool AShopCustomerFlow::StartNextVisit()
     }
     const TSubclassOf<AShopCustomer> VisitClass = Order.CustomerClass ? Order.CustomerClass : CustomerClass;
     if (!VisitClass || VisitClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)
-        || Entrance.ContainsNaN() || Checkout.ContainsNaN())
+        || Entrance.ContainsNaN() || Checkout.ContainsNaN() || TillCheckoutOffset.ContainsNaN())
     {
         return false;
     }
     const FVector EntryLocation = GetActorTransform().TransformPosition(Entrance);
-    const FVector CheckoutLocation = GetActorTransform().TransformPosition(Checkout);
+    const FVector CheckoutLocation = bCheckoutFollowsTill
+        ? Till->GetActorTransform().TransformPosition(TillCheckoutOffset)
+        : GetActorTransform().TransformPosition(Checkout);
     const FTransform SpawnTransform((CheckoutLocation - EntryLocation).Rotation(), EntryLocation);
     AShopCustomer* Customer = GetWorld()->SpawnActorDeferred<AShopCustomer>(VisitClass, SpawnTransform,
         nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
@@ -85,6 +93,7 @@ bool AShopCustomerFlow::StartNextVisit()
         return false;
     }
     ActiveCustomer = Customer;
+    ++StartedVisits;
     bOwnsActiveCustomer = true;
     bVisitCounted = false;
     WaitTime = 0;
@@ -94,6 +103,10 @@ bool AShopCustomerFlow::StartNextVisit()
 void AShopCustomerFlow::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
+    {
+        State->UpdateDay();
+    }
     if (!HasAuthority() || !IsValid(Till) || Till->GetWorld() != GetWorld())
     {
         return;
@@ -142,6 +155,24 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
     }
 }
 
+void AShopCustomerFlow::ResetMorning()
+{
+    if (IsValid(Till))
+    {
+        Till->AssignCustomer(nullptr);
+    }
+    if (IsValid(ActiveCustomer))
+    {
+        ActiveCustomer->Destroy();
+    }
+    ActiveCustomer = nullptr;
+    CompletedVisits = 0;
+    StartedVisits = 0;
+    WaitTime = 0;
+    bVisitCounted = false;
+    bOwnsActiveCustomer = false;
+}
+
 void AShopCustomerFlow::EndPlay(const EEndPlayReason::Type Reason)
 {
     if (bOwnsActiveCustomer && IsValid(ActiveCustomer))
@@ -159,6 +190,11 @@ FText AShopCustomerFlow::GetStatusText() const
 {
     if (!IsValid(ActiveCustomer))
     {
+        const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+        if (State && State->IsDayInitialized() && !State->CanStartVisit())
+        {
+            return FText::GetEmpty();
+        }
         return NSLOCTEXT("Shop", "NextCustomerOnWay", "Next customer on the way");
     }
     if (ActiveCustomer->Activity == EShopCustomerActivity::Arriving)

@@ -35,6 +35,21 @@ void AShopHUD::DrawHUD()
         const FString CashText = FText::Format(NSLOCTEXT("Shop", "CashDisplay", "Cash {0} bits"), FText::AsNumber(State->GetCash())).ToString();
         DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), 12, 12, 220, 36);
         DrawText(CashText, FLinearColor::White, 22, 20, GEngine->GetMediumFont());
+        if (State->IsDayInitialized())
+        {
+            const FString DayText = State->GetDayText();
+            float Width = 0, Height = 0;
+            GetTextSize(DayText, Width, Height, GEngine->GetMediumFont());
+            DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), 12, 86, Width + 20, Height + 12);
+            DrawText(DayText, FLinearColor::White, 22, 92, GEngine->GetMediumFont());
+            const FString Message = State->GetCheckpointMessage();
+            if (!Message.IsEmpty())
+            {
+                GetTextSize(Message, Width, Height, GEngine->GetMediumFont());
+                DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), 12, 124, Width + 20, Height + 12);
+                DrawText(Message, FLinearColor(0.9f, 0.8f, 0.55f), 22, 130, GEngine->GetMediumFont());
+            }
+        }
     }
     for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It)
     {

@@ -110,13 +110,18 @@ bool AShopPickupItem::PlaceInSlot(UShopInteractionComponent* Interactor, AShopSh
     return true;
 }
 
-bool AShopPickupItem::PlaceAtSlot(AShopShelfSlot* DestinationSlot)
+bool AShopPickupItem::PlaceAtSlot(AShopShelfSlot* DestinationSlot, bool bRestoreMorning)
 {
     if (!IsValid(DestinationSlot) || DestinationSlot->GetWorld() != GetWorld()
-        || !DestinationSlot->CanAcceptItem(this) || GetCurrentSlot())
+        || DestinationSlot->IsActorBeingDestroyed() || DestinationSlot->bChangingOccupancy
+        || DestinationSlot->GetOccupyingItem() || GetCurrentSlot())
     {
         return false;
     }
+    // Restoring validated stock retains holes left by customers; normal placement
+    // still fills sequentially. Both paths retain the same attachment/ownership commit.
+    if ((!bRestoreMorning && !DestinationSlot->CanAcceptItem(this))
+        || (DestinationSlot->GetSection() && !DestinationSlot->GetSection()->CanAccept(this))) return false;
 
     TGuardValue<bool> SlotGuard(DestinationSlot->bChangingOccupancy, true);
     TOptional<TGuardValue<bool>> SectionGuard;
