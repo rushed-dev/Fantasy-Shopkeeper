@@ -174,9 +174,8 @@ for property_name, value in (
     settings.set_editor_property(property_name, value)
 post.set_editor_property("settings", settings)
 
-# The two tables match the footprint and height of the old display blocks.
-for label, location in (("Art_RetailFront", (650, -50, 0)), ("Art_RetailBack", (650, 50, 0)),
-                        ("Art_PrepFront", (150, 350, 0)), ("Art_PrepBack", (150, 450, 0))):
+# Keep the preparation tables; the retail tables were intentionally removed.
+for label, location in (("Art_PrepFront", (150, 350, 0)), ("Art_PrepBack", (150, 450, 0))):
     table = mesh_actor(label, "SM_ApothecaryBench", location)
     table.set_actor_scale3d(unreal.Vector(300 / 220, 1, 1))
 removed = []
@@ -184,7 +183,8 @@ for old in list(actors.get_all_level_actors()):
     p = old.get_actor_location()
     retail = old.get_actor_label() in {f"SM_Cube{i}" for i in range(66, 72)} and p.x in (500, 600, 700) and p.y in (-100, 0)
     prep = old.get_actor_label() in {f"SM_Cube{i}" for i in range(52, 58)} and p.x in (0, 100, 200) and p.y in (300, 400)
-    if isinstance(old, unreal.StaticMeshActor) and p.z == 0 and (retail or prep):
+    if isinstance(old, unreal.StaticMeshActor) and ((p.z == 0 and (retail or prep))
+            or old.get_actor_label() in {"Art_RetailFront", "Art_RetailBack"}):
         removed.append(old.get_actor_label())
         actors.destroy_actor(old)
 
@@ -233,9 +233,12 @@ for old in list(actors.get_all_level_actors()):
     if (isinstance(old, unreal.ShopShelfSlot) and old.get_editor_property("available_for_sale")) or old.get_actor_label() in {
         "Art_ShelfPrice", "Art_DisplayPrice", "Art_InkPrice", "Art_RetailInkPrice", "CheckoutCounter"}:
         actors.destroy_actor(old)
-for x in (550, 650, 750):
-    for y in (-50, 50):
-        actor(f"RetailSection_{x}_{y}", unreal.ShopShelfSection, (x, y, 100))
+# The approved layout has only the four apothecary sections (32 positions).
+# Do not recreate the six retired table sections when regenerating the room.
+retired_sections = {f"RetailSection_{x}_{y}" for x in (550, 650, 750) for y in (-50, 50)}
+for old in list(actors.get_all_level_actors()):
+    if isinstance(old, unreal.ShopShelfSection) and old.get_actor_label() in retired_sections:
+        actors.destroy_actor(old)
 for z in (20, 60, 100, 140):
     actor(f"ApothecarySection_{z}", unreal.ShopShelfSection, (780, 440, z))
 ring_mesh = library.load_asset("/Game/Shop/Art/Meshes/SM_StockMarkerRing")

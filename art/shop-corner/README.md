@@ -40,7 +40,7 @@ The corrected cork uses the same flattened cross-section as the neck. Its insert
 
 The meshes and materials are under `/Game/Shop/Art`. `/Game/Shop/Native/BP_DawnTonic` extends the native generic pickup class and is the Dawn Tonic recipe's output class. Its mesh has unit scale and zero offset, so the base sits at the carry/placement origin. The loose demonstration bottle is a Dawn Tonic product.
 
-`Art_ApothecaryShelving` has four eight-slot sections at 20, 60, 100 and 140 cm. Six more sections divide the two retail tables. A section fills front-left to right, then back-left to right. Its first product determines the accepted type until empty. Customers share the item pickup operation and free a position before payment.
+`Art_ApothecaryShelving` has four eight-slot sections at 20, 60, 100 and 140 cm. These are the shop's only stock sections, providing 32 positions; the two retail tables and their former six stock sections have been removed. A section fills front-left to right, then back-left to right. Its first product determines the accepted type until empty. Customers share the item pickup operation and free a position before payment.
 
 The whole checkout table is `BP_ShopTill`, with native world-space controls. The kit includes the counter, key, open leather pouch, and copper/silver/brass coins stamped 1/10/100. Payment coins appear in the pouch and change coins in three tray lanes. Each denomination displays up to 48 coins and always shows its exact count. Counting and returning coins use the authoritative till transaction. Confirmation credits cash once.
 
@@ -48,7 +48,7 @@ The larger checkout counter is moved inward from the entrance wall and faces int
 
 Two window wall modules replace measured greybox cubes and wall overlays. Their arched openings have separate translucent glass and timber frames. Original garden ground, fence and low-poly trees provide exterior views. Four visible brass pendants light brewing, preparation, checkout and the entrance, with cool daylight at both windows. Floor and ceiling retain 66 tiles each.
 
-`Tools/install_shop_expansion.py` maintains the room, sections, physical checkout, customer presentations, recipes, supplier and customer flow. It preserves existing furniture transforms unless migrating the old counter or window geometry. Timestamped map backups are under `Saved/BeforeShopExpansion`. Old independent sale slots are replaced by sections. The station output remains independent.
+`Tools/install_shop_expansion.py` maintains the room, sections, physical checkout, customer presentations, recipes, supplier and customer flow. It preserves existing furniture transforms unless migrating the old counter or window geometry. Timestamped map backups are under `Saved/BeforeShopExpansion`. Old independent sale slots are replaced by sections, and the retired retail tables and their six stock sections are removed rather than regenerated. The station output remains independent.
 
 The expansion installs `BP_MoonlitInk`, `DA_MoonlitInk` and `BP_InkCustomer`. Customers use the existing Epic Manny and Quinn meshes with the shared unarmed animation Blueprint. R cycles recipes and supplier packs. E performs world interaction. G sets a held item down on a clear flat surface.
 
@@ -74,7 +74,7 @@ The seven retained Python tools each support a repeatable production task.
 3. `Tools/install_shop_art.py` imports meshes/materials and binds brewing/bottle presentation.
 4. `Tools/install_shop_expansion.py` maintains the saved shop, shelf sections, checkout, windows, lights and navigation.
 5. `Tools/install_shop_audio.py` imports and binds the sounds.
-6. `Tools/check_shop_art.py` validates dimensions, collision, materials, sound bindings, 80 supported stock positions, two window openings and four pendant fixtures.
+6. `Tools/check_shop_art.py` validates dimensions, collision, materials, sound bindings, 32 supported stock positions, two window openings and four pendant fixtures.
 7. `Tools/render_shop_review.py` produces static review images without saving temporary scene dressing.
 
 Run the three installers in that order. The expansion commandlet additionally needs `-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False` for synchronous navigation building. The override applies to that process. The navigation agent supports a 34 cm radius and 180 cm height. The manifest is the complete inventory of the current 34 meshes and their authored convex hulls.

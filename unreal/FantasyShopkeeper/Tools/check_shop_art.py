@@ -38,7 +38,9 @@ all_actors = actors.get_all_level_actors()
 for label in ("Art_BrewingBench", "Art_ApothecaryShelving"):
     assert sum(a.get_actor_label() == label for a in all_actors) == 1, label
 sections = [a for a in all_actors if isinstance(a, unreal.ShopShelfSection)]
-assert len(sections) == 10
+expected_sections = {f"ApothecarySection_{z}" for z in (20, 60, 100, 140)}
+assert len(sections) == 4, f"Expected four stock sections, found {len(sections)}"
+assert {a.get_actor_label() for a in sections} == expected_sections
 assert all(a.get_editor_property("available_for_sale") for a in sections)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 shelving = next(a for a in all_actors if a.get_actor_label() == "Art_ApothecaryShelving")
@@ -134,5 +136,6 @@ assert all(any(a.get_actor_label() == label for a in all_actors) for label in (
 assert station.get_editor_property("output_slot").get_editor_property("slot_marker").static_mesh.get_name() == "SM_StockMarkerRing"
 assert all(any(a.get_actor_label() == label for a in all_actors) for label in (
     "Art_WorkbenchWindow", "Art_SideWindow", "Art_DawnRecipeBook", "Art_DoorSurround",
-    "Art_RetailFront", "Art_RetailBack", "Art_PrepFront", "Art_PrepBack"))
-unreal.log(f"SHOP_ART_CHECK_PASSED meshes={len(manifest['assets'])} collisions={sum(a['collision_hulls'] for a in manifest['assets'].values())} recipe_mesh=verified stock_sections=10 positions=80 window_openings=2 pendants=4 customer_mesh=verified")
+    "Art_PrepFront", "Art_PrepBack"))
+assert not any(a.get_actor_label() in {"Art_RetailFront", "Art_RetailBack"} for a in all_actors)
+unreal.log(f"SHOP_ART_CHECK_PASSED meshes={len(manifest['assets'])} collisions={sum(a['collision_hulls'] for a in manifest['assets'].values())} recipe_mesh=verified stock_sections={len(sections)} positions={len(sections) * 8} window_openings=2 pendants=4 customer_mesh=verified")
