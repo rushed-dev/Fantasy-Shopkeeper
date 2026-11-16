@@ -23,7 +23,7 @@ if ($LASTEXITCODE -ne 0) { throw "Unreal test process failed with exit code $LAS
 # Unreal may exit zero even when individual automation tests fail.
 $report = Get-Content -LiteralPath (Join-Path $reportPath 'index.json') -Raw | ConvertFrom-Json
 $passed = $report.succeeded + $report.succeededWithWarnings
-if ($report.failed -gt 0 -or $report.notRun -gt 0 -or $passed -ne 26) {
+if ($report.failed -gt 0 -or $report.notRun -gt 0 -or $passed -ne 29) {
     throw "Interaction tests incomplete or failed. See $reportPath and $logPath"
 }
 Write-Host "All $passed shop automation tests passed. Report at $reportPath"

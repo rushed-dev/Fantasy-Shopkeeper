@@ -32,6 +32,10 @@ AShopTill::AShopTill()
     Ticket->SetVerticalAlignment(EVRTA_TextTop);
     Ticket->SetWorldSize(4.5f);
     Ticket->SetTextRenderColor(FColor(32, 43, 22));
+    PaymentNote = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PaymentNote"));
+    PaymentNote->SetupAttachment(RootComponent);
+    ChangeNote = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ChangeNote"));
+    ChangeNote->SetupAttachment(RootComponent);
     for (int32 Index = 0; Index < 3; ++Index)
     {
         UInstancedStaticMeshComponent* Change = CreateDefaultSubobject<UInstancedStaticMeshComponent>(*FString::Printf(TEXT("ChangeCoins%d"), Index));
@@ -231,15 +235,15 @@ FText AShopTill::GetInteractionPrompt() const
     }
     if (Phase == EShopTillPhase::EnteringTotal)
     {
-        return NSLOCTEXT("Shop", "TillEnterPhysicalTotal", "Enter the total on the number keys, then E on the pouch");
+        return NSLOCTEXT("Shop", "TillEnterPhysicalTotal", "Write the total in the ledger, then E on the payment dish");
     }
     if (Phase == EShopTillPhase::MakingChange)
     {
-        return NSLOCTEXT("Shop", "TillCountPhysicalChange", "Count change using the coin stacks and tray, then E on SALE");
+        return NSLOCTEXT("Shop", "TillCountPhysicalChange", "Count change on the mat, then E on the PAID stamp");
     }
     if (IsValid(Customer) && Customer->Activity == EShopCustomerActivity::ReadyToPay)
     {
-        return NSLOCTEXT("Shop", "TillOpenCheckout", "E  Start checkout | Enter total on the counter keys");
+        return NSLOCTEXT("Shop", "TillOpenCheckout", "E  Open ledger | Write the total in the number grid");
     }
     return NSLOCTEXT("Shop", "TillWaiting", "Till | Waiting for the customer to return");
 }
@@ -249,6 +253,19 @@ void AShopTill::BeginPlay()
 {
     Super::BeginPlay();
     Ticket->SetVisibility(bPhysicalCounter);
+    PaymentNote->SetVisibility(bPhysicalCounter);
+    ChangeNote->SetVisibility(bPhysicalCounter);
+    Ticket->SetRelativeLocation(FVector(-22, 40, 102.3));
+    PaymentNote->SetRelativeLocation(FVector(50, 42, 101));
+    ChangeNote->SetRelativeLocation(FVector(30, 16, 101.1));
+    for (UTextRenderComponent* Note : {Ticket.Get(), PaymentNote.Get(), ChangeNote.Get()})
+    {
+        Note->SetRelativeRotation(FRotator(90, -90, 0));
+        Note->SetHorizontalAlignment(EHTA_Center);
+        Note->SetVerticalAlignment(EVRTA_TextTop);
+        Note->SetTextRenderColor(FColor(32, 36, 24));
+        Note->SetWorldSize(Note == Ticket ? 3.6f : 3.0f);
+    }
     if (bPhysicalCounter)
     {
         BuildControls();
@@ -293,6 +310,12 @@ void AShopTill::BuildControls()
         Control->HitBox->SetBoxExtent(Extent);
         Control->Visual->SetStaticMesh(Mesh);
         Control->Label->SetText(FText::FromString(Text));
+        if (Action == EShopTillControl::Digit || Action == EShopTillControl::Clear)
+        {
+            Control->Label->SetTextRenderColor(FColor(32, 36, 24));
+            Control->Label->SetWorldSize(4.2f);
+            Control->Label->SetRelativeLocation(FVector(0, 0, -0.6));
+        }
         if (Action == EShopTillControl::AddCoin)
         {
             UInstancedStaticMeshComponent* Stack = NewObject<UInstancedStaticMeshComponent>(Control);
@@ -313,19 +336,19 @@ void AShopTill::BuildControls()
     for (int32 Digit = 1; Digit <= 9; ++Digit)
     {
         Add(EShopTillControl::Digit, Digit, FVector(-34 + ((Digit - 1) % 3) * 12, -26 + ((Digit - 1) / 3) * 12, 103),
-            FVector(4.5, 4.5, 2), KeyMesh, FString::FromInt(Digit));
+            FVector(4.5, 4.5, 1), nullptr, FString::FromInt(Digit));
     }
-    Add(EShopTillControl::Digit, 0, FVector(-22, 10, 103), FVector(4.5, 4.5, 2), KeyMesh, TEXT("0"));
-    Add(EShopTillControl::Clear, 0, FVector(-34, 10, 103), FVector(4.5, 4.5, 2), KeyMesh, TEXT("C"));
-    Add(EShopTillControl::Confirm, 0, FVector(55, -34, 103), FVector(13, 7, 3), KeyMesh, TEXT("SALE"));
-    Add(EShopTillControl::AcceptPayment, 0, FVector(50, 24, 112), FVector(14, 12, 14), PouchMesh, TEXT(""));
+    Add(EShopTillControl::Digit, 0, FVector(-22, 10, 103), FVector(4.5, 4.5, 1), nullptr, TEXT("0"));
+    Add(EShopTillControl::Clear, 0, FVector(-34, 10, 103), FVector(4.5, 4.5, 1), nullptr, TEXT("C"));
+    Add(EShopTillControl::Confirm, 0, FVector(55, -34, 103), FVector(8, 7, 7), KeyMesh, TEXT(""));
+    Add(EShopTillControl::AcceptPayment, 0, FVector(50, 27, 103), FVector(14, 12, 3), PouchMesh, TEXT(""));
     if (AShopTillControl* Pouch = FindControl(EShopTillControl::AcceptPayment))
     {
-        Pouch->Visual->SetRelativeLocation(FVector(0, 0, -12));
+        Pouch->Visual->SetRelativeLocation(FVector(0, 0, -3));
     }
     if (AShopTillControl* Confirm = FindControl(EShopTillControl::Confirm))
     {
-        Confirm->Visual->SetRelativeScale3D(FVector(2.6, 1.4, 1));
+        Confirm->Visual->SetRelativeLocation(FVector(0, 0, -3));
     }
     const int32 Denominations[] = {1, 10, 100};
     for (int32 Index = 0; Index < 3; ++Index)
@@ -333,7 +356,7 @@ void AShopTill::BuildControls()
         UStaticMesh* Mesh = CoinMeshes.IsValidIndex(Index) ? CoinMeshes[Index].Get() : nullptr;
         Add(EShopTillControl::AddCoin, Denominations[Index], FVector(-65, -24 + Index * 24, 103), FVector(9, 9, 4), Mesh,
             FString::FromInt(Denominations[Index]));
-        Add(EShopTillControl::RemoveCoin, Denominations[Index], FVector(12 + Index * 18, -8, 103), FVector(8, 18, 8), nullptr, TEXT(""));
+        Add(EShopTillControl::RemoveCoin, Denominations[Index], FVector(12 + Index * 18, -8, 103), FVector(8, 18, 1), nullptr, TEXT(""));
         ChangeVisuals[Index]->SetStaticMesh(Mesh);
         TenderVisuals[Index]->SetStaticMesh(Mesh);
     }
@@ -426,7 +449,7 @@ void AShopTill::RefreshPresentation()
             const int32 Count = Index == 2 ? Tender / 100 : (Tender / Denominations[Index]) % 10;
             for (int32 Coin = 0; Coin < FMath::Min(Count, 48); ++Coin)
             {
-                Payment->AddInstance(FTransform(FVector(46 + Index * 4, 24, 123 + Coin * 0.55)));
+                Payment->AddInstance(FTransform(FVector(46 + Index * 4, 27, 102 + Coin * 0.55)));
             }
             if (AShopTillControl* Lane = FindControl(EShopTillControl::RemoveCoin, Denominations[Index]))
             {
@@ -451,7 +474,7 @@ void AShopTill::RefreshPresentation()
     int32 LineLength = 0;
     for (const FString& Word : Words)
     {
-        if (LineLength + Word.Len() > 58)
+        if (LineLength + Word.Len() > 24)
         {
             Status += TEXT("\n");
             LineLength = 0;
@@ -464,7 +487,9 @@ void AShopTill::RefreshPresentation()
         Status += Word;
         LineLength += Word.Len();
     }
-    Ticket->SetText(FText::FromString(FString::Printf(TEXT("%s\nTotal %s   |   Payment %d\nChange %lld / %d bits\n%s"),
-        *Header, EnteredTotalText.IsEmpty() ? TEXT("_") : *EnteredTotalText, Tender, Change,
-        bPaid ? QuotedTender - QuotedPrice : 0, *Status)));
+    Ticket->SetText(FText::FromString(FString::Printf(TEXT("SHOP LEDGER\n%s\nTotal: %s bits\n%s"),
+        *Header, EnteredTotalText.IsEmpty() ? TEXT("_") : *EnteredTotalText,
+        Phase == EShopTillPhase::Complete ? TEXT("PAID") : *Status)));
+    PaymentNote->SetText(FText::FromString(FString::Printf(TEXT("Payment: %d bits"), Tender)));
+    ChangeNote->SetText(FText::FromString(FString::Printf(TEXT("Change counted: %lld"), Change)));
 }

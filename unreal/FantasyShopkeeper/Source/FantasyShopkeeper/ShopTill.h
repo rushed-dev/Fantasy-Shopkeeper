@@ -67,6 +67,8 @@ public:
 
     UPROPERTY(VisibleAnywhere, Category = "Shop|Till")
     TObjectPtr<UTextRenderComponent> Ticket;
+    UPROPERTY(VisibleAnywhere, Category = "Shop|Till") TObjectPtr<UTextRenderComponent> PaymentNote;
+    UPROPERTY(VisibleAnywhere, Category = "Shop|Till") TObjectPtr<UTextRenderComponent> ChangeNote;
 
     int64 GetChangeTotal() const;
     int32 GetCoinCount(int32 Denomination) const { return TrayCoins.FindRef(Denomination); }

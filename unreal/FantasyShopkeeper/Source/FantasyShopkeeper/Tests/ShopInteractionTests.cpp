@@ -23,6 +23,9 @@
 #include "../ShopCustomerFlow.h"
 #include "../ShopShelfSection.h"
 #include "../ShopMorningSave.h"
+#include "../ShopDayLighting.h"
+#include "Engine/DirectionalLight.h"
+#include "Components/LightComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
@@ -95,6 +98,17 @@ namespace
             State->DispatchBeginPlay();
             World->SetGameState(State);
             return State;
+        }
+
+        void Evening(AShopGameState* State)
+        {
+            if (!State->IsDayInitialized())
+            {
+                Spawn<AShopCustomerFlow>(FVector::ZeroVector);
+                State->InitializeDay(FString());
+            }
+            State->OpenShop();
+            State->CloseShop();
         }
 
         AStaticMeshActor* Surface(const FVector& Location, const FVector& Scale)
@@ -749,15 +763,20 @@ bool FShopSupplyPurchaseTest::RunTest(const FString& Parameters)
     AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
     Crate->Station = Station;
     Test.AimAt(Crate);
-    TestTrue(TEXT("Camera interaction buys the first supplies"), Test.Interaction->Interact());
-    TestEqual(TEXT("Purchase charges the advertised price"), State->GetCash(), int64(24));
-    TestEqual(TEXT("Purchase delivers six Moonleaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
-    TestEqual(TEXT("Purchase delivers three water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 3);
-    TestTrue(TEXT("A separate interaction can buy another parcel"), Test.Interaction->Interact());
-    TestEqual(TEXT("Second purchase reaches ingredient capacity"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 12);
-    TestFalse(TEXT("An over-capacity delivery is rejected"), Test.Interaction->Interact());
-    TestEqual(TEXT("Rejected delivery costs nothing"), State->GetCash(), int64(12));
-    TestEqual(TEXT("Rejected delivery preserves the other ingredient too"), Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
+    TestFalse(TEXT("Preparation cannot buy supplies"), Test.Interaction->Interact());
+    Test.Evening(State);
+    TestTrue(TEXT("Select two packs"), Crate->ChangeQuantity(Test.Interaction, 1));
+    TestTrue(TEXT("Evening confirms the complete paid order"), Test.Interaction->Interact());
+    TestEqual(TEXT("Order charges the advertised total"), State->GetCash(), int64(12));
+    TestEqual(TEXT("No same-day ingredients appear"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestFalse(TEXT("Repeated confirmation cannot pay twice"), Test.Interaction->Interact());
+    TestTrue(TEXT("Morning receives the paid order"), State->AdvanceMorning());
+    TestEqual(TEXT("Delivery reaches capacity"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 12);
+    TestEqual(TEXT("Both packs delivered once"), Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
+    TestFalse(TEXT("Morning cannot repeat the delivery"), State->AdvanceMorning());
+    Test.Evening(State);
+    TestFalse(TEXT("Over-capacity order rejected"), Test.Interaction->Interact());
+    TestEqual(TEXT("Rejected order costs nothing"), State->GetCash(), int64(12));
     AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
     TestNotNull(TEXT("Purchased ingredients brew a physical potion"), Test.BrewAndStock(Station, Shelf));
     TestEqual(TEXT("Brewing consumes the purchased Moonleaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 10);
@@ -775,6 +794,7 @@ bool FShopSupplyRejectionTest::RunTest(const FString& Parameters)
     AShopBrewingStation* Station = Test.BrewingStation(0, 0);
     AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
     Crate->Station = Station;
+    Test.Evening(State);
     Test.AimAt(Crate);
     Crate->Delivery.Add(TEXT("Spring Water"), -1);
     TestFalse(TEXT("One malformed quantity rejects the entire delivery"), Test.Interaction->Interact());
@@ -811,6 +831,7 @@ bool FShopSupplyRejectionTest::RunTest(const FString& Parameters)
     FullStation->IngredientCapacity = MAX_int32;
     AShopSupplyCrate* OtherCrate = Overflow.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
     OtherCrate->Station = FullStation;
+    Overflow.Evening(OverflowState);
     Overflow.AimAt(OtherCrate);
     TestFalse(TEXT("Delivery addition cannot overflow a stored quantity"), Overflow.Interaction->Interact());
     TestEqual(TEXT("Overflow rejection preserves cash"), OverflowState->GetCash(), int64(24));
@@ -821,6 +842,7 @@ bool FShopSupplyRejectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Individual water pack has its own price"), OtherCrate->PriceBits, 6);
     TestTrue(TEXT("Water can be replenished while Moonleaf storage is full"), Overflow.Interaction->Interact());
     TestEqual(TEXT("Individual pack preserves the full ingredient"), FullStation->GetIngredientQuantity(TEXT("Moonleaf")), MAX_int32 - 1);
+    TestTrue(TEXT("Individual order delivered next morning"), OverflowState->AdvanceMorning());
     TestEqual(TEXT("Individual water pack delivers its complete quantity"), FullStation->GetIngredientQuantity(TEXT("Spring Water")), 3);
     TestEqual(TEXT("Individual pack charges its advertised price"), OverflowState->GetCash(), int64(18));
     return true;
@@ -1327,6 +1349,7 @@ bool FShopDayTransitionsTest::RunTest(const FString& Parameters)
     Flow->Tick(0);
     TestEqual(TEXT("Departure completes closing"), State->GetDayPhase(), EShopDayPhase::Evening);
     TestNull(TEXT("Finite day does not wrap forever"), Flow->GetActiveCustomer());
+    State->ConfirmNoSupplies();
     TestTrue(TEXT("Next morning commits"), State->AdvanceMorning());
     TestFalse(TEXT("Repeated next morning rejected"), State->AdvanceMorning());
     TestEqual(TEXT("Day advances once"), State->GetDay(), 2);
@@ -1365,8 +1388,7 @@ bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
     AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
     Crate->Station = Station;
     Test.AimAt(Crate);
-    TestTrue(TEXT("Paid preparation replenishment"), Test.Interaction->Interact());
-    TestEqual(TEXT("Supply spending tracked"), State->GetSupplySpending(), int64(12));
+    TestFalse(TEXT("Preparation no longer replenishes supplies"), Test.Interaction->Interact());
     State->OpenShop();
     Flow->StartNextVisit();
     AShopCustomer* Buyer = Flow->GetActiveCustomer();
@@ -1380,7 +1402,7 @@ bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
     Till->SubmitTotal(TEXT("12"));
     for (int32 Coin = 0; Coin < 8; ++Coin) Till->AddChangeCoin(1);
     TestTrue(TEXT("Sale before restore"), Till->ConfirmSale(Test.Interaction));
-    TestEqual(TEXT("Cash reflects purchase and sale"), State->GetCash(), int64(50));
+    TestEqual(TEXT("Cash reflects sale before restore"), State->GetCash(), int64(62));
     for (int32 Retry = 0; Retry < 3; ++Retry)
     {
         TestTrue(TEXT("Restore can repeat without adding anything"), State->RestoreMorning());
@@ -1400,9 +1422,10 @@ bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Daily spending reset"), State->GetSupplySpending(), int64(0));
     }
     Test.AimAt(Crate);
-    TestTrue(TEXT("Fresh purchase works after load"), Test.Interaction->Interact());
     State->OpenShop();
     State->CloseShop();
+    TestTrue(TEXT("Evening order works after load"), Test.Interaction->Interact());
+    TestEqual(TEXT("Pending supplies not delivered during evening"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves);
     TestTrue(TEXT("Morning saves paid supplies and unsold stock"), State->AdvanceMorning());
     TestTrue(TEXT("Reload next morning"), State->RestoreMorning());
     TestEqual(TEXT("Day two restored"), State->GetDay(), 2);
@@ -1442,6 +1465,7 @@ bool FShopInvalidMorningTest::RunTest(const FString& Parameters)
         TestNotNull(TEXT("Rejected restore keeps stock"), Shelf->GetOccupyingItem());
         State->OpenShop();
         State->CloseShop();
+        State->ConfirmNoSupplies();
         TestFalse(TEXT("Invalid file cannot be overwritten by morning advance"), State->AdvanceMorning());
         FFileHelper::LoadFileToArray(After, *File.Path);
         TestTrue(TEXT("Invalid file preserved byte for byte"), Before == After);
@@ -1502,6 +1526,7 @@ bool FShopMorningFailureTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Cannot restore halfway through consuming ingredients"), NestedRestore);
     Test.AimAt(Station->OutputSlot);
     TestTrue(TEXT("Hold a finished brew"), Test.Interaction->Interact());
+    State->ConfirmNoSupplies();
     TestFalse(TEXT("Held stock blocks sleep"), State->AdvanceMorning());
     TestEqual(TEXT("Blocked sleep keeps day"), State->GetDay(), 1);
     TestTrue(TEXT("Put brew back"), Test.Interaction->Interact());
@@ -1512,6 +1537,126 @@ bool FShopMorningFailureTest::RunTest(const FString& Parameters)
     Lock.Reset();
     TestTrue(TEXT("Retry after failure succeeds"), State->AdvanceMorning());
     TestEqual(TEXT("Retry advances exactly once"), State->GetDay(), 2);
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopDeferredSuppliesTest, "FantasyShopkeeper.Supplies.MorningDeliveryRetriesAndRestore",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopDeferredSuppliesTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(50);
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    AShopCustomerFlow* Flow = DayFlow(Test);
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
+    Crate->Station = Station;
+    State->InitializeDay(File.Path);
+    Test.AimAt(Crate);
+    TestFalse(TEXT("No preparation ordering"), Test.Interaction->Interact());
+    State->OpenShop();
+    TestFalse(TEXT("No trading ordering"), Test.Interaction->Interact());
+    State->CloseShop();
+    TestFalse(TEXT("Morning needs an explicit order or zero order"), State->AdvanceMorning());
+    TestTrue(TEXT("Confirm paid evening order"), Test.Interaction->Interact());
+    TestEqual(TEXT("Debit once"), State->GetCash(), int64(38));
+    TestFalse(TEXT("Repeated payment rejected"), Test.Interaction->Interact());
+    TestEqual(TEXT("Evening ingredients unchanged"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestTrue(TEXT("Restart rolls back the entire pending order"), State->RestoreMorning());
+    TestEqual(TEXT("Paid debit rolled back with undelivered order"), State->GetCash(), int64(50));
+    TestFalse(TEXT("Order status resets with morning"), State->HasConfirmedSupplies());
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Can order after restoration"), Test.Interaction->Interact());
+    // Pending order owns quantities, not a live pointer to the supplier offer.
+    Crate->Delivery[TEXT("Moonleaf")] = 29;
+    Station->IngredientCapacity = 5;
+    TestFalse(TEXT("Changed storage capacity blocks morning coherently"), State->AdvanceMorning());
+    Station->IngredientCapacity = 30;
+    TUniquePtr<FArchive> Lock(IFileManager::Get().CreateFileReader(*File.Path));
+    TestFalse(TEXT("Locked save cannot deliver paid stock"), State->AdvanceMorning());
+    TestTrue(TEXT("Paid order retained for retry"), State->HasConfirmedSupplies());
+    TestEqual(TEXT("Failed write creates no ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestEqual(TEXT("Failed write charges no second payment"), State->GetCash(), int64(38));
+    Lock.Reset();
+    TestTrue(TEXT("Retry delivers and saves"), State->AdvanceMorning());
+    TestEqual(TEXT("Original ordered quantity used"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    TestEqual(TEXT("Original water quantity delivered"), Station->GetIngredientQuantity(TEXT("Spring Water")), 3);
+    for (int32 Retry = 0; Retry < 2; ++Retry)
+    {
+        TestTrue(TEXT("Delivered morning restores"), State->RestoreMorning());
+        TestEqual(TEXT("Delivery is never replayed"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+        TestEqual(TEXT("Payment is never replayed"), State->GetCash(), int64(38));
+    }
+    State->OpenShop(); State->CloseShop();
+    TestTrue(TEXT("Choose zero packs"), Crate->ChangeQuantity(Test.Interaction, -1));
+    TestTrue(TEXT("Confirm zero order through ordinary interaction"), Test.Interaction->Interact());
+    TestEqual(TEXT("Zero order costs nothing"), State->GetCash(), int64(38));
+    TestTrue(TEXT("Zero order permits next morning"), State->AdvanceMorning());
+    TestEqual(TEXT("Zero order adds no ingredients"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopLightingTest, "FantasyShopkeeper.Day.PhaseLightingTransitions",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopLightingTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    DayFlow(Test);
+    State->InitializeDay(FString());
+    ADirectionalLight* Sun = Test.Spawn<ADirectionalLight>(FVector::ZeroVector);
+    Sun->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+    Sun->GetLightComponent()->SetIntensity(10000);
+    AShopDayLighting* Lighting = Test.Spawn<AShopDayLighting>(FVector::ZeroVector);
+    Lighting->Tick(1);
+    TestTrue(TEXT("Morning has daylight"), Sun->GetLightComponent()->Intensity > 7000);
+    State->OpenShop();
+    Lighting->Tick(5);
+    TestEqual(TEXT("Trading reaches full daylight"), Sun->GetLightComponent()->Intensity, 10000.f);
+    State->CloseShop();
+    Lighting->Tick(1);
+    TestTrue(TEXT("Closing interpolates rather than snapping"), Lighting->GetNightBlend() > 0 && Lighting->GetNightBlend() < 1);
+    Lighting->Tick(4);
+    TestEqual(TEXT("Evening reaches night"), Lighting->GetNightBlend(), 1.f);
+    TestTrue(TEXT("Sun is dim at night"), Sun->GetLightComponent()->Intensity < 1);
+    Lighting->Tick(100);
+    TestEqual(TEXT("Waiting never advances the day"), State->GetDay(), 1);
+    State->ConfirmNoSupplies(); State->AdvanceMorning();
+    Lighting->Tick(1);
+    TestEqual(TEXT("Explicit morning restores day lighting"), Lighting->GetNightBlend(), 0.f);
+    TestTrue(TEXT("Morning sun returns"), Sun->GetLightComponent()->Intensity > 7000);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopUnservedVisitTest, "FantasyShopkeeper.Customer.EndUnservedVisitWithoutMoneyOrStock",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopUnservedVisitTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopCustomerFlow* Flow = DayFlow(Test);
+    Flow->VisitsPerDay = 1;
+    State->InitializeDay(FString());
+    State->OpenShop(); Flow->StartNextVisit();
+    AShopCustomer* Buyer = Flow->GetActiveCustomer();
+    if (!TestNotNull(TEXT("Unserved visitor"), Buyer)) return false;
+    TestTrue(TEXT("Player can resolve a stock shortage"), Flow->EndUnservedVisit());
+    TestFalse(TEXT("Repeat dismissal rejected"), Flow->EndUnservedVisit());
+    TestFalse(TEXT("Unserved customer has not paid"), Buyer->HasCompletedSale());
+    Buyer->SetActorLocation(Flow->Entrance); Buyer->Tick(0); Flow->Tick(0); Flow->Tick(0);
+    TestEqual(TEXT("Resolved opportunity reaches evening"), State->GetDayPhase(), EShopDayPhase::Evening);
+    TestEqual(TEXT("No invented payment"), State->GetCash(), int64(0));
+    State->ConfirmNoSupplies(); State->AdvanceMorning(); State->OpenShop(); Flow->StartNextVisit();
+    Buyer = Flow->GetActiveCustomer();
+    if (!TestNotNull(TEXT("Following morning visitor"), Buyer)) return false;
+    Buyer->SetActorLocation(Flow->Checkout); Buyer->Tick(0);
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
+    AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+    TestTrue(TEXT("Visitor collects physical stock"), Test.CollectAndReturn(Buyer, Item));
+    TestFalse(TEXT("Cannot dismiss a customer carrying unpaid stock"), Flow->EndUnservedVisit());
+    TestEqual(TEXT("Checkout obligation retains ownership"), Buyer->ShopInteraction->GetHeldItem(), Item);
     return true;
 }
 

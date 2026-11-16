@@ -5,6 +5,7 @@
 #include "Components/TextRenderComponent.h"
 #include "ShopInteractionComponent.h"
 #include "ShopTill.h"
+#include "ShopCustomer.h"
 
 AShopTillControl::AShopTillControl()
 {
@@ -38,21 +39,22 @@ bool AShopTillControl::Interact_Implementation(UShopInteractionComponent* Intera
 
 FText AShopTillControl::GetInteractionPrompt() const
 {
+    if (!IsValid(Till) || !IsValid(Till->Customer)) return FText::FromString(TEXT("Ledger | No customer at checkout"));
     if (Action == EShopTillControl::AddCoin || Action == EShopTillControl::RemoveCoin)
     {
         return FText::Format(Action == EShopTillControl::AddCoin
-            ? NSLOCTEXT("Shop", "TakeTillCoin", "E  Put a {0}-bit coin in the change tray")
+            ? NSLOCTEXT("Shop", "TakeTillCoin", "E  Put a {0}-bit coin in the change mat")
             : NSLOCTEXT("Shop", "ReturnTillCoin", "E  Return a {0}-bit coin to the till"), FText::AsNumber(Value));
     }
     if (Action == EShopTillControl::AcceptPayment)
     {
-        return NSLOCTEXT("Shop", "TakePouch", "E  Accept payment pouch after entering the total");
+        return NSLOCTEXT("Shop", "TakePouch", "E  Accept the payment dish after writing the total");
     }
     if (Action == EShopTillControl::Confirm)
     {
-        return NSLOCTEXT("Shop", "SealSale", "E  Complete sale with the counted change");
+        return NSLOCTEXT("Shop", "SealSale", "E  Stamp PAID with the counted change");
     }
     return Action == EShopTillControl::Clear
-        ? NSLOCTEXT("Shop", "ClearTill", "E  Clear entered total")
-        : FText::Format(NSLOCTEXT("Shop", "TillDigit", "E  Enter {0}"), FText::AsNumber(Value));
+        ? NSLOCTEXT("Shop", "ClearTill", "E  Erase the written total")
+        : FText::Format(NSLOCTEXT("Shop", "TillDigit", "E  Write {0}"), FText::AsNumber(Value));
 }

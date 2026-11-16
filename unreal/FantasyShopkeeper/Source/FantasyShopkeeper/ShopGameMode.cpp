@@ -6,6 +6,7 @@
 #include "ShopPlayerController.h"
 #include "ShopHUD.h"
 #include "ShopGameState.h"
+#include "ShopDayLighting.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Misc/Paths.h"
 
@@ -34,5 +35,6 @@ void AShopGameMode::StartPlay()
     if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
     {
         State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
+        GetWorld()->SpawnActor<AShopDayLighting>();
     }
 }

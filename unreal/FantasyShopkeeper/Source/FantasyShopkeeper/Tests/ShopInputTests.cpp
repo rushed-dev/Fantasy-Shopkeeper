@@ -524,14 +524,18 @@ namespace
                 Test->TestFalse(TEXT("Repeated physical confirmation cannot pay twice"), Controller->ShopInteraction->Interact());
                 Test->TestEqual(TEXT("Repeated confirmation earns no extra cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
                 ++Visits;
-                if (Visits >= 3)
+                if (Visits >= 2)
                 {
                     AimTarget.Reset();
+                    Key(EKeys::O, IE_Pressed);
+                    Key(EKeys::O, IE_Released);
                     Step = 44;
                     NextStep = Now + 0.2;
                     return false;
                 }
-                break;
+                Step = 31;
+                NextStep = Now + 0.2;
+                return false;
             case 28:
                 AimTarget = Crate;
                 AimHeight = 35;
@@ -548,12 +552,14 @@ namespace
                 break;
             case 30:
                 Key(EKeys::E, IE_Released);
-                Test->TestEqual(TEXT("E buys six Moonleaf from the physical supply crate"), Station->GetIngredientQuantity(TEXT("Moonleaf")), LeavesBeforeBrew + 6);
-                Test->TestEqual(TEXT("E buys three water from the supply crate"), Station->GetIngredientQuantity(TEXT("Spring Water")), WaterBeforeBrew + 3);
+                Test->TestEqual(TEXT("Evening order does not deliver Moonleaf immediately"), Station->GetIngredientQuantity(TEXT("Moonleaf")), LeavesBeforeBrew);
+                Test->TestEqual(TEXT("Evening order does not deliver water immediately"), Station->GetIngredientQuantity(TEXT("Spring Water")), WaterBeforeBrew);
                 Test->TestEqual(TEXT("Supply delivery charges the advertised price"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSupplies - Crate->PriceBits);
                 AimTarget.Reset();
                 Pawn->SetActorLocation(FVector(50, 150, 96), false, nullptr, ETeleportType::TeleportPhysics);
-                break;
+                Step = 45;
+                NextStep = Now + 0.2;
+                return false;
             case 31:
                 if (Flow->GetActiveCustomer() == Customer.Get() || !IsValid(Flow->GetActiveCustomer())
                     || Flow->GetActiveCustomer()->Activity != EShopCustomerActivity::Browsing)
@@ -649,25 +655,48 @@ namespace
                     return false;
                 }
                 Test->TestNull(TEXT("Final departure leaves no fourth visitor"), Flow->GetActiveCustomer());
-                Test->TestEqual(TEXT("Day includes all three sales"), World->GetGameState<AShopGameState>()->GetTakings(), int64(42));
+                Test->TestEqual(TEXT("Day includes both products sold"), World->GetGameState<AShopGameState>()->GetTakings(), int64(30));
+                Pawn->SetActorLocation(FVector(400, 70, 160), false, nullptr, ETeleportType::TeleportPhysics);
+                Controller->SetControlRotation((FVector(665, 370, 120) - Camera->GetComponentLocation()).Rotation());
+                Step = 48;
+                NextStep = Now + 5;
+                return false;
+            case 48:
                 {
                     FString Screenshot;
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopEveningScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
                 }
-                break;
+                Step = 28;
+                NextStep = Now + 0.2;
+                return false;
             case 45:
                 Key(EKeys::N, IE_Pressed);
                 Key(EKeys::N, IE_Released);
                 Test->TestEqual(TEXT("N advances to morning two"), World->GetGameState<AShopGameState>()->GetDay(), 2);
                 Test->TestEqual(TEXT("Next morning requires explicit reopening"), World->GetGameState<AShopGameState>()->GetDayPhase(), EShopDayPhase::Preparation);
                 Test->TestNull(TEXT("Preparation has no customer"), Flow->GetActiveCustomer());
+                Test->TestEqual(TEXT("Morning delivers six paid Moonleaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), LeavesBeforeBrew + 6);
+                Test->TestEqual(TEXT("Morning delivers three paid water"), Station->GetIngredientQuantity(TEXT("Spring Water")), WaterBeforeBrew + 3);
+                Step = 49;
+                NextStep = Now + 4;
+                return false;
+            case 49:
+                AimTarget.Reset();
+                Pawn->SetActorLocation(FVector(400, 70, 160), false, nullptr, ETeleportType::TeleportPhysics);
+                Controller->SetControlRotation((FVector(665, 370, 120) - Camera->GetComponentLocation()).Rotation());
+                Step = 50;
+                NextStep = Now + 3;
+                return false;
+            case 50:
                 {
                     FString Screenshot;
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopMorningScreenshot="), Screenshot))
                         FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
                 }
-                break;
+                Step = 46;
+                NextStep = Now + 0.2;
+                return false;
             case 46:
                 {
                     FString Screenshot;
