@@ -1909,4 +1909,80 @@ bool FShopCheckoutPresentationCancelTest::RunTest(const FString& Parameters)
     return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopCustomerDialogueTest, "FantasyShopkeeper.Customer.RequestAndPurchaseReactionOnce",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopCustomerDialogueTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, 60, 0));
+    AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+    AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+    Buyer->ConfigureVisitPersonality(0);
+    TestTrue(TEXT("Begin the visit"), Buyer->BeginVisit(Buyer->GetActorLocation()));
+    TestTrue(TEXT("Request waits for a short natural pause"), Buyer->GetSpokenLine().IsEmpty());
+    Buyer->AdvanceConversation(0.55f);
+    TestTrue(TEXT("Arrival names the requested product"), Buyer->GetSpokenLine().ToString().Contains(TEXT("Dawn Tonic")));
+    TestTrue(TEXT("Subtitle fades in"), Buyer->GetSpeechOpacity() > 0);
+    Buyer->AdvanceConversation(10.f);
+    TestTrue(TEXT("Arrival expires"), Buyer->GetSpokenLine().IsEmpty());
+    Buyer->BeginVisit(Buyer->GetActorLocation()); Buyer->AdvanceConversation(1.f);
+    TestTrue(TEXT("Route retries do not repeat arrival dialogue"), Buyer->GetSpokenLine().IsEmpty());
+    if (!TestTrue(TEXT("Collect goods"), Test.CollectAndReturn(Buyer, Item))) return false;
+    AShopTill* Till = Test.PreparedTill(Buyer);
+    if (!TestNotNull(TEXT("Checkout ready"), Till)) return false;
+    Till->RemoveChangeCoin(1);
+    TestFalse(TEXT("Wrong change rejects sale"), Till->ConfirmSale(Test.Interaction));
+    Buyer->AdvanceConversation(1.f);
+    TestTrue(TEXT("Rejected sale does not thank the player for a purchase"), Buyer->GetSpokenLine().IsEmpty());
+    Till->AddChangeCoin(1);
+    TestTrue(TEXT("Exact manual change completes sale"), Till->ConfirmSale(Test.Interaction));
+    TestTrue(TEXT("Reaction has a short pause"), Buyer->GetSpokenLine().IsEmpty());
+    Buyer->AdvanceConversation(0.3f);
+    TestTrue(TEXT("Committed sale earns a reaction"), Buyer->GetSpokenLine().ToString().Contains(TEXT("Much obliged")));
+    TestEqual(TEXT("Dialogue cannot change takings"), State->GetCash(), int64(12));
+    Buyer->AdvanceConversation(10.f);
+    TestFalse(TEXT("Repeat confirmation cannot pay twice"), Till->ConfirmSale(Test.Interaction));
+    Buyer->AdvanceConversation(1.f);
+    TestTrue(TEXT("Repeat confirmation cannot repeat thanks"), Buyer->GetSpokenLine().IsEmpty());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopCustomerDialogueVariationsTest, "FantasyShopkeeper.Customer.DialogueVariationsAndUnservedExit",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopCustomerDialogueVariationsTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    Test.ShopState();
+    TSet<FString> Lines;
+    for (int32 Variation = 0; Variation < 3; ++Variation)
+    {
+        AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(400 + Variation * 100, 0, 0));
+        Buyer->RequestedProductName = FText::FromString(TEXT("Moonlit Ink"));
+        Buyer->ConfigureVisitPersonality(Variation);
+        Buyer->BeginVisit(Buyer->GetActorLocation());
+        Buyer->AdvanceConversation(0.5f);
+        TestEqual(TEXT("Greeting delays vary predictably"), Buyer->GetSpokenLine().IsEmpty(), Variation != 0);
+        Buyer->AdvanceConversation(0.6f);
+        Lines.Add(Buyer->GetSpokenLine().ToString());
+        TestTrue(TEXT("Every variation names the actual product"), Buyer->GetSpokenLine().ToString().Contains(TEXT("Moonlit Ink")));
+        TestTrue(TEXT("Departure pace remains bounded"), Buyer->GetDeparturePace() >= 0.85f && Buyer->GetDeparturePace() <= 1.16f);
+        TestTrue(TEXT("Unserved visit can still end"), Buyer->LeaveWithoutPurchase(FVector(1000, 0, 0)));
+        Buyer->AdvanceConversation(10.f);
+        TestTrue(TEXT("Unserved exit clears purchase/request speech"), Buyer->GetSpokenLine().IsEmpty());
+        TestFalse(TEXT("Unserved exit does not imply a purchase"), Buyer->GetInteractionPrompt().ToString().Contains(TEXT("Thank")));
+        Buyer->Destroy();
+    }
+    TestEqual(TEXT("Three distinct requests"), Lines.Num(), 3);
+    AShopCustomer* First = Test.Spawn<AShopCustomer>(FVector(400, 0, 0));
+    AShopCustomer* Reloaded = Test.Spawn<AShopCustomer>(FVector(500, 0, 0));
+    First->ConfigureVisitPersonality(4); Reloaded->ConfigureVisitPersonality(4);
+    First->BeginVisit(First->GetActorLocation()); Reloaded->BeginVisit(Reloaded->GetActorLocation());
+    First->AdvanceConversation(1.f); Reloaded->AdvanceConversation(1.f);
+    TestEqual(TEXT("Same visit selection restores the same wording"), First->GetSpokenLine().ToString(), Reloaded->GetSpokenLine().ToString());
+    return true;
+}
+
 #endif

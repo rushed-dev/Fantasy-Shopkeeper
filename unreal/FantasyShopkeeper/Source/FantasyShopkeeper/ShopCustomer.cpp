@@ -216,6 +216,16 @@ void AShopCustomer::FinishPurchasePresentation(bool bCompleted)
         return;
     }
     PurchasedItemVisual->SetVisibility(bCompleted);
+    if (bCompleted && HasCompletedSale() && !bPurchaseReactionQueued)
+    {
+        bPurchaseReactionQueued = true;
+        const FText Reactions[] = {
+            NSLOCTEXT("Shop", "ThanksPractical", "Just what I needed. Much obliged."),
+            NSLOCTEXT("Shop", "ThanksWarm", "Lovely. I'll make good use of this."),
+            NSLOCTEXT("Shop", "ThanksQuiet", "That's my errand done. Thank you.")
+        };
+        QueueSpeech(Reactions[DialogueVariation], 0.1f + 0.08f * DialogueVariation);
+    }
     if (!bCompleted)
     {
         PurchasedItemVisual->SetStaticMesh(nullptr);
@@ -229,6 +239,16 @@ bool AShopCustomer::BeginVisit(const FVector& Checkout)
         || IsActorBeingDestroyed() || Checkout.ContainsNaN())
     {
         return false;
+    }
+    if (!bArrivalQueued)
+    {
+        bArrivalQueued = true;
+        const FText Requests[] = {
+            NSLOCTEXT("Shop", "RequestPractical", "Morning! A bottle of {0}, please."),
+            NSLOCTEXT("Shop", "RequestWarm", "Hello there. Have you any {0}?"),
+            NSLOCTEXT("Shop", "RequestQuiet", "I've come for {0}, if you have some.")
+        };
+        QueueSpeech(FText::Format(Requests[DialogueVariation], RequestedProductName), 0.35f + 0.25f * DialogueVariation);
     }
     CheckoutLocation = Checkout;
     VisitDestination = Checkout;
@@ -246,6 +266,8 @@ bool AShopCustomer::LeaveWithoutPurchase(const FVector& Exit)
             && Activity != EShopCustomerActivity::Collecting) || Exit.ContainsNaN()) return false;
     TargetItem = nullptr;
     bLeavingWithoutPurchase = true;
+    PendingSpeech = SpokenLine = FText::GetEmpty();
+    SpeechRemaining = SpeechDelay = 0;
     VisitDestination = Exit;
     Activity = EShopCustomerActivity::Leaving;
     JourneyTime = 0;
@@ -275,6 +297,7 @@ bool AShopCustomer::HasGoodsOnCounter() const
 void AShopCustomer::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    AdvanceConversation(DeltaSeconds);
     if (GetMesh()->GetSkeletalMeshAsset() && GetMesh()->DoesSocketExist(TEXT("hand_r")))
     {
         CarryAnchor->SetWorldLocation(GetMesh()->GetSocketLocation(TEXT("hand_r")) - FVector(0, 0, 20));
@@ -372,7 +395,8 @@ FText AShopCustomer::GetInteractionPrompt() const
     }
     if (Activity == EShopCustomerActivity::Leaving)
     {
-        return NSLOCTEXT("Shop", "CustomerLeaving", "Thank you! See you again.");
+        return HasCompletedSale() ? NSLOCTEXT("Shop", "CustomerLeaving", "Thank you! See you again.")
+            : NSLOCTEXT("Shop", "CustomerLeavingUnserved", "Heading home");
     }
     if (HasCompletedSale())
     {
@@ -391,4 +415,45 @@ FText AShopCustomer::GetInteractionPrompt() const
         return FText::Format(NSLOCTEXT("Shop", "PayAtTill", "Ready to pay for {0} | Use the till"), RequestedProductName);
     }
     return FText::Format(NSLOCTEXT("Shop", "CustomerBrowsing", "Wants {0} for {1} bits | Stock a sale shelf"), RequestedProductName, FText::AsNumber(PriceBits));
+}
+
+
+void AShopCustomer::ConfigureVisitPersonality(int32 Variation)
+{
+    // Stable selection makes morning reloads repeat the same visit without global RNG.
+    if (!bArrivalQueued && !bPurchaseReactionQueued)
+        DialogueVariation = FMath::Abs(Variation % 3);
+}
+
+void AShopCustomer::QueueSpeech(const FText& Line, float Delay)
+{
+    SpokenLine = FText::GetEmpty();
+    SpeechRemaining = 0;
+    PendingSpeech = Line;
+    SpeechDelay = Delay;
+}
+
+void AShopCustomer::AdvanceConversation(float DeltaSeconds)
+{
+    const float Step = FMath::Max(0.f, DeltaSeconds);
+    SpeechRemaining = FMath::Max(0.f, SpeechRemaining - Step);
+    if (SpeechRemaining <= 0) SpokenLine = FText::GetEmpty();
+    if (!PendingSpeech.IsEmpty())
+    {
+        SpeechDelay -= Step;
+        if (SpeechDelay <= 0)
+        {
+            SpokenLine = PendingSpeech;
+            PendingSpeech = FText::GetEmpty();
+            SpeechDuration = 4.3f + 0.4f * DialogueVariation;
+            SpeechRemaining = FMath::Max(0.f, SpeechDuration + SpeechDelay);
+            if (SpeechRemaining <= 0) SpokenLine = FText::GetEmpty();
+        }
+    }
+}
+
+float AShopCustomer::GetSpeechOpacity() const
+{
+    if (SpokenLine.IsEmpty()) return 0;
+    return FMath::Clamp(FMath::Min(SpeechRemaining / 0.4f, (SpeechDuration - SpeechRemaining) / 0.15f), 0.f, 1.f);
 }

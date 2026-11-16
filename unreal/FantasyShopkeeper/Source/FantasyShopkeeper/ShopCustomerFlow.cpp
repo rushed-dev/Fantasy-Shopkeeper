@@ -77,6 +77,7 @@ bool AShopCustomerFlow::StartNextVisit()
         Customer->PriceBits = Order.PriceBits;
         Customer->TenderBits = Order.TenderBits;
     }
+    Customer->ConfigureVisitPersonality((State ? State->GetDay() - 1 : 0) % 3 + StartedVisits % 3);
     Customer->FinishSpawning(SpawnTransform);
     if (!IsValid(Customer))
     {
@@ -147,7 +148,7 @@ void AShopCustomerFlow::Tick(float DeltaSeconds)
     if (ActiveCustomer->Activity == EShopCustomerActivity::Completed)
     {
         WaitTime += DeltaSeconds;
-        if (WaitTime >= FMath::Max(0.f, DepartureDelay))
+        if (WaitTime >= FMath::Max(0.f, DepartureDelay) * ActiveCustomer->GetDeparturePace())
         {
             ActiveCustomer->BeginDeparture(GetActorTransform().TransformPosition(Entrance));
             WaitTime = 0;

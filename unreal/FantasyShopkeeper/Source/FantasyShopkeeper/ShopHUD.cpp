@@ -57,6 +57,19 @@ void AShopHUD::DrawHUD()
     }
     for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It)
     {
+        if (const AShopCustomer* Speaker = It->GetActiveCustomer(); Speaker && !Speaker->GetSpokenLine().IsEmpty()
+            && FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), Speaker->GetActorLocation()) < FMath::Square(900.f))
+        {
+            // Nearby subtitles imply speech without a floating world-space board or input capture.
+            const FString Line = FString::Printf(TEXT("Customer: %s"), *Speaker->GetSpokenLine().ToString());
+            float SpeechWidth = 0, SpeechHeight = 0;
+            GetTextSize(Line, SpeechWidth, SpeechHeight, GEngine->GetMediumFont());
+            const float Opacity = Speaker->GetSpeechOpacity();
+            const float SpeechX = (Canvas->ClipX - SpeechWidth) * 0.5f;
+            const float SpeechY = Canvas->ClipY - SpeechHeight - 100.f;
+            DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.65f * Opacity), SpeechX - 12, SpeechY - 6, SpeechWidth + 24, SpeechHeight + 12);
+            DrawText(Line, FLinearColor(0.96f, 0.89f, 0.72f, Opacity), SpeechX, SpeechY, GEngine->GetMediumFont());
+        }
         const FString Status = It->GetStatusText().ToString();
         float Width = 0;
         float Height = 0;

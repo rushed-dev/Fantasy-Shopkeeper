@@ -29,6 +29,12 @@ class FANTASYSHOPKEEPER_API AShopCustomer : public ACharacter, public IShopInter
 
 public:
     AShopCustomer();
+    void ConfigureVisitPersonality(int32 Variation);
+    void AdvanceConversation(float DeltaSeconds);
+    FText GetSpokenLine() const { return SpokenLine; }
+    float GetSpeechOpacity() const;
+    float GetDeparturePace() const { return 0.85f + 0.15f * DialogueVariation; }
+
     bool HasGoodsOnCounter() const;
     UPROPERTY(Transient) TWeakObjectPtr<AShopPickupItem> CounterItem;
     virtual void Tick(float DeltaSeconds) override;
@@ -106,6 +112,15 @@ private:
     float RetryAfter = 0;
     float JourneyTime = 0;
     FVector VisitDestination = FVector::ZeroVector;
+    int32 DialogueVariation = 0;
+    bool bArrivalQueued = false;
+    bool bPurchaseReactionQueued = false;
+    float SpeechDelay = 0;
+    float SpeechRemaining = 0;
+    float SpeechDuration = 0;
+    FText PendingSpeech;
+    FText SpokenLine;
+    void QueueSpeech(const FText& Line, float Delay);
     bool bLeftShop = false;
     bool bLeavingWithoutPurchase = false;
 };

@@ -59,7 +59,7 @@ if ($Action -eq 'Editor') {
 }
 
 $testFilter = 'FantasyShopkeeper.'
-$expectedTests = 34
+$expectedTests = 36
 $renderArguments = @('-nullrhi')
 if ($Action -eq 'Rendered') {
     $testFilter = 'FantasyShopkeeper.Interaction.ShopMapKeyboardWorkflow'
