@@ -14,7 +14,7 @@ The project is now a serious game concept. The Godot prototype remains the playa
 | User confirmed | Stylised, richly lit 3D, using Tiny Glade and Kena as visual references. Their content scale and character-production budgets are not our targets. |
 | User confirmed | Development PC: Ryzen 7 9800X3D, 32 GB RAM, RTX 5070 Ti. Moderate Unreal Blueprint experience; limited C++. |
 | User confirmed, updated 2026-11-15 | AI-generated artwork is permitted. Prioritise fast production, quality and rigorous verification. Maintain asset/tool records and verify current release disclosure requirements. See [content provenance](content-provenance.md). |
-| Existing design retained | Single player, Windows first, keyboard/mouse, relaxed pacing, manual totals/change, physical stock, ordinary trade viable, voluntary stories and recoverable financial trouble. |
+| Existing design retained | Single player, Windows first, keyboard/mouse, relaxed pacing, manual change, physical stock, ordinary trade viable, voluntary stories and recoverable financial trouble. |
 | Recommendation | Make brewing the next major design exploration. Evaluate Unreal as the production engine before growing the Godot implementation. See [engine decision](engine-decision.md). |
 | Proposed, not approved release commitments | The content envelope, crafting rules, progression and shipping save behaviour below. Validate these in a representative slice. No release date or advertised playtime is set. |
 
@@ -58,7 +58,7 @@ flowchart LR
 
 **Preparation:** receive paid deliveries, inspect ingredients and finished stock, make batches, arrange shelves, set prices and review accepted orders. Start trading explicitly when ready.
 
-**Trading:** serve a fixed allocation of customer opportunities. Customers browse available shelf stock, bring baskets to the counter and may offer an optional conversation or request. Work at the bench or restock between interactions. Progress follows resolved visits, including lost sales, rather than arithmetic speed.
+**Trading:** open the shop by interacting with its open/closed sign, then serve a fixed allocation of customer opportunities. Customers browse available shelf stock, bring baskets to the counter and may offer an optional conversation or request. Work at the bench or restock between interactions. Progress follows resolved visits, including lost sales, rather than arithmetic speed.
 
 **Closing:** stop new arrivals and finish the current obligations. The interface must distinguish unstarted visits that will be skipped from customers already being served. Repeated close actions cannot charge costs twice.
 
@@ -88,7 +88,7 @@ Accepted orders must state whether goods are being bought, donated or exchanged.
 
 ### Supply
 
-Buy ingredients and a limited range of finished staples through evening suppliers. Ingredient deliveries support brewing; finished staples can keep everyday retail moving while the player learns or takes on a specialist order. Core recipes and a viable ingredient supply must remain available through ordinary progression, even when story offers are declined.
+Buy ingredients and a limited range of finished staples through evening suppliers. Allow multiple deliberate orders in one evening, while repeated confirmation of the same selection must never charge twice. Ingredient deliveries support brewing; finished staples can keep everyday retail moving while the player learns or takes on a specialist order. Core recipes and a viable ingredient supply must remain available through ordinary progression, even when story offers are declined.
 
 For the first brewing slice, use fixed, legible supplier costs. Harvesting, combat drops, random ingredient quality and simulated spoilage would multiply the systems to balance and are deferred.
 
@@ -106,7 +106,7 @@ Prepared bottles need a readable product identity, recipe/output data and any ac
 
 Ordinary customers arrive with modest, understandable baskets. They buy available shelf stock and can reject an unreasonable price. Delivery stock that has not been put out for sale remains unavailable. Missing-stock reactions are immediate; the initial design does not add an automatic persistent lost-sales report.
 
-The default checkout remains manual: read individual prices, enter the basket total, receive payment, dispense change and confirm. Bits, marks and crowns have values 1, 10 and 100. Any correct combination works. Click/hold dispensing, keyboard alternatives, tray correction and leaving/returning must preserve a pending transaction.
+Following the 2026-11-16 playtest, the default checkout begins when the customer puts goods and payment on the desk. Read the prices and tender, work out and dispense the change, then confirm. There is no typed basket-total or separate accept-payment step. A deliberately basic counter leaves room for later practical or magical improvements; those upgrades are not required for ordinary trading. Bits, marks and crowns have values 1, 10 and 100. Any correct combination works. Click/hold dispensing, keyboard alternatives, tray correction and leaving/returning must preserve a pending transaction.
 
 Price expectations should be explainable through products and customers. The prototype's twice-initial-price rejection threshold is a test rule, not a finished demand model. Begin with stable ranges before considering fluctuating markets or personalised willingness-to-pay.
 
