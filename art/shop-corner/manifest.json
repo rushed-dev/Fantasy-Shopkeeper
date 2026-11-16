@@ -358,11 +358,11 @@
       ]
     },
     "SM_CheckoutCounter": {
-      "triangles": 2928,
+      "triangles": 3056,
       "dimensions_cm": [
         170.00001525878906,
         100.00001525878906,
-        102.20000457763672
+        102.0999984741211
       ],
       "collision_hulls": 1,
       "materials": [
@@ -371,7 +371,6 @@
         "DarkWood",
         "Leather",
         "CreamLabel",
-        "LabelInk",
         "Brass"
       ]
     },

@@ -525,8 +525,9 @@ window_wall = export_asset("SM_WindowWall", parts, hulls)
 parts = [box("CounterTop", (0, 0, 96), (170, 100, 8), "HoneyWood", 1.5),
          box("CounterFront", (0, 43, 48), (162, 8, 88), "SagePaint", 1),
          box("CounterShelf", (0, 0, 20), (158, 88, 5), "DarkWood", 0.8),
-         box("LedgerCover", (-22, 3, 100.6), (49, 86, 1.2), "Leather", 0.7),
-         box("LedgerPages", (-22, 3, 101.5), (46, 82, 1.2), "CreamLabel", 0.5),
+         box("LedgerCover", (-22, 30, 100.6), (49, 30, 1.2), "Leather", 0.7),
+         box("LedgerPages", (-22, 30, 101.5), (46, 28, 1.2), "CreamLabel", 0.5),
+         box("GoodsMat", (-22, -12, 100.4), (48, 44, 0.8), "Leather", 1),
          box("ChangeMat", (30, -8, 100.4), (58, 34, 0.8), "SagePaint", 1),
          box("ChangeTally", (30, 13, 100.6), (58, 8, 0.6), "CreamLabel", 0.3),
          box("PaymentSlip", (50, 39, 100.5), (40, 9, 0.6), "CreamLabel", 0.3)]
@@ -535,9 +536,6 @@ for x in (-76, 76):
         parts.append(box("CounterLeg", (x, y, 47), (10, 10, 94), "DarkWood", 1))
 for x in (2, 21, 39, 58):
     parts.append(box("MatStitching", (x, -8, 100.9), (0.25, 30, 0.15), "CreamLabel", 0))
-# The ledger's lower half is a written number grid rather than mechanical keys.
-for y in (-32, -20, -8, 4, 16):
-    parts.append(box("LedgerRule", (-22, y, 102.15), (39, 0.15, 0.1), "LabelInk", 0))
 for y in (-24, 0, 24):
     parts.append(lathe("CoinWell", [(10, 100), (10, 101), (8.5, 101)], "Brass", segments=32))
     parts[-1].location.x = -65
