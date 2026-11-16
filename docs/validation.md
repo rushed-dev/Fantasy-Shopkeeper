@@ -1,3 +1,16 @@
+# Customer requests and purchase reactions — 2026-11-16
+
+Customers now offer a brief product-specific request as they arrive and a short reaction after a committed purchase. Three authored phrasing styles use small greeting/reaction delays, four-to-five-second subtitle lifetimes and departure delays scaled between 0.85 and 1.15 of the authored value. The day and visit select the variation deterministically, without changing the global random stream or save schema. Explicit zero departure delay still works for tests and authored instant departures.
+
+Subtitles appear near the bottom of the screen within nine metres, fade in/out and never capture input. There are no floating speech boards, voices, dialogue choices, new rewards or impatience penalties. Existing status/request text remains available. Failed checkout and unserved exits do not trigger purchase thanks; route retries and repeated confirmation do not repeat dialogue. An unserved customer's interaction prompt now says they are heading home instead of thanking the player for a purchase.
+
+- Local build/gameplay: **36 passed, 0 automation warnings**, report `Saved/Automation/Gameplay-20261116-180608-937`; log `Saved/Logs/CustomerPersonalityChecks.log`. New checks cover delayed requests, correct product names, expiry, three variants, stable visit selection, bounded timing, successful-sale gating, repeated confirmations and unserved exits. Existing transaction, physical checkout, multi-day and save/load tests pass.
+- Rendered workflow: **1 passed, 0 automation warnings**, report `Saved/Automation/Rendered-20261116-180804-412`; log `Saved/Logs/CustomerPersonalityRendered.log`. Inspected `Saved/ArtReview/20261116-180804-412/paid.png`: the purchase reaction is readable below checkout without obscuring its goods or controls, and the customer retains their purchased bottle.
+- Asset checks: **34 meshes, 87 collision hulls, four sections / 32 positions, two windows and four pendants; 0 errors and 0 warnings**, log `Saved/Logs/Assets-20261116-180817-137.log`. All seven maintained Python tools parse. No maps, assets, media or new scripts were required.
+- Windows package: **passed**, `builds/unreal-customer-personality/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/CustomerPersonalityPackage.log`. Automatic startup/reopening used isolated `Saved/CustomerPersonalitySmoke` data and preserved the checkpoint hash and timestamp; launch/restore logs have no warnings/errors. Builds retain the existing compiler preferred-version and engine-header deprecation notices.
+
+All checks used the local tooling. Human assessment of dialogue tone and timing remains with the user.
+
 # Tactile checkout presentation — 2026-11-16
 
 Checkout now presents the carried bottle through a 0.45-second hand-to-mat motion and a placement sound, followed by staggered payment coin drops/clinks. A collision-free visual copy handles the gesture while the real item retains its reserved checkout-slot ownership. Completion or cancellation restores the real item's visibility. Change coins settle into controlled mat positions; denomination pitches, louder placement clinks and lower return tones reuse the existing original audio cues.

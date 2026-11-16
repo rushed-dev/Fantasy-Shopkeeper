@@ -56,3 +56,8 @@ The user is handling hands-on gameplay, audible mix and presentation assessment.
 ## Physical planning and delivery polish, 2026-11-16
 
 The native order book, paper tabs and sealed delivery reuse the existing original crate/material kit and engine cube geometry. World-space labels are authored C++ text. `ShopDayLighting` synthesizes a short deterministic wind/cricket cue from filtered noise and a pulsed sine wave at 24 kHz mono; it uses no samples, external media or runtime AI service. These additions are AI-assisted code and procedural presentation. Rendering, transaction and persistence checks are recorded in `validation.md`; audible mix and hands-on assessment remain with the user.
+
+
+## Customer conversation polish, 2026-11-16
+
+Three arrival-request templates and three short purchase reactions are original AI-assisted authored text in `ShopCustomer.cpp`, using Unreal localizable text macros. They are displayed as nearby subtitles; no voice, external language service, generated runtime dialogue or new media is used. Selection and small timing differences follow the day/visit index. They add no persistent story claims, prices, rewards or penalties.
