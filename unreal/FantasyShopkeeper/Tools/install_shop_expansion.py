@@ -18,6 +18,18 @@ actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 level = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 assert level.load_level("/Game/Levels/L_Shop")
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+till = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.ShopTill))
+customer = till.get_editor_property("customer")
+assert customer
+# The small device had been moved against the entrance wall. The full counter
+# needs standing room on both sides, with its cashier side facing into the room.
+p = till.get_actor_location()
+if p.y <= -300:
+    till.set_actor_location(unreal.Vector(p.x, -180, p.z), False, False)
+    till.set_actor_rotation(unreal.Rotator(yaw=180), False)
+checkout_position = unreal.MathLibrary.transform_location(till.get_actor_transform(), unreal.Vector(0, 100, 88 - till.get_actor_location().z))
+customer.set_actor_location(checkout_position, False, False)
+
 
 
 def actor(label, cls, position, yaw=0):
@@ -105,8 +117,8 @@ for label, mesh, position, yaw in (
     ("Art_SideTree", "SM_GardenTree", (1500, 550, 0), 0),
 ):
     mesh_actor(label, mesh, position, yaw)
-for label, x, y in (("Art_BrassPendant", 600, 350), ("Art_CheckoutPendant", 350, 50),
-                    ("Art_PrepPendant", 150, 400), ("Art_EntryPendant", 250, -250)):
+for label, x, y in (("Art_BrassPendant", 600, 350), ("Art_CheckoutPendant", 130, -180),
+                    ("Art_PrepPendant", 150, 400), ("Art_EntryPendant", 350, -200)):
     pendant = mesh_actor(label, "SM_BrassPendant", (x, y, 242), decorative=True)
     pendant.set_actor_location(unreal.Vector(x, y, 242), False, False)
 mesh_actor("Art_DoorSurround", "SM_ShopDoorSurround", (300, -390, 0), 180)
@@ -121,8 +133,8 @@ mesh_actor("Art_InkRecipeBook", "SM_InkRecipeBook", (175, 340, 100), decorative=
 for label, position, target, intensity, color, width, height in (
     ("Art_BackWindowLight", (600, 645, 200), (600, 250, 110), 1600, (0.7, 0.84, 1), 120, 160),
     ("Art_SideWindowLight", (945, 400, 200), (650, 400, 100), 1000, (0.7, 0.84, 1), 120, 160),
-    ("Art_CheckoutLight", (350, 50, 239), (350, 40, 90), 900, (1, 0.8, 0.57), 140, 100),
-    ("Art_EntryLight", (250, -250, 239), (250, -250, 90), 900, (1, 0.8, 0.57), 100, 100),
+    ("Art_CheckoutLight", (130, -180, 239), (130, -180, 90), 900, (1, 0.8, 0.57), 140, 100),
+    ("Art_EntryLight", (350, -200, 239), (350, -200, 90), 900, (1, 0.8, 0.57), 100, 100),
     ("Art_PrepLight", (150, 400, 239), (150, 350, 100), 700, (1, 0.86, 0.65), 140, 100),
 ):
     light = actor(label, unreal.RectLight, position)
@@ -138,6 +150,18 @@ for label, position, target, intensity, color, width, height in (
     component.set_editor_property("attenuation_radius", 700)
     component.set_editor_property("cast_raytraced_shadow", unreal.CastRayTracedShadow.DISABLED)
     component.set_editor_property("allow_mega_lights", False)
+
+# The original greybox sun used six lux, which left exterior views dark.
+# Give the existing atmosphere a daylight source and capture it in the skylight.
+sun = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.DirectionalLight))
+sun.set_actor_rotation(unreal.Rotator(pitch=-38, yaw=-135), False)
+sun_component = sun.get_component_by_class(unreal.DirectionalLightComponent)
+sun_component.set_intensity(12000)
+sun_component.set_light_color(unreal.LinearColor(1, 0.9, 0.78, 1))
+sky = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.SkyLight))
+sky_component = sky.get_component_by_class(unreal.SkyLightComponent)
+sky_component.set_editor_property("real_time_capture", True)
+sky_component.set_intensity(0.6)
 
 post = actor("Art_ShopPostProcess", unreal.PostProcessVolume, (500, 150, 150))
 post.set_editor_property("unbound", True)
@@ -329,6 +353,7 @@ flow.set_editor_property("orders", orders)
 unreal.SystemLibrary.execute_console_command(world, "RebuildNavigation")
 entry = unreal.MathLibrary.transform_location(flow_transform, flow.get_editor_property("entrance"))
 route = unreal.NavigationSystemV1.find_path_to_location_synchronously(world, entry, customer.get_actor_location())
+unreal.log(f"CHECKOUT_ROUTE till={till.get_actor_location()} customer={customer.get_actor_location()} route={route.path_points if route else None}")
 assert route and route.is_valid() and not route.is_partial(), "Entrance must have a complete route to checkout"
 assert level.save_current_level()
 unreal.log(f"SHOP_EXPANSION_INSTALLED removed_supports={removed} entrance_route_points={len(route.path_points)} backup={backup}")

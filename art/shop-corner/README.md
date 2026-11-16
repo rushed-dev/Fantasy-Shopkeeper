@@ -44,6 +44,8 @@ The meshes and materials are under `/Game/Shop/Art`. `/Game/Shop/Native/BP_DawnT
 
 The whole checkout table is `BP_ShopTill`, with native world-space controls. The kit includes the counter, key, open leather pouch, and copper/silver/brass coins stamped 1/10/100. Payment coins appear in the pouch and change coins in three tray lanes. Each denomination displays up to 48 coins and always shows its exact count. Counting and returning coins use the authoritative till transaction. Confirmation credits cash once.
 
+The larger checkout counter is moved inward from the entrance wall and faces into the room, with a matching customer waypoint and a verified entrance route.
+
 Two window wall modules replace measured greybox cubes and wall overlays. Their arched openings have separate translucent glass and timber frames. Original garden ground, fence and low-poly trees provide exterior views. Four visible brass pendants light brewing, preparation, checkout and the entrance, with cool daylight at both windows. Floor and ceiling retain 66 tiles each.
 
 `Tools/install_shop_expansion.py` maintains the room, sections, physical checkout, customer presentations, recipes, supplier and customer flow. It preserves existing furniture transforms unless migrating the old counter or window geometry. Timestamped map backups are under `Saved/BeforeShopExpansion`. Old independent sale slots are replaced by sections. The station output remains independent.
