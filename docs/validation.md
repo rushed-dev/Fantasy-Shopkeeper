@@ -1,3 +1,18 @@
+# First-day supplies and supplier ordering page — 2026-11-16
+
+The native station default and authored `L_Shop` station now start with six Moonleaf and six Spring Water. Two Dawn Tonics and one Moonlit Ink consume five leaf and four water. Existing checkpoints retain their saved inventory; a fresh game uses the revised starting quantities. The maintained expansion installer writes these defaults and the asset validator checks them.
+
+E on the supplier book opens a native Slate ordering page. It shows stored ingredients, forecast requirements after deducting matching sale-shelf bottles, paid deliveries, capacity, projected stock and remaining shortfall. Unknown recipes produce an unavailable forecast rather than partial totals. The page has mouse buttons and R/F/T quantity/pack controls, Enter to sign/pay and F10 to close. Reading is allowed outside evening; purchasing remains evening-only. Opening never spends money, and paying twice cannot repeat an order. Further deliberate selections still support multiple orders. Player movement/look are held while reading and restored on close; invalid reach, held items or overnight transition close the page.
+
+The page reuses the existing guarded purchase and sealed next-morning delivery mechanisms. No recipe discounts, same-day replenishment, farming, save-schema changes or new tool scripts were added.
+
+- Local build/gameplay: **44 passed, 0 automation warnings**, `Saved/Automation/Gameplay-20261116-201616-989`; log `Saved/Logs/OrderingChecks.log`. New coverage verifies the complete first-day recipe budget, shelf-adjusted forecasts and unknown recipes. The actual-map keyboard workflow checks six-of-each initialization, read-only preparation access, opening without payment, one-time confirmation, input restoration and morning unpacking.
+- Rendered workflow: **1 passed, 0 automation warnings**, `Saved/Automation/Rendered-20261116-202107-543`; log `Saved/Logs/OrderingFinalRendered.log`. The final test additionally sends quantity keys through the focused Slate page, rather than only controller injection. Inspected the page in `Saved/ArtReview/20261116-201752-014/ordering.png` from the initial rendered pass; the capture includes editor chrome because Slate UI requires a UI-inclusive screenshot.
+- Asset checks: **34 meshes, 87 collision hulls, four sections / 32 positions, two windows and four pendants; 0 errors and 0 warnings**, log `Saved/Logs/Assets-20261116-201724-949.log`. All seven maintained Python tools parse. Installer log `Saved/Logs/Editor-20261116-201516-267.log` records no removed furniture and a complete three-point entrance route. The previous map is backed up under `Saved/BeforeShopExpansion/20261116-201521`.
+- Windows package: **passed**, `builds/unreal-ingredient-orders/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/OrderingPackage.log`. Isolated `Saved/IngredientOrdersSmoke` startup/reopening preserved checkpoint hashes/timestamps without warnings/errors. Existing compiler preferred-version and engine-header deprecation notices remain build-only.
+
+All checks used the local tooling. Player saves were not touched. Manual assessment of mouse handling and menu feel remains with the user.
+
 # Recovery shortcut in Play-in-Editor — 2026-11-16
 
 Changed the recovery menu toggle and cancellation from Escape to F10. Unreal Editor reserves Escape for Stop Play Session before the game controller receives it. F10 opens recovery options; F then Enter starts a fresh day 1, Enter alone restarts the morning, and F10 cancels. The editor's Escape binding is unchanged.

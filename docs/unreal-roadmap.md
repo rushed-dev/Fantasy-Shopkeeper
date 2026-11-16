@@ -137,3 +137,7 @@ Implemented one physical evening purchase: 24 bits for extra ingredient drawers,
 ### Batch bottling kit
 
 Implemented a 36-bit evening purchase at the bench, with a physical one/three-bottle selector and two additional non-sale output positions on a brass rack. Batches charge the authored per-bottle recipe costs only after every output acquires its slot. Version 4 mornings restore the kit, selection and all outputs together; versions 1-3 retain single brewing. Partial pickup blocks further brewing until the outputs are clear. No timed stirring, yield discount or staff automation was added.
+
+### Ingredient ordering page
+
+Fresh shops now start with six of each ingredient, enough for two Dawn Tonics and one Moonlit Ink. E on the supplier book opens a native Slate page with mouse buttons and keyboard shortcuts for selecting packs, quantity and explicit payment. It forecasts ingredients from the finite customer sequence after deducting sale-shelf stock. Read-only access is available outside evening; the guarded economy and next-morning sealed delivery are unchanged. Existing morning saves retain their quantities.
