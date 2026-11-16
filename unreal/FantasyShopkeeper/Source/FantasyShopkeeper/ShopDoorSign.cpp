@@ -45,7 +45,9 @@ FText AShopDoorSign::GetInteractionPrompt() const
     if (!State) return FText::GetEmpty();
     switch (State->GetDayPhase())
     {
-    case EShopDayPhase::Preparation: return FText::FromString(TEXT("E  Turn sign to OPEN"));
+    case EShopDayPhase::Preparation:
+        if (State->HasDelivery()) return FText::FromString(TEXT("Unpack the delivery by the entrance before opening"));
+        return FText::FromString(TEXT("E  Turn sign to OPEN"));
     case EShopDayPhase::Trading: return FText::FromString(TEXT("E  Turn sign to CLOSED | Finish the current visit"));
     case EShopDayPhase::Closing: return FText::FromString(TEXT("CLOSED | Waiting for the current customer to leave"));
     default: return FText::FromString(TEXT("CLOSED | Order supplies for tomorrow"));

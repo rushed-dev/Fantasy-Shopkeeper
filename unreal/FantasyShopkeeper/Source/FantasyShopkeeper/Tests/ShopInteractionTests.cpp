@@ -25,6 +25,8 @@
 #include "../ShopMorningSave.h"
 #include "../ShopDayLighting.h"
 #include "../ShopDoorSign.h"
+#include "../ShopSupplyControl.h"
+#include "TimerManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
 #include "Misc/FileHelper.h"
@@ -154,10 +156,10 @@ namespace
             return Collected;
         }
 
-        AShopTill* PreparedTill(AShopCustomer* Customer)
+        AShopTill* PreparedTill(AShopCustomer* Customer, AShopTill* ExistingTill = nullptr)
         {
-            AShopTill* Till = Spawn<AShopTill>(Customer->GetActorLocation() * 0.6);
-            Till->Customer = Customer;
+            AShopTill* Till = ExistingTill ? ExistingTill : Spawn<AShopTill>(Customer->GetActorLocation() * 0.6);
+            Till->AssignCustomer(Customer);
             AimAt(Till);
             if (!Till->BeginCheckout(Interaction))
             {
@@ -770,6 +772,7 @@ bool FShopSupplyPurchaseTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("No same-day ingredients appear"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
     TestFalse(TEXT("Repeated confirmation cannot pay twice"), Test.Interaction->Interact());
     TestTrue(TEXT("Morning receives the paid order"), State->AdvanceMorning());
+    TestTrue(TEXT("Unpack the sealed morning parcel"), State->UnpackDelivery());
     TestEqual(TEXT("Delivery reaches capacity"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 12);
     TestEqual(TEXT("Both packs delivered once"), Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
     TestFalse(TEXT("Morning cannot repeat the delivery"), State->AdvanceMorning());
@@ -842,6 +845,7 @@ bool FShopSupplyRejectionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Water can be replenished while Moonleaf storage is full"), Overflow.Interaction->Interact());
     TestEqual(TEXT("Individual pack preserves the full ingredient"), FullStation->GetIngredientQuantity(TEXT("Moonleaf")), MAX_int32 - 1);
     TestTrue(TEXT("Individual order delivered next morning"), OverflowState->AdvanceMorning());
+    TestTrue(TEXT("Unpack the sealed morning parcel"), OverflowState->UnpackDelivery());
     TestEqual(TEXT("Individual water pack delivers its complete quantity"), FullStation->GetIngredientQuantity(TEXT("Spring Water")), 3);
     TestEqual(TEXT("Individual pack charges its advertised price"), OverflowState->GetCash(), int64(18));
     return true;
@@ -1421,6 +1425,8 @@ bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Reload next morning"), State->RestoreMorning());
     TestEqual(TEXT("Day two restored"), State->GetDay(), 2);
     TestEqual(TEXT("Paid cost not replayed"), State->GetCash(), int64(38));
+    TestTrue(TEXT("Restored parcel unpacks once"), State->UnpackDelivery());
+    TestFalse(TEXT("Repeated unpack is rejected"), State->UnpackDelivery());
     TestEqual(TEXT("Delivery not replayed"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves + 6);
     // A replacement GameState simulates startup against the same stable map actors.
     State->Destroy();
@@ -1581,11 +1587,15 @@ bool FShopDeferredSuppliesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Failed write charges no second payment"), State->GetCash(), int64(38));
     Lock.Reset();
     TestTrue(TEXT("Retry delivers and saves"), State->AdvanceMorning());
+    TestTrue(TEXT("Unpack the sealed morning parcel"), State->UnpackDelivery());
     TestEqual(TEXT("Original ordered quantity used"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
     TestEqual(TEXT("Original water quantity delivered"), Station->GetIngredientQuantity(TEXT("Spring Water")), 3);
     for (int32 Retry = 0; Retry < 2; ++Retry)
     {
         TestTrue(TEXT("Delivered morning restores"), State->RestoreMorning());
+        TestEqual(TEXT("Restoration returns ingredients to unopened state"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+        TestTrue(TEXT("Restored paid parcel unpacks"), State->UnpackDelivery());
+        TestFalse(TEXT("Repeated unpack cannot duplicate ingredients"), State->UnpackDelivery());
         TestEqual(TEXT("Delivery is never replayed"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
         TestEqual(TEXT("Payment is never replayed"), State->GetCash(), int64(38));
     }
@@ -1694,7 +1704,7 @@ bool FShopMultipleOrdersTest::RunTest(const FString& Parameters)
     FInteractionWorld Test;
     AShopGameState* State = Test.ShopState(50);
     AShopBrewingStation* Station = Test.BrewingStation(0, 0);
-    DayFlow(Test);
+    AShopCustomerFlow* Flow = DayFlow(Test);
     AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
     AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
     Crate->Station = Station;
@@ -1723,6 +1733,7 @@ bool FShopMultipleOrdersTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Advance through day four"), State->GetDay(), Morning);
         TestTrue(TEXT("Restore delivered morning"), State->RestoreMorning());
         TestTrue(TEXT("Repeated restore cannot redeliver"), State->RestoreMorning());
+        TestTrue(TEXT("Unpack both orders together"), State->UnpackDelivery());
         TestEqual(TEXT("Both water orders arrive once"), Station->GetIngredientQuantity(TEXT("Spring Water")), Water + 6);
         TestEqual(TEXT("Bundle leaves arrive once"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves + 6);
         TestEqual(TEXT("Reload does not recharge orders"), State->GetCash(), CashBefore - 18);
@@ -1739,14 +1750,114 @@ bool FShopMultipleOrdersTest::RunTest(const FString& Parameters)
             Buyer->PriceBits = bInk ? 18 : 12;
             Buyer->TenderBits = bInk ? 50 : 20;
             TestTrue(TEXT("Customer collects brewed goods"), Test.CollectAndReturn(Buyer, Item));
-            AShopTill* Till = Test.PreparedTill(Buyer);
-            if (!TestNotNull(TEXT("Goods and payment reach checkout"), Till)) return false;
+            AShopTill* Till = Test.PreparedTill(Buyer, Flow->Till);
+            if (!TestNotNull(TEXT("Goods and payment reach checkout"), Till))
+            {
+                AddError(FString::Printf(TEXT("Morning %d visit %d: buyer %s activity %d target %s held %s item slot %s"), Morning, Visit,
+                    *Buyer->GetActorLocation().ToString(), int32(Buyer->Activity), *GetNameSafe(Test.Interaction->GetInteractionTarget()),
+                    *GetNameSafe(Buyer->ShopInteraction->GetHeldItem()), *GetNameSafe(Item->GetCurrentSlot())));
+                return false;
+            }
             TestTrue(TEXT("Sell without a typed total"), Till->ConfirmSale(Test.Interaction));
-            Till->Destroy(); Buyer->Destroy();
+            Till->AssignCustomer(nullptr); Buyer->Destroy();
         }
         TestEqual(TEXT("All three visits fund the following evening"), State->GetCash(), CashBefore - 18 + 42);
         State->CloseShop();
     }
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopPhysicalDeliveryTest, "FantasyShopkeeper.Supplies.PhysicalParcelAndInvalidSave",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopPhysicalDeliveryTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(50);
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    DayFlow(Test);
+    AShopSupplyCrate* Desk = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
+    Desk->Station = Station;
+    State->InitializeDay(File.Path);
+    State->OpenShop(); State->CloseShop();
+    Test.AimAt(Desk);
+    TestTrue(TEXT("Evening order succeeds"), Test.Interaction->Interact());
+    TestTrue(TEXT("Physical book includes tomorrow's visitors"), Desk->GetPlanningText().Contains(TEXT("3 visitors")));
+    TestTrue(TEXT("Morning checkpoints the unopened parcel"), State->AdvanceMorning());
+    TestEqual(TEXT("Delivery is not usable before unpacking"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestFalse(TEXT("Opening directs player to unpack"), State->OpenShop());
+    AShopSupplyControl* Parcel = Test.Spawn<AShopSupplyControl>(FVector(0, -100, 0));
+    Parcel->Configure(Desk, EShopSupplyControl::Delivery);
+    Test.AimAt(Parcel);
+    TestTrue(TEXT("Reachable E unpacks the parcel"), Test.Interaction->Interact());
+    TestEqual(TEXT("Unpack transfers all ingredients once"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+    TestFalse(TEXT("Second E has no delivery to duplicate"), Parcel->Interact_Implementation(Test.Interaction));
+    TestTrue(TEXT("Restore rolls back unpacking"), State->RestoreMorning());
+    Parcel->Tick(0);
+    TestEqual(TEXT("Restored storage excludes parcel"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 0);
+    TestEqual(TEXT("Restored parcel contains original paid quantity"), State->GetDeliveredQuantity(TEXT("Moonleaf")), 6);
+    Parcel->SetActorLocation(FVector(0, -500, 0));
+    TestFalse(TEXT("Cannot unpack remotely"), Parcel->Interact_Implementation(Test.Interaction));
+    TArray<uint8> Bytes;
+    FFileHelper::LoadFileToArray(Bytes, *File.Path);
+    UShopMorningSave* Save = UShopMorningSave::Decode(Bytes);
+    if (!TestNotNull(TEXT("Saved unopened parcel"), Save)) return false;
+    Save->Delivery.Add(TEXT("Moonleaf"), MAX_int32);
+    UShopMorningSave::Encode(Save, Bytes);
+    FFileHelper::SaveArrayToFile(Bytes, *File.Path);
+    TestFalse(TEXT("Overflowing parcel save rejected before changes"), State->RestoreMorning());
+    TestEqual(TEXT("Rejected save preserves paid parcel"), State->GetDeliveredQuantity(TEXT("Moonleaf")), 6);
+    TestEqual(TEXT("Rejected save preserves cash"), State->GetCash(), int64(38));
+    // Old checkpoints restore their already-delivered ingredients without inventing a parcel.
+    Save->Version = 1;
+    Save->Delivery.Empty();
+    Save->DeliveryStation.Empty();
+    UShopMorningSave::Encode(Save, Bytes);
+    FFileHelper::SaveArrayToFile(Bytes, *File.Path);
+    TestTrue(TEXT("Version one checkpoint remains readable"), State->RestoreMorning());
+    TestFalse(TEXT("Old checkpoint has no invented delivery"), State->HasDelivery());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopOvernightTest, "FantasyShopkeeper.Day.PhysicalRestAndOvernightGuard",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopOvernightTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    DayFlow(Test);
+    State->InitializeDay(FString());
+    AShopSupplyCrate* Desk = Test.Spawn<AShopSupplyCrate>(FVector(100, 100, 0));
+    AShopSupplyControl* Rest = Test.Spawn<AShopSupplyControl>(FVector(-100, 0, 0));
+    Rest->Configure(Desk, EShopSupplyControl::Rest);
+    Test.Camera->SetWorldRotation((Rest->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
+    TestFalse(TEXT("Cannot sleep in preparation"), Test.Interaction->Interact());
+    State->OpenShop(); State->CloseShop();
+    TestFalse(TEXT("Rest needs explicit evening planning"), Test.Interaction->Interact());
+    Rest->Configure(Desk, EShopSupplyControl::Pack);
+    TestTrue(TEXT("E on pack tab changes offer"), Test.Interaction->Interact());
+    Rest->Configure(Desk, EShopSupplyControl::More);
+    TestTrue(TEXT("E on more tab increments quantity"), Test.Interaction->Interact());
+    TestEqual(TEXT("Quantity is now two"), Desk->GetPackCount(), 2);
+    Rest->Configure(Desk, EShopSupplyControl::Less);
+    TestTrue(TEXT("E on less tab decrements quantity"), Test.Interaction->Interact());
+    Rest->Configure(Desk, EShopSupplyControl::Rest);
+    State->ConfirmNoSupplies();
+    TestTrue(TEXT("E on rest tab starts the night"), Test.Interaction->Interact());
+    TestTrue(TEXT("Transition has an explicit guard"), State->IsOvernight());
+    TestEqual(TEXT("Night does not immediately commit morning"), State->GetDay(), 1);
+    TestFalse(TEXT("No repeated sleep"), State->BeginOvernight());
+    TestFalse(TEXT("No orders during fade"), State->ConfirmNoSupplies());
+    TestFalse(TEXT("No early morning commit during fade"), State->AdvanceMorning());
+    {
+        TGuardValue<uint64> FrameGuard(GFrameCounter, GFrameCounter);
+        Test.World->GetTimerManager().Tick(0.f);
+        ++GFrameCounter;
+        Test.World->GetTimerManager().Tick(4.f);
+    }
+    TestFalse(TEXT("Night completes"), State->IsOvernight());
+    TestEqual(TEXT("One morning committed"), State->GetDay(), 2);
     return true;
 }
 

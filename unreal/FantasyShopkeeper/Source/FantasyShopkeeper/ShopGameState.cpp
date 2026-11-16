@@ -18,7 +18,7 @@ bool AShopGameState::ConfirmNoSupplies()
 {
     if (!HasAuthority() || !CanOrderSupplies()) return false;
     bSuppliesConfirmed = true;
-    CheckpointMessage = TEXT("No additional supplies ordered. N: Next morning.");
+    CheckpointMessage = TEXT("No additional supplies ordered. Rest at the order book.");
     return true;
 }
 
@@ -27,6 +27,7 @@ bool AShopGameState::CanReceiveOrder(AShopBrewingStation* Station, const TMap<FN
     if (!IsValid(Station) || Station->GetWorld() != GetWorld()
         || (!PendingDelivery.IsEmpty() && DeliveryStation.Get() != Station)) return false;
     TMap<FName, int32> Combined = PendingDelivery;
+    if (!MorningDelivery.IsEmpty()) return false;
     for (const auto& Entry : Additional)
     {
         if (Entry.Value <= 0 || int64(Combined.FindRef(Entry.Key)) + Entry.Value > MAX_int32) return false;

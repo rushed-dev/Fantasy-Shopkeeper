@@ -24,6 +24,11 @@ public:
     bool OpenShop();
     bool CloseShop();
     bool AdvanceMorning();
+    bool BeginOvernight();
+    bool IsOvernight() const { return bOvernight; }
+    bool UnpackDelivery();
+    int32 GetDeliveredQuantity(FName Ingredient) const { return MorningDelivery.FindRef(Ingredient); }
+    bool HasDelivery() const { return !MorningDelivery.IsEmpty(); }
     bool RestoreMorning();
     void UpdateDay();
     bool CanStartVisit() const;
@@ -31,7 +36,7 @@ public:
     bool CanReceiveOrder(AShopBrewingStation* Station, const TMap<FName, int32>& Additional) const;
     int32 GetPendingIngredientQuantity(FName Ingredient) const { return PendingDelivery.FindRef(Ingredient); }
     bool HasConfirmedSupplies() const { return bSuppliesConfirmed; }
-    bool CanOrderSupplies() const { return bDayInitialized && DayPhase == EShopDayPhase::Evening && !bChangingEconomy; }
+    bool CanOrderSupplies() const { return bDayInitialized && DayPhase == EShopDayPhase::Evening && !bChangingEconomy && !bOvernight; }
     bool IsDayInitialized() const { return bDayInitialized; }
     bool IsChangingEconomy() const { return bChangingEconomy; }
     EShopDayPhase GetDayPhase() const { return DayPhase; }
@@ -60,6 +65,10 @@ private:
     int64 Cash = 0;
 
     bool bChangingEconomy = false;
+    bool bOvernight = false;
+    FTimerHandle OvernightTimer;
+    UPROPERTY(Transient) TMap<FName, int32> MorningDelivery;
+    UPROPERTY(Transient) TWeakObjectPtr<AShopBrewingStation> MorningDeliveryStation;
     bool bDayInitialized = false;
     bool bCheckpointBlocked = false;
     bool bSuppliesConfirmed = false;

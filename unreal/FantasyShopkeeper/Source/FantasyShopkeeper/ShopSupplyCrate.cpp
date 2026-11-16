@@ -3,6 +3,11 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "ShopBrewingStation.h"
+#include "ShopCustomerFlow.h"
+#include "ShopSupplyControl.h"
+#include "Components/TextRenderComponent.h"
+#include "Materials/MaterialInterface.h"
+#include "EngineUtils.h"
 #include "ShopGameState.h"
 #include "ShopInteractionComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -22,7 +27,8 @@ AShopSupplyCrate::AShopSupplyCrate()
     Water.PriceBits = 6;
     Water.Ingredients = {{TEXT("Spring Water"), 3}};
     Offers.Add(Water);
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickInterval = 0.1f;
     CrateMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CrateMesh"));
     RootComponent = CrateMesh;
     CrateMesh->SetCollisionProfileName(TEXT("BlockAll"));
@@ -32,6 +38,31 @@ AShopSupplyCrate::AShopSupplyCrate()
         CrateMesh->SetStaticMesh(Cube.Object);
         CrateMesh->SetRelativeScale3D(FVector(0.6, 0.45, 0.4));
     }
+    Cover = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BookCover"));
+    Cover->SetupAttachment(RootComponent);
+    Cover->SetStaticMesh(Cube.Object);
+    Cover->SetRelativeLocation(FVector(0, 0, 67));
+    Cover->SetRelativeScale3D(FVector(0.72, 0.64, 0.035));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> Leather(TEXT("/Game/Shop/Art/Materials/M_DarkWood.M_DarkWood"));
+    Cover->SetMaterial(0, Leather.Object);
+    Cover->SetCanEverAffectNavigation(false);
+    Book = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("OrderBook"));
+    Book->SetupAttachment(RootComponent);
+    Book->SetStaticMesh(Cube.Object);
+    Book->SetRelativeLocation(FVector(0, 0, 69.5));
+    Book->SetRelativeScale3D(FVector(0.68, 0.60, 0.025));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> Paper(TEXT("/Game/Shop/Art/Materials/M_CreamLabel.M_CreamLabel"));
+    Book->SetMaterial(0, Paper.Object);
+    Book->SetCanEverAffectNavigation(false);
+    Page = CreateDefaultSubobject<UTextRenderComponent>(TEXT("OrderPage"));
+    Page->SetupAttachment(RootComponent);
+    Page->SetRelativeLocation(FVector(0, 27, 70.9));
+    Page->SetRelativeRotation(FRotator(90, -90, 0));
+    Page->SetHorizontalAlignment(EHTA_Center);
+    Page->SetVerticalAlignment(EVRTA_TextTop);
+    Page->SetWorldSize(4.f);
+    Page->SetTextRenderColor(FColor(32, 36, 24));
+
 }
 
 bool AShopSupplyCrate::GetOrder(TMap<FName, int32>& Quantities, int64& Cost) const
@@ -140,20 +171,44 @@ FText AShopSupplyCrate::GetInteractionPrompt(UShopInteractionComponent* Interact
     const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
     const FText BlockReason = GetBlockReason();
     if (!State || State->GetDayPhase() != EShopDayPhase::Evening) return BlockReason;
+    return BlockReason.IsEmpty() ? FText::FromString(TEXT("E  Sign order | Book tabs: pack, less, more, rest")) : BlockReason;
+
+}
+
+
+void AShopSupplyCrate::BeginPlay()
+{
+    Super::BeginPlay();
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        AShopSupplyControl* Control = GetWorld()->SpawnActor<AShopSupplyControl>(
+            GetActorTransform().TransformPosition(FVector(25.5 - Index * 17, -36, 70)), GetActorRotation());
+        if (!Control) continue;
+        Control->SetOwner(this);
+        Control->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+        Control->Configure(this, EShopSupplyControl(Index));
+    }
+}
+FString AShopSupplyCrate::GetPlanningText() const
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!State) return TEXT("SUPPLIER ORDER BOOK");
+    int32 Visitors = 0;
+    for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It) { Visitors = It->VisitsPerDay; break; }
     TMap<FName, int32> Quantities;
     int64 Cost = 0;
     GetOrder(Quantities, Cost);
-    FString Contents;
-    TArray<FName> Keys;
-    Delivery.GetKeys(Keys);
-    Keys.Sort(FNameLexicalLess());
-    for (const FName Key : Keys)
-        Contents += FString::Printf(TEXT("%s %d/%d | Ordered %d | Add %lld\n"), *Key.ToString(),
-            IsValid(Station) ? Station->GetIngredientQuantity(Key) : 0,
-            IsValid(Station) ? Station->IngredientCapacity : 0, State->GetPendingIngredientQuantity(Key),
-            bOrderSubmitted ? int64(0) : int64(Delivery[Key]) * PackCount);
-    const FString Action = BlockReason.IsEmpty()
-        ? (PackCount == 0 ? TEXT("E Confirm no order") : TEXT("E Pay for tomorrow")) : BlockReason.ToString();
-    return FText::FromString(FString::Printf(TEXT("%s | %d packs / %lld bits\n%sR Pack | F Less | T More"),
-        *Action, PackCount, Cost, *Contents));
+    const int32 Leaves = Station ? Station->GetIngredientQuantity(TEXT("Moonleaf")) : 0;
+    const int32 Water = Station ? Station->GetIngredientQuantity(TEXT("Spring Water")) : 0;
+    return FString::Printf(TEXT("TOMORROW - %d visitors\nTakings %lld / Supplies %lld\nPurse %lld bits\n             Stored  Ordered\nMoonleaf     %d       %d\nWater        %d       %d\n\nAdd %d leaf / %d water\n%d packs : %lld bits\n%s"),
+        Visitors, State->GetTakings(), State->GetSupplySpending(), State->GetCash(), Leaves,
+        State->GetPendingIngredientQuantity(TEXT("Moonleaf")), Water, State->GetPendingIngredientQuantity(TEXT("Spring Water")),
+        Quantities.FindRef(TEXT("Moonleaf")), Quantities.FindRef(TEXT("Spring Water")), PackCount, Cost,
+        State->GetDayPhase() != EShopDayPhase::Evening ? TEXT("Orders taken in the evening")
+            : bOrderSubmitted ? TEXT("PAID - change tabs to add more") : TEXT("E : sign & pay this order"));
+}
+void AShopSupplyCrate::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    Page->SetText(FText::FromString(GetPlanningText()));
 }

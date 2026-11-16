@@ -8,6 +8,7 @@
 class AShopBrewingStation;
 class UStaticMeshComponent;
 class USoundBase;
+class UTextRenderComponent;
 
 USTRUCT(BlueprintType)
 struct FShopSupplyOffer
@@ -28,6 +29,9 @@ class FANTASYSHOPKEEPER_API AShopSupplyCrate : public AActor, public IShopIntera
 
 public:
     AShopSupplyCrate();
+    virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
+    FString GetPlanningText() const;
     bool ChangeQuantity(UShopInteractionComponent* Interactor, int32 Delta);
     void ResetOrder() { bOrderSubmitted = false; }
     bool HasSubmittedOrder() const { return bOrderSubmitted; }
@@ -61,6 +65,9 @@ public:
 
 private:
     friend class AShopGameState;
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> Cover;
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> Book;
+    UPROPERTY() TObjectPtr<UTextRenderComponent> Page;
     bool bOrderSubmitted = false;
     int32 PackCount = 1;
     FText GetBlockReason() const;

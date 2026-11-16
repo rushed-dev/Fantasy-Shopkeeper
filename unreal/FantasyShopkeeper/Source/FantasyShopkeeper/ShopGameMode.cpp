@@ -8,6 +8,8 @@
 #include "ShopGameState.h"
 #include "ShopDayLighting.h"
 #include "ShopDoorSign.h"
+#include "ShopSupplyCrate.h"
+#include "ShopSupplyControl.h"
 #include "EngineUtils.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Misc/Paths.h"
@@ -38,6 +40,12 @@ void AShopGameMode::StartPlay()
     {
         State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
         GetWorld()->SpawnActor<AShopDayLighting>();
+        for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It)
+        {
+            AShopSupplyControl* Parcel = GetWorld()->SpawnActor<AShopSupplyControl>(FVector(350, -320, 0), FRotator::ZeroRotator);
+            if (Parcel) Parcel->Configure(*It, EShopSupplyControl::Delivery);
+            break;
+        }
         if (!TActorIterator<AShopDoorSign>(GetWorld()))
             GetWorld()->SpawnActor<AShopDoorSign>(FVector(445, -374, 155), FRotator(0, 90, 0));
     }

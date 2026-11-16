@@ -96,6 +96,7 @@ void AShopPlayerController::HandleInteract()
 
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
+    if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight() && Params.Event != IE_Released) return true;
     if (Params.Event == IE_Pressed)
     {
         if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
@@ -107,7 +108,7 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
             }
             if (Params.Key == EKeys::N)
             {
-                State->AdvanceMorning();
+                State->BeginOvernight();
                 return true;
             }
         }

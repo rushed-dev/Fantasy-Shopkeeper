@@ -12,6 +12,7 @@
 #include "ShopGameState.h"
 #include "ShopTill.h"
 #include "ShopDoorSign.h"
+#include "ShopSupplyControl.h"
 #include "ShopTillControl.h"
 #include "ShopSupplyCrate.h"
 #include "ShopCustomerFlow.h"
@@ -26,6 +27,8 @@ void AShopHUD::DrawHUD()
     {
         return;
     }
+
+    if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight()) return;
 
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
@@ -66,7 +69,11 @@ void AShopHUD::DrawHUD()
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
-    if (const AShopDoorSign* Sign = Cast<AShopDoorSign>(Target))
+    if (const AShopSupplyControl* SupplyControl = Cast<AShopSupplyControl>(Target))
+    {
+        Prompt = Interaction->GetHeldItem() ? TEXT("Put down the held item first") : SupplyControl->GetInteractionPrompt().ToString();
+    }
+    else if (const AShopDoorSign* Sign = Cast<AShopDoorSign>(Target))
     {
         Prompt = Interaction->GetHeldItem() ? TEXT("Put down the held item to turn the sign") : Sign->GetInteractionPrompt().ToString();
     }
@@ -123,7 +130,9 @@ void AShopHUD::DrawHUD()
         float Width = 0.0f;
         float Height = 0.0f;
         GetTextSize(Prompt, Width, Height, GEngine->GetMediumFont());
-        DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), CenterX - Width * 0.5f - 10.0f, CenterY + 22.0f, Width + 20.0f, Height + 12.0f);
-        DrawText(Prompt, FLinearColor::White, CenterX - Width * 0.5f, CenterY + 28.0f, GEngine->GetMediumFont());
+        const bool bReadingSupplies = Target && (Target->IsA<AShopSupplyCrate>() || Target->IsA<AShopSupplyControl>());
+        const float PromptY = bReadingSupplies ? Canvas->ClipY - Height - 30.f : CenterY + 28.f;
+        DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), CenterX - Width * 0.5f - 10.0f, PromptY - 6.f, Width + 20.0f, Height + 12.0f);
+        DrawText(Prompt, FLinearColor::White, CenterX - Width * 0.5f, PromptY, GEngine->GetMediumFont());
     }
 }

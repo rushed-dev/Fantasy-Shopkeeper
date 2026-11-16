@@ -1,6 +1,8 @@
 #include "ShopGameState.h"
 
 #include "ShopMorningSave.h"
+#include "ShopDayLighting.h"
+#include "TimerManager.h"
 #include "ShopBrewingStation.h"
 #include "ShopBrewingRecipe.h"
 #include "ShopCustomer.h"
@@ -122,7 +124,7 @@ bool AShopGameState::OpenShop()
 {
     AShopCustomerFlow* Flow = FindFlow(GetWorld());
     if (!HasAuthority() || !bDayInitialized || bChangingEconomy || DayPhase != EShopDayPhase::Preparation
-        || !Flow || Flow->VisitsPerDay < 1 || Flow->VisitsPerDay > 100) return false;
+        || bOvernight || HasDelivery() || !Flow || Flow->VisitsPerDay < 1 || Flow->VisitsPerDay > 100) return false;
     DayPhase = EShopDayPhase::Trading;
     return true;
 }
@@ -149,7 +151,7 @@ void AShopGameState::UpdateDay()
 
 bool AShopGameState::AdvanceMorning()
 {
-    if (!HasAuthority() || !bDayInitialized || bChangingEconomy || DayPhase != EShopDayPhase::Evening || Day == MAX_int32) return false;
+    if (!HasAuthority() || !bDayInitialized || bChangingEconomy || bOvernight || DayPhase != EShopDayPhase::Evening || Day == MAX_int32) return false;
     if (!bSuppliesConfirmed)
     {
         CheckpointMessage = TEXT("Confirm tomorrow's order at SUPPLIES first (quantity 0 orders nothing).");
@@ -169,21 +171,14 @@ bool AShopGameState::AdvanceMorning()
             CheckpointMessage = TEXT("Make room for the paid delivery before advancing morning.");
             return false;
         }
-        for (FShopSavedIngredients& Entry : Save->Ingredients)
-            if (Entry.Station == DeliveryStation->GetName())
-                for (const auto& Quantity : PendingDelivery) Entry.Quantities.FindOrAdd(Quantity.Key) += Quantity.Value;
+        Save->DeliveryStation = DeliveryStation->GetName();
+        Save->Delivery = PendingDelivery;
     }
-    // Persist the delivered result first. A failed write leaves both the world
-    // and the paid pending order intact, so a retry cannot deliver twice.
+    // Save the unopened parcel, not a repeatable delivery transaction.
     if (!WriteMorning(Save)) return false;
-    if (DeliveryStation.IsValid() && !PendingDelivery.IsEmpty())
-    {
-        DeliveryStation->ReceiveIngredients(PendingDelivery);
-        for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It)
-            if (It->Station == DeliveryStation.Get())
-                UGameplayStatics::PlaySoundAtLocation(this, It->DeliverySound, It->GetActorLocation(), 0.4f);
-    }
-    CheckpointMessage = PendingDelivery.IsEmpty() ? TEXT("Morning ready.") : TEXT("Paid supplies delivered. Morning ready.");
+    MorningDelivery = Save->Delivery;
+    MorningDeliveryStation = DeliveryStation;
+    CheckpointMessage = MorningDelivery.IsEmpty() ? TEXT("Morning ready.") : TEXT("Supplies await unpacking by the entrance.");
     PendingDelivery.Empty();
     DeliveryStation.Reset();
     bSuppliesConfirmed = false;
@@ -200,6 +195,8 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
     UShopMorningSave* Save = NewObject<UShopMorningSave>();
     Save->Day = MorningDay;
     Save->Cash = Cash;
+    Save->Delivery = MorningDelivery;
+    Save->DeliveryStation = MorningDeliveryStation.IsValid() ? MorningDeliveryStation->GetName() : FString();
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
     {
         if (It->bBrewing) return nullptr;
@@ -224,7 +221,7 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
 
 bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
 {
-    if (!Save || Save->Version != 1 || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
+    if (!Save || (Save->Version != 1 && Save->Version != 2) || Save->Day < 1 || Save->Cash < 0 || Save->Stock.Num() > 2048) return false;
     TMap<FString, AShopBrewingStation*> Stations;
     // Only current recipe/item classes are trusted; a save cannot instantiate arbitrary actors.
     TMap<FString, TSet<FName>> Products;
@@ -248,6 +245,18 @@ bool AShopGameState::ValidateMorning(const UShopMorningSave* Save) const
         SeenStations.Add(Entry.Station);
         for (const auto& Quantity : Entry.Quantities)
             if (!(*Station)->StartingIngredients.Contains(Quantity.Key) || Quantity.Value < 0 || Quantity.Value > (*Station)->IngredientCapacity) return false;
+    }
+    if (Save->Version == 1 && (!Save->Delivery.IsEmpty() || !Save->DeliveryStation.IsEmpty())) return false;
+    if (Save->Delivery.IsEmpty() != Save->DeliveryStation.IsEmpty()) return false;
+    if (!Save->Delivery.IsEmpty())
+    {
+        AShopBrewingStation* const* Station = Stations.Find(Save->DeliveryStation);
+        if (!Station || Save->Delivery.Num() > (*Station)->StartingIngredients.Num()) return false;
+        const FShopSavedIngredients* Stored = Save->Ingredients.FindByPredicate([Save](const FShopSavedIngredients& Entry) { return Entry.Station == Save->DeliveryStation; });
+        if (!Stored) return false;
+        for (const auto& Entry : Save->Delivery)
+            if (!(*Station)->StartingIngredients.Contains(Entry.Key) || Entry.Value <= 0
+                || int64(Stored->Quantities.FindRef(Entry.Key)) + Entry.Value > (*Station)->IngredientCapacity) return false;
     }
     const auto Slots = GatherSlots(GetWorld());
     TSet<FString> Occupied;
@@ -304,7 +313,7 @@ bool AShopGameState::WriteMorning(UShopMorningSave* Save)
 
 bool AShopGameState::RestoreMorning()
 {
-    if (!HasAuthority() || bChangingEconomy || !bDayInitialized || CheckpointPath.IsEmpty()) return false;
+    if (!HasAuthority() || bChangingEconomy || bOvernight || !bDayInitialized || CheckpointPath.IsEmpty()) return false;
     for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
         if (It->bBrewing) return false;
     TGuardValue<bool> Guard(bChangingEconomy, true);
@@ -360,6 +369,10 @@ bool AShopGameState::RestoreMorning()
     DeliveryStation.Reset();
     bSuppliesConfirmed = false;
     for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It) It->ResetOrder();
+    MorningDelivery = Save->Delivery;
+    MorningDeliveryStation.Reset();
+    for (TActorIterator<AShopBrewingStation> It(GetWorld()); It; ++It)
+        if (It->GetName() == Save->DeliveryStation) MorningDeliveryStation = *It;
     Cash = Save->Cash;
     Day = Save->Day;
     Takings = SupplySpending = 0;
@@ -371,19 +384,50 @@ bool AShopGameState::RestoreMorning()
 
 FString AShopGameState::GetDayText() const
 {
+    if (bOvernight) return TEXT("Resting until morning");
     const AShopCustomerFlow* Flow = FindFlow(GetWorld());
     const int32 Started = Flow ? Flow->GetStartedVisits() : 0;
     const int32 Limit = Flow ? Flow->VisitsPerDay : 0;
     switch (DayPhase)
     {
     case EShopDayPhase::Preparation:
-        return FString::Printf(TEXT("Day %d | Preparation | Use the door sign to open (%d visits)"), Day, Limit);
+        return HasDelivery() ? FString::Printf(TEXT("Day %d | Preparation | Unpack the delivery by the entrance"), Day)
+            : FString::Printf(TEXT("Day %d | Preparation | Use the door sign to open (%d visits)"), Day, Limit);
     case EShopDayPhase::Trading:
         return FString::Printf(TEXT("Day %d | Trading | %d/%d visits started | Use the door sign to close, skip %d unstarted visits"), Day, Started, Limit, FMath::Max(0, Limit - Started));
     case EShopDayPhase::Closing:
         return TEXT("Closing | Finish the active customer; no new arrivals. Brew missing stock if needed.");
     default:
-        return FString::Printf(TEXT("Day %d | Evening | Takings %lld | Supplies %lld | Cash %lld bits | %s"), Day, Takings, SupplySpending, Cash,
-            bSuppliesConfirmed ? TEXT("Order confirmed | N: Next morning") : TEXT("Order tomorrow at SUPPLIES"));
+        return FString::Printf(TEXT("Day %d | Evening | %s"), Day,
+            bSuppliesConfirmed ? TEXT("Order confirmed | Rest at the order book") : TEXT("Plan tomorrow at the order book"));
     }
+}
+
+
+bool AShopGameState::UnpackDelivery()
+{
+    if (!HasAuthority() || !bDayInitialized || bChangingEconomy || bOvernight
+        || DayPhase != EShopDayPhase::Preparation || MorningDelivery.IsEmpty()
+        || !MorningDeliveryStation.IsValid() || !MorningDeliveryStation->CanReceiveIngredients(MorningDelivery)) return false;
+    TGuardValue<bool> Guard(bChangingEconomy, true);
+    MorningDeliveryStation->ReceiveIngredients(MorningDelivery);
+    MorningDelivery.Empty();
+    MorningDeliveryStation.Reset();
+    CheckpointMessage = TEXT("Supplies unpacked into ingredient storage.");
+    return true;
+}
+
+bool AShopGameState::BeginOvernight()
+{
+    if (!HasAuthority() || !bDayInitialized || bChangingEconomy || bOvernight
+        || DayPhase != EShopDayPhase::Evening || !bSuppliesConfirmed || Day == MAX_int32 || !CaptureMorning(Day + 1)) return false;
+    bOvernight = true;
+    for (TActorIterator<AShopDayLighting> It(GetWorld()); It; ++It) It->BeginNight();
+    GetWorldTimerManager().SetTimer(OvernightTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+    {
+        bOvernight = false;
+        const bool bAdvanced = AdvanceMorning();
+        for (TActorIterator<AShopDayLighting> It(GetWorld()); It; ++It) It->EndNight(bAdvanced);
+    }), 3.5f, false);
+    return true;
 }

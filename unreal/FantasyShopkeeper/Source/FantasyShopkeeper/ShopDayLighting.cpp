@@ -8,6 +8,8 @@
 #include "Components/SkyLightComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Sound/SoundWaveProcedural.h"
+#include "Kismet/GameplayStatics.h"
 
 AShopDayLighting::AShopDayLighting()
 {
@@ -71,4 +73,49 @@ void AShopDayLighting::Tick(float DeltaSeconds)
         Sun->SetWorldRotation(Rotation);
     }
     if (Sky) Sky->SetIntensity(SkyIntensity * FMath::Lerp(Daylight, 0.06f, NightBlend));
+}
+
+
+void AShopDayLighting::BeginNight()
+{
+    if (APlayerController* Player = GetWorld()->GetFirstPlayerController())
+    {
+        Player->SetIgnoreMoveInput(true);
+        Player->SetIgnoreLookInput(true);
+        if (Player->PlayerCameraManager) Player->PlayerCameraManager->StartCameraFade(0, 1, 1.4f, FLinearColor::Black, false, true);
+    }
+    // Original short wind/cricket cue. No external media or streaming service.
+    NightSound = NewObject<USoundWaveProcedural>(this);
+    NightSound->SetSampleRate(24000);
+    NightSound->NumChannels = 1;
+    NightSound->Duration = 3.5f;
+    TArray<int16> Samples;
+    Samples.SetNumUninitialized(84000);
+    FRandomStream Noise(741);
+    float Wind = 0;
+    for (int32 Index = 0; Index < Samples.Num(); ++Index)
+    {
+        const float Time = Index / 24000.f;
+        Wind = 0.98f * Wind + 0.02f * Noise.FRandRange(-1.f, 1.f);
+        const float Envelope = FMath::Min(1.f, FMath::Min(Time / 0.4f, (3.5f - Time) / 0.7f));
+        const float Pulse = FMath::Pow(FMath::Max(0.f, FMath::Sin(Time * 27.f)), 8.f);
+        Samples[Index] = int16(Envelope * (Wind * 5000 + Pulse * FMath::Sin(Time * 14451.f) * 700));
+    }
+    NightSound->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+    UGameplayStatics::PlaySound2D(this, NightSound, 0.5f);
+}
+void AShopDayLighting::EndNight(bool bMorning)
+{
+    if (APlayerController* Player = GetWorld()->GetFirstPlayerController())
+    {
+        Player->SetIgnoreMoveInput(false);
+        Player->SetIgnoreLookInput(false);
+        if (Player->PlayerCameraManager) Player->PlayerCameraManager->StartCameraFade(1, 0, 2.f, FLinearColor::Black, false, false);
+    }
+    if (bMorning)
+    {
+        PreviousDay = GetWorld()->GetGameState<AShopGameState>()->GetDay();
+        NightBlend = 0;
+        Daylight = 0.75f;
+    }
 }

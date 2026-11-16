@@ -13,6 +13,8 @@ class FANTASYSHOPKEEPER_API AShopDayLighting : public AActor
 public:
     AShopDayLighting();
     virtual void Tick(float DeltaSeconds) override;
+    void BeginNight();
+    void EndNight(bool bMorning);
     float GetNightBlend() const { return NightBlend; }
 protected:
     virtual void BeginPlay() override;
@@ -26,4 +28,5 @@ private:
     float NightBlend = 0;
     float Daylight = 0.75f;
     int32 PreviousDay = 0;
+    UPROPERTY(Transient) TObjectPtr<class USoundWaveProcedural> NightSound;
 };

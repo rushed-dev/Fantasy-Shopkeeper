@@ -10,6 +10,9 @@
 #include "ShopShelfSection.h"
 #include "ShopTill.h"
 #include "ShopTillControl.h"
+#include "ShopSupplyControl.h"
+#include "ShopSupplyCrate.h"
+#include "ShopGameState.h"
 
 namespace
 {
@@ -84,6 +87,8 @@ bool UShopInteractionComponent::CanReach(const AActor* Target) const
     AActor* Resolved = SectionTarget(const_cast<AActor*>(Target));
     const UCameraComponent* Camera = GetCamera();
     AActor* Hit = GetInteractionTarget();
+    if (const AShopSupplyControl* Control = Cast<AShopSupplyControl>(Hit))
+        if (Control->GetAction() != EShopSupplyControl::Delivery && Control->GetDesk() == Target) return true;
     if (const AShopTillControl* Control = Cast<AShopTillControl>(Hit))
     {
         if (Control->GetTill() == Target)
@@ -102,6 +107,7 @@ AShopPickupItem* UShopInteractionComponent::GetHeldItem() const
 
 bool UShopInteractionComponent::Interact()
 {
+    if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight()) return false;
     AActor* Target = GetInteractionTarget();
     return IsValid(Target) && Target->Implements<UShopInteractable>()
         && IShopInteractable::Execute_Interact(Target, this);
