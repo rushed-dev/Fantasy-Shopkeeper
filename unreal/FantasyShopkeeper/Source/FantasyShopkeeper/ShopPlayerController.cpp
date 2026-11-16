@@ -17,6 +17,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "AudioDevice.h"
+#include "GameFramework/GameUserSettings.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Engine/GameViewportClient.h"
@@ -303,6 +304,7 @@ void AShopPlayerController::PlayerTick(float DeltaTime)
         {
             GConfig->GetFloat(TEXT("ShopPreferences"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
             GConfig->GetFloat(TEXT("ShopPreferences"), TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
+            GraphicsQuality = UGameUserSettings::GetGameUserSettings()->GetOverallScalabilityLevel();
             SetLookSensitivity(LookSensitivity); SetMasterVolume(MasterVolume);
         }
     }
@@ -394,6 +396,8 @@ void AShopPlayerController::MenuAction(FName Action)
         if (Action == TEXT("Credit") && CanUseSupplierDesk()) { State->UseSupplierCredit(); OpenShopMenu(TEXT("Journal")); return; }
         if (Action == TEXT("Repay") && CanUseSupplierDesk()) { State->RepaySupplierCredit(); OpenShopMenu(TEXT("Journal")); return; }
     }
+    if (MenuPage == TEXT("Settings") && (Action == TEXT("QualityHigh") || Action == TEXT("QualityEpic")))
+    { SetGraphicsQuality(Action == TEXT("QualityHigh") ? 2 : 3); OpenShopMenu(TEXT("Settings")); return; }
     const TSet<FName> Pages = {TEXT("Main"), TEXT("Help"), TEXT("Journal"), TEXT("Settings"), TEXT("Chapter"), TEXT("Credits"), TEXT("Restart"), TEXT("Fresh"), TEXT("Quit")};
     if (Pages.Contains(Action)) OpenShopMenu(Action);
 }
@@ -438,4 +442,16 @@ bool AShopPlayerController::CanUseSupplierDesk() const
     if (!ShopInteraction || ShopInteraction->GetHeldItem()) return false;
     for (TActorIterator<AShopSupplyCrate> Desk(GetWorld()); Desk; ++Desk) if (ShopInteraction->CanReach(*Desk)) return true;
     return false;
+}
+
+void AShopPlayerController::SetGraphicsQuality(int32 Value)
+{
+    GraphicsQuality = FMath::Clamp(Value, 2, 3);
+    if (!GIsAutomationTesting)
+    {
+        UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+        Settings->SetOverallScalabilityLevel(GraphicsQuality);
+        Settings->ApplyNonResolutionSettings();
+        Settings->SaveSettings();
+    }
 }

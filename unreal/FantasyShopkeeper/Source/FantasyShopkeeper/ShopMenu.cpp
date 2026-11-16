@@ -53,6 +53,10 @@ void SShopMenu::Construct(const FArguments& Args)
     }
     else if (Page == TEXT("Settings"))
     {
+        Content->AddSlot().AutoHeight().Padding(0, 0, 0, 6)[SNew(STextBlock).Font(Font).Text_Lambda([this]()
+            { return FText::FromString(Controller->GetGraphicsQuality() == 2 ? TEXT("Graphics: High") : Controller->GetGraphicsQuality() == 3 ? TEXT("Graphics: Epic") : TEXT("Graphics: Custom")); })];
+        Button(TEXT("High graphics (recommended)"), TEXT("QualityHigh"));
+        Button(TEXT("Epic graphics"), TEXT("QualityEpic"));
         Content->AddSlot().AutoHeight()[SNew(STextBlock).Font(Font).Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("Mouse sensitivity: %.2f"), Controller->GetLookSensitivity())); })];
         Content->AddSlot().AutoHeight().Padding(0, 10)[SNew(SSlider).MinValue(0.25f).MaxValue(2.f).Value(Controller->GetLookSensitivity()).OnValueChanged_Lambda([this](float Value) { if (Controller.IsValid()) Controller->SetLookSensitivity(Value); })];
         Content->AddSlot().AutoHeight()[SNew(STextBlock).Font(Font).Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("Master volume: %.0f%%"), 100 * Controller->GetMasterVolume())); })];

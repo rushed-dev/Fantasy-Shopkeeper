@@ -25,6 +25,8 @@ public:
     void MenuAction(FName Action);
     FName GetMenuPage() const { return MenuPage; }
     FString GetMenuText() const;
+    int32 GetGraphicsQuality() const { return GraphicsQuality; }
+    void SetGraphicsQuality(int32 Value);
     float GetLookSensitivity() const { return LookSensitivity; }
     float GetMasterVolume() const { return MasterVolume; }
     void SetLookSensitivity(float Value);
@@ -63,6 +65,7 @@ private:
     bool bWelcomeShown = false;
     bool bChapterShown = false;
     bool bSettingsLoaded = false;
+    int32 GraphicsQuality = 2;
     float LookSensitivity = 1.f;
     float MasterVolume = 0.7f;
     TWeakObjectPtr<AShopSupplyCrate> OrderingDesk;

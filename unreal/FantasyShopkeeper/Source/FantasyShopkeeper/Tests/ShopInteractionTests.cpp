@@ -2672,6 +2672,8 @@ bool FShopPreferencesTest::RunTest(const FString& Parameters)
     FInteractionWorld Test;
     AShopGameState* State = Test.ShopState(); Test.BrewingStation(); DayFlow(Test); State->InitializeDay(FString());
     AShopPlayerController* Controller = Test.Spawn<AShopPlayerController>(FVector::ZeroVector);
+    Controller->SetGraphicsQuality(-1); TestEqual(TEXT("Graphics lower bound is High"), Controller->GetGraphicsQuality(), 2);
+    Controller->SetGraphicsQuality(8); TestEqual(TEXT("Graphics upper bound is Epic"), Controller->GetGraphicsQuality(), 3);
     Controller->SetLookSensitivity(-10); TestEqual(TEXT("Sensitivity lower bound"), Controller->GetLookSensitivity(), 0.25f);
     Controller->SetLookSensitivity(50); TestEqual(TEXT("Sensitivity upper bound"), Controller->GetLookSensitivity(), 2.f);
     Controller->SetMasterVolume(-1); TestEqual(TEXT("Volume lower bound"), Controller->GetMasterVolume(), 0.f);
