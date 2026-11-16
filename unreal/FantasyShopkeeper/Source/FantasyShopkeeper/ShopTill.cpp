@@ -29,6 +29,7 @@ AShopTill::AShopTill()
     Ticket->SetRelativeLocation(FVector(0, 38, 152));
     Ticket->SetRelativeRotation(FRotator(0, -90, 0));
     Ticket->SetHorizontalAlignment(EHTA_Center);
+    Ticket->SetVerticalAlignment(EVRTA_TextTop);
     Ticket->SetWorldSize(4.5f);
     Ticket->SetTextRenderColor(FColor(32, 43, 22));
     for (int32 Index = 0; Index < 3; ++Index)
@@ -227,6 +228,14 @@ FText AShopTill::GetInteractionPrompt() const
     if (Phase == EShopTillPhase::Complete)
     {
         return NSLOCTEXT("Shop", "TillReviewReceipt", "Sale complete");
+    }
+    if (Phase == EShopTillPhase::EnteringTotal)
+    {
+        return NSLOCTEXT("Shop", "TillEnterPhysicalTotal", "Enter the total on the number keys, then E on the pouch");
+    }
+    if (Phase == EShopTillPhase::MakingChange)
+    {
+        return NSLOCTEXT("Shop", "TillCountPhysicalChange", "Count change using the coin stacks and tray, then E on SALE");
     }
     if (IsValid(Customer) && Customer->Activity == EShopCustomerActivity::ReadyToPay)
     {

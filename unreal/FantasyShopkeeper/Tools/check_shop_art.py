@@ -65,7 +65,11 @@ assert any(isinstance(a, unreal.NavMeshBoundsVolume) for a in all_actors), "Cust
 till = next(a for a in all_actors if isinstance(a, unreal.ShopTill))
 assert till.get_editor_property("till_mesh").static_mesh.get_name() == "SM_CheckoutCounter"
 assert till.get_editor_property("customer") == customer
+checkout_offset = customer.get_actor_location() - till.get_actor_location()
+assert checkout_offset.x ** 2 + checkout_offset.y ** 2 < 150 ** 2
 assert till.get_editor_property("physical_counter")
+for material_name in ("Copper", "Silver", "Brass"):
+    assert unreal.load_asset(f"/Game/Shop/Art/Materials/M_{material_name}").get_editor_property("used_with_instanced_static_meshes")
 assert till.get_editor_property("pouch_mesh").get_name() == "SM_CoinPouch"
 assert len(till.get_editor_property("coin_meshes")) == 3
 assert abs(till.get_actor_location().z) < 1
@@ -121,6 +125,8 @@ for side, start, end in (("Back", (600, 600, 180), (600, 1000, 180)),
 material = unreal.load_asset("/Game/Shop/Art/Materials/M_WindowGlass")
 assert material.get_editor_property("blend_mode") == unreal.BlendMode.BLEND_TRANSLUCENT
 assert sum(a.get_actor_label().endswith("Pendant") for a in all_actors) == 4
+sun = next(a for a in all_actors if isinstance(a, unreal.DirectionalLight))
+assert sun.get_component_by_class(unreal.DirectionalLightComponent).get_editor_property("intensity") >= 10000
 assert all(any(a.get_actor_label() == label for a in all_actors) for label in (
     "Art_EntryLight", "Art_CheckoutLight", "Art_PrepLight", "Art_BackWindowLight", "Art_SideWindowLight"))
 assert station.get_editor_property("output_slot").get_editor_property("slot_marker").static_mesh.get_name() == "SM_StockMarkerRing"

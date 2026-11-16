@@ -7,6 +7,7 @@
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "UnrealClient.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -97,7 +98,11 @@ namespace
             // after teleporting before sending a keyboard event.
             if (AimTarget.IsValid())
             {
-                Controller->SetControlRotation((AimTarget->GetActorLocation() + FVector(0, 0, AimHeight) - Camera->GetComponentLocation()).Rotation());
+                const FRotator Desired = (AimTarget->GetActorLocation() + FVector(0, 0, AimHeight) - Camera->GetComponentLocation()).Rotation();
+                const FRotator Error = (Desired - Camera->GetComponentRotation()).GetNormalized();
+                // Follow the rendered view, including the template's animated
+                // head offset, when steering toward small physical controls.
+                Controller->SetControlRotation((Controller->GetControlRotation() + Error * 0.5f).GetNormalized());
             }
             if (Now < NextStep)
             {
@@ -169,6 +174,15 @@ namespace
                     {
                         Controller->FlushPressedKeys();
                         return false;
+                    }
+                }
+                // Offscreen editor automation may never render the player's
+                // mesh. Its head-mounted camera still needs fresh bone poses.
+                {
+                    TInlineComponentArray<USkeletalMeshComponent*> PlayerMeshes(Pawn);
+                    for (USkeletalMeshComponent* Mesh : PlayerMeshes)
+                    {
+                        Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
                     }
                 }
                 for (TActorIterator<AShopCustomerFlow> It(World); It; ++It)
@@ -432,6 +446,7 @@ namespace
                     Test->AddInfo(FString::Printf(TEXT("Till rejection: %s; target=%s"), *Till->GetFeedback().ToString(), *GetNameSafe(Controller->ShopInteraction->GetInteractionTarget())));
                     return true;
                 }
+                Test->TestTrue(TEXT("Physical ticket text flows down inside its paper"), Till->Ticket->VerticalAlignment == EVRTA_TextTop);
                 Test->TestFalse(TEXT("Physical checkout preserves mouse look"), Controller->IsLookInputIgnored());
                 Test->TestFalse(TEXT("Physical checkout preserves movement"), Controller->IsMoveInputIgnored());
                 Key(EKeys::One, IE_Pressed);
@@ -474,7 +489,11 @@ namespace
                     FString Screenshot;
                     if (FParse::Value(FCommandLine::Get(), TEXT("ShopTillScreenshot="), Screenshot))
                     {
-                        FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
+                        AimAt(Till.Get());
+                        AimHeight = 115;
+                        Step = 42;
+                        NextStep = Now + 1;
+                        return false;
                     }
                 }
                 LookStart = Controller->GetControlRotation();
@@ -606,6 +625,22 @@ namespace
                 Test->TestEqual(TEXT("E retrieves a bottle from the floor"), Controller->ShopInteraction->GetHeldItem(), Item.Get());
                 AimAt(Slots[1].Get());
                 Step = 7;
+                NextStep = Now + 0.2;
+                return false;
+            case 42:
+                {
+                    FString Screenshot;
+                    FParse::Value(FCommandLine::Get(), TEXT("ShopTillScreenshot="), Screenshot);
+                    FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                    Step = 43;
+                    NextStep = Now + 0.5;
+                    return false;
+                }
+            case 43:
+                LookStart = Controller->GetControlRotation();
+                AimTarget.Reset();
+                Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), EKeys::MouseX, 20.0f, 1.0f / 60.0f, 1, FPlatformTime::Cycles64()));
+                Step = 25;
                 NextStep = Now + 0.2;
                 return false;
             case 40:

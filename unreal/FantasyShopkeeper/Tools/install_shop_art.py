@@ -80,6 +80,8 @@ def create_material(name, settings):
     if name == "InkLiquid":
         emission = color_node(material, (0.025, 0.12, 0.26))
         MATERIALS.connect_material_property(emission, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if name in ("Copper", "Silver", "Brass"):
+        MATERIALS.set_base_material_usage(material, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
     if name == "WarmPlaster":
         MATERIALS.set_base_material_usage(material, unreal.MaterialUsage.MATUSAGE_NANITE)
     MATERIALS.recompile_material(material)
