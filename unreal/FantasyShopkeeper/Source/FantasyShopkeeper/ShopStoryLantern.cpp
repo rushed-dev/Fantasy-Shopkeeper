@@ -19,6 +19,22 @@ AShopStoryLantern::AShopStoryLantern()
     Glow->SetStaticMesh(Sphere.Object); Glow->SetMaterial(0, WarmGlow.Object); Glow->SetRelativeScale3D(FVector(0.19, 0.19, 0.27));
     Frame->SetCollisionEnabled(ECollisionEnabled::NoCollision); Glow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Frame->SetCanEverAffectNavigation(false); Glow->SetCanEverAffectNavigation(false);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    auto FramePart = [this](const TCHAR* Name, UStaticMesh* Mesh, FVector Position, FVector Scale)
+    {
+        UStaticMeshComponent* Part = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+        Part->SetupAttachment(RootComponent); Part->SetStaticMesh(Mesh); Part->SetMaterial(0, Brass.Object);
+        Part->SetRelativeLocation(Position); Part->SetRelativeScale3D(Scale);
+        Part->SetCollisionEnabled(ECollisionEnabled::NoCollision); Part->SetCanEverAffectNavigation(false);
+    };
+    FramePart(TEXT("LanternCap"), Cylinder.Object, FVector(0, 0, 15), FVector(0.3, 0.3, 0.04));
+    FramePart(TEXT("RailFront"), Cube.Object, FVector(12, 0, 1), FVector(0.025, 0.025, 0.28));
+    FramePart(TEXT("RailBack"), Cube.Object, FVector(-12, 0, 1), FVector(0.025, 0.025, 0.28));
+    FramePart(TEXT("RailLeft"), Cube.Object, FVector(0, 12, 1), FVector(0.025, 0.025, 0.28));
+    FramePart(TEXT("RailRight"), Cube.Object, FVector(0, -12, 1), FVector(0.025, 0.025, 0.28));
+    FramePart(TEXT("HandleLeft"), Cube.Object, FVector(0, 5, 23), FVector(0.02, 0.02, 0.14));
+    FramePart(TEXT("HandleRight"), Cube.Object, FVector(0, -5, 23), FVector(0.02, 0.02, 0.14));
+    FramePart(TEXT("HandleTop"), Cube.Object, FVector(0, 0, 30), FVector(0.02, 0.12, 0.02));
     Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("LanternLight")); Light->SetupAttachment(RootComponent);
     Light->SetIntensity(140); Light->SetAttenuationRadius(180); Light->SetLightColor(FLinearColor(1.f, 0.65f, 0.25f)); Light->SetCastShadows(false);
     SetActorHiddenInGame(true);

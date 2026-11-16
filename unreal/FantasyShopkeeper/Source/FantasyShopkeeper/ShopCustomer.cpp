@@ -63,7 +63,7 @@ AShopCustomer::AShopCustomer()
     RegularBadge->SetupAttachment(RootComponent);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> BadgeMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     RegularBadge->SetStaticMesh(BadgeMesh.Object);
-    RegularBadge->SetRelativeLocation(FVector(25, -10, 38));
+    RegularBadge->SetRelativeLocation(FVector(14, -8, 36));
     RegularBadge->SetRelativeScale3D(FVector(0.13, 0.06, 0.18));
     RegularBadge->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     RegularBadge->SetCanEverAffectNavigation(false);
@@ -515,5 +515,5 @@ void AShopCustomer::ConfigureRegular(int32 Index, int32 Day)
     RegularId = Names[Index]; VisitDay = Day;
     RegularBadge->SetVisibility(true);
     RegularBadge->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, Materials[Index]));
-    RegularBadge->SetRelativeScale3D(Index == 0 ? FVector(0.16, 0.07, 0.12) : Index == 1 ? FVector(0.11, 0.07, 0.21) : FVector(0.15, 0.07, 0.15));
+    RegularBadge->SetRelativeScale3D(Index == 0 ? FVector(0.025, 0.14, 0.08) : Index == 1 ? FVector(0.025, 0.08, 0.15) : FVector(0.025, 0.12, 0.12));
 }
