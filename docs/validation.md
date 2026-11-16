@@ -1,3 +1,15 @@
+# Day restart and fresh day-one recovery — 2026-11-16
+
+Esc opens recovery options. Enter restarts the current saved morning. F switches to a separate fresh-game confirmation, where Enter starts day 1 and Esc cancels. Movement, look and trading inputs are blocked while confirming; key releases still reach Enhanced Input. Recovery is unavailable during the overnight transition.
+
+The game captures the authored initial morning before loading an existing checkpoint. A confirmed new game backs up the current save to `Morning.sav.before-new-game-<id>.bak`, atomically writes that initial morning, then uses the existing restoration path. Cash, ingredients, stock, paid deliveries and upgrades reset together. Failed writes leave the current run intact; failed restoration attempts recover the previous disk checkpoint from its retained backup. Restarting only the current morning does not create extra resources.
+
+- Local build/gameplay: **43 passed, 0 automation warnings**, `Saved/Automation/Gameplay-20261116-194308-455`; log `Saved/Logs/FreshGameChecks.log`. Tests cover confirmation/cancellation, blocked trading shortcuts, held-item cleanup, cash/ingredient/upgrade rollback, repeat restarts, invalid saves, a resource-empty day 4 returning to day 1, byte-identical backup preservation and a failed write followed by a successful retry.
+- Rendered keyboard workflow: **1 passed, 0 automation warnings**, `Saved/Automation/Rendered-20261116-194459-980`; log `Saved/Logs/FreshGameRendered.log`. It opens the new-game confirmation, captures `Saved/ArtReview/20261116-194459-980/restart.png`, cancels, verifies input recovery and completes the ordinary evening/morning workflow.
+- Windows package: **passed**, `builds/unreal-day-recovery/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/FreshGamePackage.log`. Automatic startup/reopening used isolated `Saved/DayRecoverySmoke` data, preserved the morning checkpoint hash and timestamp, and logged no warnings/errors. Existing compiler preferred-version and engine-header deprecation notices remain build-only.
+
+All runs used the local tooling. No player checkpoint, saved map, generated art or maintained tool script was changed by verification. Manual playtesting remains with the user.
+
 # Purchasable batch bottling kit — 2026-11-16
 
 The bench-front plaque offers a 36-bit evening purchase. After purchase, E on the plaque selects one or three bottles per brew; E on the vessel brews and R still changes recipes. A brass rack and two additional non-sale output positions appear. All finished outputs must be collected before another brew. The ordinary pickup and stocking operations remain authoritative.
