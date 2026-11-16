@@ -3,7 +3,7 @@
 Use `unreal/FantasyShopkeeper/Tools/check.ps1` for builds, automation, asset checks and packaging. All actions share the same local execution settings. No firewall rules, engine binaries, user-wide build configuration or security settings are changed.
 
 ```powershell
-# Build and run all 36 gameplay tests (default).
+# Build and run all 38 gameplay tests (default).
 ./unreal/FantasyShopkeeper/Tools/check.ps1
 
 # After building, run the rendered workflow or asset validation.
@@ -17,7 +17,7 @@ Use `unreal/FantasyShopkeeper/Tools/check.ps1` for builds, automation, asset che
 ./unreal/FantasyShopkeeper/Tools/check.ps1 -Action Package -PackageDirectory "$PWD/builds/unreal-local-tooling"
 ```
 
-`-EngineRoot` selects another engine installation. Gameplay and rendered actions validate the automation report as well as the exit code; rendered checks expect one test and gameplay expects 36. Rendered screenshots go to a timestamped `Saved/ArtReview` directory. Reports and logs go to `Saved/Automation` and `Saved/Logs`.
+`-EngineRoot` selects another engine installation. Gameplay and rendered actions validate the automation report as well as the exit code; rendered checks expect one test and gameplay expects 38. Rendered screenshots go to a timestamped `Saved/ArtReview` directory. Reports and logs go to `Saved/Automation` and `Saved/Logs`.
 
 For maintained editor-Python tools, use the same runner rather than launching an unconfigured editor process:
 

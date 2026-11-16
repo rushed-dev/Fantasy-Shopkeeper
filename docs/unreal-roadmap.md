@@ -129,3 +129,7 @@ Use focused C++ gameplay actors/components, a shared interaction interface, sepa
 Use the existing Godot regressions as scenario specifications, not evidence that Unreal is correct. Add focused Unreal checks for ownership, transaction retries and persistence as those systems arrive, alongside hands-on checks for handling, readability and fun. Package at every milestone.
 
 For each work session, choose one observable outcome, implement it, verify it in play and push a working checkpoint. The immediate target after setup is: **make one bottle, place it on a shelf and sell it in a packaged build**.
+
+### Ingredient storage reinvestment
+
+Implemented one physical evening purchase: 24 bits for extra ingredient drawers, doubling each ingredient capacity from 30 to 60. It uses guarded economy transactions and the next morning checkpoint, with separate upgrade spending in the order book. Save schema 3 restores the upgrade alongside cash, ingredients and paid deliveries; schema 1/2 retains base capacity. This is a single storage tier; batch brewing and worker automation remain future work.

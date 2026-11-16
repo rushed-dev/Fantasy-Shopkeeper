@@ -1,3 +1,16 @@
+# Purchasable ingredient storage — 2026-11-16
+
+A physical cabinet beside the supplier offers one evening upgrade for 24 bits. E with empty hands doubles each ingredient limit from 30 to 60 and reveals upper drawers. The guarded transaction rejects duplicate purchases, insufficient funds, remote interaction, full hands and overflowing capacities. The order book distinguishes upgrade spending from supplies. Buying capacity adds no ingredients.
+
+Morning schema 3 stores each station's upgrade alongside cash, stock and sealed deliveries. Restoring rolls these back together; invalid saves leave the live state intact. Schemas 1/2 retain base capacity. A failed morning write retains the paid upgrade and order for retry. No maps, generated assets or additional scripts were needed.
+
+- Local build and gameplay: **38 passed, 0 automation warnings**, report `Saved/Automation/Gameplay-20261116-182308-483`; log `Saved/Logs/StorageFinalChecks.log`. New coverage exercises physical purchase, daily totals, rollback, larger orders, failed writes, repeated restoration/unpacking, invalid capacity and legacy saves.
+- Rendered keyboard workflow: **1 passed, 0 automation warnings**, report `Saved/Automation/Rendered-20261116-182441-334`; log `Saved/Logs/StorageFinalRendered.log`. The evening cabinet offer is captured in `Saved/ArtReview/20261116-182441-334/storage.png`. A first capture caught a drawer pull covering the label; the final model leaves that area clear. The rendered workflow shows the unpurchased cabinet; focused tests cover purchased drawer visibility and its restoration.
+- Asset checks: **34 meshes, 87 collision hulls, four sections / 32 positions, two windows and four pendants; 0 errors and 0 warnings**, log `Saved/Logs/Assets-20261116-182121-580.log`. All seven maintained Python tools parse.
+- Windows package: **passed**, `builds/unreal-storage-upgrade/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/StorageFinalPackage.log`. Automatic startup/reopening used isolated `Saved/StorageUpgradeSmoke` data, preserved the checkpoint hash and timestamp, and logged no warnings/errors. Existing compiler preferred-version and engine-header deprecation notices remain build-only.
+
+All checks used the local tooling. Manual assessment of the purchase's feel and economic balance remains with the user.
+
 # Customer requests and purchase reactions — 2026-11-16
 
 Customers now offer a brief product-specific request as they arrive and a short reaction after a committed purchase. Three authored phrasing styles use small greeting/reaction delays, four-to-five-second subtitle lifetimes and departure delays scaled between 0.85 and 1.15 of the authored value. The day and visit select the variation deterministically, without changing the global random stream or save schema. Explicit zero departure delay still works for tests and authored instant departures.
