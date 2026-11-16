@@ -81,7 +81,7 @@ Run the three installers in that order. The expansion commandlet additionally ne
 
 Five completed one-off interaction, brewing, sale, mannequin and small-till migration scripts have been removed. Their durable Blueprint and recipe assets are committed. Current character and till presentation setup lives in the expansion installer.
 
-Run the 31 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
+Run the 33 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes two sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
 
 Launch `Tools/render_shop_review.py` through editor `-ExecCmds=py <absolute script>` with `-RenderOffscreen`. It uses temporal warm-up frames and writes to `Saved/ArtReview`. Hands-on playtesting belongs to the user.
 
@@ -90,3 +90,6 @@ For a focused mesh revision, set `SHOP_ART_ASSETS=SM_CheckoutCounter,SM_TillKey,
 `ShopDayLighting` fades sunlight, sky illumination and the two exterior window fills into evening while leaving the pendants lit. Advancing to morning adds a short camera fade. Lighting follows explicit shop phases without a real-time trading deadline.
 
 The entrance open/closed sign is a native `ShopDoorSign` actor using the shared wood material and engine cube, with cream world-space lettering. It uses the ordinary E interaction and updates from the authoritative shop phase. The counter has no number grid: customers place the real bottle on its goods mat and payment appears immediately.
+
+
+The supplier crate now supports a native cream-paper order book with flat PACK, LESS, MORE and REST tabs. These use the existing cube and material kit, with text on the page rather than a floating planning panel. A smaller instance of the existing supply-crate mesh appears beside the entrance for paid morning deliveries, and disappears after E unpacks its contents. The map and the 34-mesh asset inventory are unchanged. The overnight wind/cricket cue is original deterministic synthesis in `ShopDayLighting`, with no imported media or additional tool script.

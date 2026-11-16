@@ -51,3 +51,8 @@ For the next slice, establish one coherent visual reference, use a small reusabl
 | Customer presentations and animation | Epic First Person template content already in this project | Manny and Quinn simple meshes with the existing unarmed animation Blueprint. Native AI and shared item interaction provide behaviour. Preserve Epic's applicable content licence records for release. |
 
 The user is handling hands-on gameplay, audible mix and presentation assessment. Release licence and platform-disclosure review remains part of release preparation.
+
+
+## Physical planning and delivery polish, 2026-11-16
+
+The native order book, paper tabs and sealed delivery reuse the existing original crate/material kit and engine cube geometry. World-space labels are authored C++ text. `ShopDayLighting` synthesizes a short deterministic wind/cricket cue from filtered noise and a pulsed sine wave at 24 kHz mono; it uses no samples, external media or runtime AI service. These additions are AI-assisted code and procedural presentation. Rendering, transaction and persistence checks are recorded in `validation.md`; audible mix and hands-on assessment remain with the user.

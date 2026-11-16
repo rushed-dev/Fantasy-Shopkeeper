@@ -1,3 +1,18 @@
+# Physical evening planning, night and morning deliveries — 2026-11-16
+
+Implemented an order book on the supplier crate with tomorrow's visitor count, takings, supply spending, cash, stored ingredients, pending paid quantities and the selected order. Reachable PACK / LESS / MORE / REST tabs use E; R/F/T and N remain shortcuts. Orders still use the existing guarded debit and duplicate-confirmation protection. Evening totals live on the book, and supply prompts sit below the physical labels.
+
+Rest fades to black over 1.4 seconds, holds through a 3.5-second night with an original procedural wind/cricket cue, then fades into morning. Movement, new interaction and ordering are blocked during the night; key releases still reach Enhanced Input. A failed checkpoint write returns to evening with the paid order intact. The night has no HUD or trading deadline.
+
+Paid supplies appear as a closed, labelled crate beside the entrance. E with empty hands unpacks the complete order into ingredient storage once. Opening requires unpacking first. Morning save version 2 stores the unopened parcel separately from usable ingredients; restoring rolls both back together. Version 1 mornings remain readable with their existing stored ingredients and no invented parcel. This is still a morning checkpoint, not mid-day saving. Unpacking is one bulk transfer, not individual sack carrying or a bespoke hand animation.
+
+- Local runner build and gameplay: **33 passed, 0 automation warnings**, report `Saved/Automation/Gameplay-20261116-133538-383`; log `Saved/Logs/PlanningFinal.log`. Includes physical book tabs/rest, transition guards, actual E unpacking, remote/repeated unpack rejection, malformed parcel data, older-save compatibility, save-write retry, repeated restoration, and three consecutive trading days. The multi-day fixture now reuses its flow's till instead of placing overlapping counters at the same location.
+- Rendered workflow: **1 passed, 0 automation warnings**, report `Saved/Automation/Rendered-20261116-133641-476`; log `Saved/Logs/PlanningRenderedFinal.log`. Inspected `Saved/ArtReview/20261116-133641-476/{evening,night,morning}.png`: readable planning figures and tabs, unobstructed parcel label, black night frame without HUD, morning delivery and successful unpacking. Existing counter/sign checks also pass.
+- Asset validation: **34 meshes, 87 hulls, four sections / 32 positions, two window openings, four pendants; 0 errors and 0 warnings**, `Saved/Logs/Assets-20261116-132720-943.log`. No saved map or asset changes were needed; native components reuse existing geometry and materials. All seven maintained Python tools parse; no scripts added.
+- Windows package: **passed**, `builds/unreal-morning-deliveries/Windows/FantasyShopkeeper.exe`; log `Saved/Logs/PlanningPackageFinal.log`. Automatic startup and reopening used isolated `Saved/PlanningPackageSmoke` data and preserved the checkpoint hash and timestamp. Launch/restore logs contain no warnings or errors. The build reports the existing installed compiler preferred-version and engine-header deprecation notices.
+
+All engine invocations used the local tooling settings. Manual playtesting, text comfort and audible mix remain with the user.
+
 # Local execution tooling — 2026-11-16
 
 The maintained PowerShell runner now shares local build, shader, cache and discovery settings across gameplay, rendered checks, asset checks, editor tools and packaging. See [local tooling](local-tooling.md) for commands and the retained stock-engine trace-control limitation. No firewall rules or installed engine binaries were changed; no scripts were added.
