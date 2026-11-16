@@ -3,7 +3,7 @@
 Use `unreal/FantasyShopkeeper/Tools/check.ps1` for builds, automation, asset checks and packaging. All actions share the same local execution settings. No firewall rules, engine binaries, user-wide build configuration or security settings are changed.
 
 ```powershell
-# Build and run all 46 gameplay tests (default).
+# Build and run all 49 gameplay tests (default).
 ./unreal/FantasyShopkeeper/Tools/check.ps1
 
 # After building, run the rendered workflow or asset validation.
@@ -17,7 +17,7 @@ Use `unreal/FantasyShopkeeper/Tools/check.ps1` for builds, automation, asset che
 ./unreal/FantasyShopkeeper/Tools/check.ps1 -Action Package -PackageDirectory "$PWD/builds/unreal-local-tooling"
 ```
 
-`-EngineRoot` selects another engine installation. Gameplay and rendered actions validate the automation report as well as the exit code; rendered checks expect one test and gameplay expects 46. Rendered screenshots go to a timestamped `Saved/ArtReview` directory. Reports and logs go to `Saved/Automation` and `Saved/Logs`.
+`-EngineRoot` selects another engine installation. Gameplay and rendered actions validate the automation report as well as the exit code; rendered checks expect one test and gameplay expects 49. Rendered screenshots go to a timestamped `Saved/ArtReview` directory. Reports and logs go to `Saved/Automation` and `Saved/Logs`.
 
 For maintained editor-Python tools, use the same runner rather than launching an unconfigured editor process:
 
@@ -44,3 +44,7 @@ Close the interactive editor before builds or saved-asset imports. A static rend
 **Remaining stock-engine limitation:** UE 5.8's precompiled TraceLog opens a TCP control socket on `0.0.0.0:1985`, or a fallback port if that is occupied. The installed `TraceLog/Private/Trace/Control.cpp` and `Detail/Windows/WindowsTrace.cpp` show an unconditional control update and wildcard bind. There is no runtime bind-address/disable option in this implementation; `UE_TRACE_ALLOW_TCP_CONTROL` is a compile-time setting. Disabling the trace worker merely moves updates onto the frame loop and does not remove the listener. A separate source-built engine would be required to change that behavior. The user chose to retain the built-in engine behavior rather than pursue that disproportionate change.
 
 These settings remove optional network services and distributed builds; they are **not** a guarantee of zero listeners or zero firewall prompts from the stock engine. No existing firewall permission is broadened or bypassed. Socket snapshots are observations of running processes, not a packet capture or continuous audit.
+
+## Packaged performance checks
+
+Use an isolated `-UserDir` with `-SaveToUserDir` for packaged verification. A normal offscreen 1080p benchmark exits cleanly. On this installed engine, CSV profiling captures valid frames but the process exits with code 777003 during shutdown (the engine crash-reporting thread failure code), even when capture finishes before exit. Do not count that profiling run as a clean runtime pass or suppress the exit code. See [validation](validation.md) for measurements and the separate normal-render result. Fresh installs use High graphics; existing player settings remain intact.

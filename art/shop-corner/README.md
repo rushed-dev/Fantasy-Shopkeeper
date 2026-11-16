@@ -81,7 +81,7 @@ Run the three installers in that order. The expansion commandlet additionally ne
 
 Five completed one-off interaction, brewing, sale, mannequin and small-till migration scripts have been removed. Their durable Blueprint and recipe assets are committed. Current character and till presentation setup lives in the expansion installer.
 
-Run the 46 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes three sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
+Run the 49 gameplay regressions with `Tools/check.ps1`, or use `-SkipBuild` after rebuilding. The actual-map keyboard workflow completes three sales, orders evening supplies, advances to morning and exercises recipes, stocking, G/E set-down and retrieval, supply purchases, walking customers, physical coin dispensing and sale confirmation while retaining mouse look. Focused tests cover product locking, capacity, fill order, reassignment, reach, stale quotes and cash consistency.
 
 Launch `Tools/render_shop_review.py` through editor `-ExecCmds=py <absolute script>` with `-RenderOffscreen`. It uses temporal warm-up frames and writes to `Saved/ArtReview`. Hands-on playtesting belongs to the user.
 

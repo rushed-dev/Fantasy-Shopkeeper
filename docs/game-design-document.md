@@ -6,6 +6,10 @@ Version 0.1 · 2026-11-09 · Production planning draft
 
 The project is now a serious game concept. The Godot prototype remains the playable reference for retail and Fen's encounter. This document defines the proposed production game; it does not claim that brewing, staff or the release content described here already exist.
 
+## Current bounded MVP
+
+As agreed on 2026-11-16, the immediate MVP is one shop and a three-day chapter: three regulars, two recipes, one optional paid Lantern Walk request, the existing two upgrades, a small queue, menus/onboarding and bounded supplier credit. Morning checkpoints are retained. Workers and the larger commercial content envelope below are deferred. See [the current Unreal roadmap](unreal-roadmap.md) for the implementation and review boundary.
+
 ## 1. Decisions and assumptions
 
 | Status | Direction |

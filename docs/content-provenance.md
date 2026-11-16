@@ -61,3 +61,7 @@ The native order book, paper tabs and sealed delivery reuse the existing origina
 ## Customer conversation polish, 2026-11-16
 
 Three arrival-request templates and three short purchase reactions are original AI-assisted authored text in `ShopCustomer.cpp`, using Unreal localizable text macros. They are displayed as nearby subtitles; no voice, external language service, generated runtime dialogue or new media is used. Selection and small timing differences follow the day/visit index. They add no persistent story claims, prices, rewards or penalties.
+
+## Bounded Lantern Walk MVP, 2026-11-16
+
+The Ivo/Fen/Nessa dialogue, journal, menu and onboarding text are original AI-assisted authored project content. The small work badges and story lantern combine Unreal basic primitives with the project's existing original materials, assembled in native C++; they add no downloaded artwork or third-party media. Customer bodies/animations remain the existing Epic template presentations. Story and dialogue are authored offline, with no runtime AI service. Credits and the packaged notices distinguish the original procedural shop kit from Epic template content. Platform release policy review remains outside this private MVP review build.

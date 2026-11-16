@@ -4,6 +4,16 @@ A cosy first-person fantasy shop game about brewing, stocking and serving custom
 
 The Unreal 5.8.4 production project is under `unreal/FantasyShopkeeper`. Its C++ shop loop includes two recipes, physical stock, walking customers, manual checkout and paid ingredient replenishment, with an original modelled interior. The Godot project remains the earlier behavioural reference. Read the [game design document](docs/game-design-document.md), [engine decision](docs/engine-decision.md), [art direction](docs/art-direction.md) and [content policy](docs/content-provenance.md).
 
+## The Lantern Walk MVP
+
+The startup menu introduces the shop and explains morning checkpoints. **F1** pauses/resumes through a mouse-operated menu with help, settings, requests, credits and confirmed restart/new-game/quit actions. **F10** retains the quick day-recovery controls. Sensitivity, master volume and High/Epic graphics settings persist separately from shop progress. Fresh installations default to High; existing graphics choices are retained. Quitting does not save the current day; rest to commit the next morning.
+
+Three regulars visit: **Ivo**, the courier (Dawn Tonic), **Fen**, the lamplighter (Moonlit Ink), and **Nessa**, the printer (Dawn Tonic). Their badges, requests and return lines distinguish them. On day one, Fen's note in **Requests & supplier account** offers a voluntary paid collection of one Moonlit Ink on day two. Open it from the supplier book, the menu, or E on Fen. Accepting does not reserve stock or charge money. A real 18-bit sale to Fen on day two lights a lantern beside the entrance. Declining or missing the collection causes no fine or loss of ordinary trade.
+
+When evening supplies are short and cash is below 12 bits, the supplier book's account page can order **6 Moonleaf + 6 Water for next morning**, with **18 bits owed**, no interest and no deadline. One loan may be outstanding; repayment is an explicit action at the book in the evening. Credit adds ingredients to the next parcel, never spendable cash. The account and story persist together with the morning checkpoint (schema 5; older mornings remain compatible).
+
+After evening three, the chapter summary recognises the shop's progress and Fen's outcome. Continue trading for as many days as you like. Order and rest to save that evening's progress. Workers, gathering, additional premises and mid-day saving remain outside this MVP.
+
 ## Unreal shop checkpoint
 
 Open `unreal/FantasyShopkeeper/FantasyShopkeeper.uproject`. The startup map is `L_Shop`. Aim the centre dot at a bottle and press **E** within two metres to pick it up. Aim anywhere on a shelf section and press **E** to stock its next free position. Each section has **eight positions** and locks to its first stocked product until empty. With empty hands, **E** retrieves the first stocked bottle. The section's label shows its product and count.
@@ -43,7 +53,7 @@ Edit visuals through the Blueprint children in `/Game/Shop/Native`. The original
 
 The modelled art kit adds a timber brewing bench, sage-backed shelving, brass-and-ceramic brewer, Moonleaf jar, water jug, mortar and pendant lamp, under the `ShopArt` Outliner folder. Four eight-position sections fit the apothecary shelving, providing 32 stock positions. The two retail tables and their former six stock sections have been removed. Dawn Tonic uses the recipe-specific `BP_DawnTonic` presentation child, with a flattened tapered cork sized to fit the neck. Editable Blender source, FBX exports, studio and cork-fit previews, and regeneration instructions live in [art/shop-corner](art/shop-corner/README.md). The pre-art map is backed up locally under `Saved/BeforeShopArt`, and the map before the mannequin migration is under `Saved/BeforeCustomerCharacter`. The room has plaster and timber walls, transparent arched windows with garden views, and four visible pendant lights.
 
-Run the build and forty-six interaction, brewing, customer, supply, till, day and persistence regressions from the repository root when Unreal Editor is closed:
+Run the build and forty-nine interaction, brewing, customer, supply, till, day and persistence regressions from the repository root when Unreal Editor is closed:
 
 ```powershell
 ./unreal/FantasyShopkeeper/Tools/check.ps1
@@ -71,7 +81,7 @@ Press **F10** for recovery options. **Enter** restarts the saved morning, rollin
 
 Reopening automatically restores `Saved/SaveGames/Morning.sav` under the Unreal project (or the packaged game's saved-data directory). Changes made after that morning—including sales, brews, upgrades and supply purchases—roll back together. This is a morning checkpoint, not a mid-day save. The initial morning is saved on first launch. Automation uses isolated files and never reads or writes the player's checkpoint.
 
-Version 4 checkpoints store storage and batch upgrades, the selected batch size and every finished bottle. Versions 1-3 remain readable with their existing storage entitlement and single-bottle brewing. Checkpoints have a schema version and checksum, validate products, ingredients and destinations, and replace the previous file atomically on Windows. Invalid or incompatible files are reported in the HUD and preserved; further saving is blocked. To deliberately start fresh, close the game and move `Morning.sav` aside, keeping it as a backup. Renaming shelf sections or stations can invalidate existing checkpoints; migration of authored map identities is future work.
+Version 5 checkpoints also store the lantern story and supplier debt alongside storage and batch upgrades, selected batch size and every finished bottle. Versions 1–4 remain readable with their existing entitlements. Checkpoints have a schema version and checksum, validate products, ingredients and destinations, and replace the previous file atomically on Windows. Invalid or incompatible files are reported in the HUD and preserved; further saving is blocked. Use the confirmed Start a new shop menu action to begin again and retain a backup of the previous morning. Renaming shelf sections or stations can invalidate existing checkpoints; migration of authored map identities is future work.
 
 ## Godot prototype reference
 
