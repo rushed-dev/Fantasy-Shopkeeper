@@ -32,6 +32,9 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     FString GetPlanningText() const;
+    bool GetNextDayNeeds(TMap<FName, int64>& Needs, int32& Visitors) const;
+    FText GetOrderStatus() const { return GetBlockReason(); }
+    bool CanSubmitOrder() const;
     bool ChangeQuantity(UShopInteractionComponent* Interactor, int32 Delta);
     void ResetOrder() { bOrderSubmitted = false; }
     bool HasSubmittedOrder() const { return bOrderSubmitted; }

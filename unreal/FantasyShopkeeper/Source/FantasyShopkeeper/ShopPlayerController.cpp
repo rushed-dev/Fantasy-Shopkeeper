@@ -11,6 +11,8 @@
 #include "InputKeyEventArgs.h"
 #include "ShopBrewingStation.h"
 #include "ShopSupplyCrate.h"
+#include "ShopOrderingPage.h"
+#include "Engine/GameViewportClient.h"
 #include "ShopGameState.h"
 #include "ShopCustomerFlow.h"
 #include "EngineUtils.h"
@@ -74,12 +76,12 @@ void AShopPlayerController::SetupInputComponent()
 
 void AShopPlayerController::HandleSetDown()
 {
-    if (!bRestartPromptOpen) ShopInteraction->SetDownHeldItem();
+    if (!bRestartPromptOpen && !IsOrderingPageOpen()) ShopInteraction->SetDownHeldItem();
 }
 
 void AShopPlayerController::HandleNextRecipe()
 {
-    if (bRestartPromptOpen) return;
+    if (bRestartPromptOpen || IsOrderingPageOpen()) return;
     if (AShopBrewingStation* Station = Cast<AShopBrewingStation>(ShopInteraction->GetInteractionTarget()))
     {
         Station->CycleRecipe(ShopInteraction);
@@ -92,12 +94,19 @@ void AShopPlayerController::HandleNextRecipe()
 
 void AShopPlayerController::HandleInteract()
 {
-    if (!bRestartPromptOpen) ShopInteraction->Interact();
+    if (bRestartPromptOpen || IsOrderingPageOpen()) return;
+    if (AShopSupplyCrate* Desk = Cast<AShopSupplyCrate>(ShopInteraction->GetInteractionTarget())) OpenOrderingPage(Desk);
+    else ShopInteraction->Interact();
 }
 
 bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight() && Params.Event != IE_Released) return true;
+    if (IsOrderingPageOpen())
+    {
+        if (Params.Event == IE_Pressed) HandleOrderingKey(Params.Key);
+        return Params.Event == IE_Released ? Super::InputKey(Params) : true;
+    }
     if (Params.Event == IE_Pressed && Params.Key == EKeys::F10)
     {
         SetRestartPrompt(!bRestartPromptOpen);
@@ -177,12 +186,14 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
 
 void AShopPlayerController::OnUnPossess()
 {
+    CloseOrderingPage();
     ShopInteraction->ReleaseHeldItem();
     Super::OnUnPossess();
 }
 
 void AShopPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    CloseOrderingPage();
     if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         if (InteractionMappingContext)
@@ -207,4 +218,62 @@ void AShopPlayerController::SetRestartPrompt(bool bOpen)
     SetIgnoreLookInput(bOpen);
     if (APawn* ControlledPawn = GetPawn())
         if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent()) Movement->StopMovementImmediately();
+}
+
+bool AShopPlayerController::OpenOrderingPage(AShopSupplyCrate* Desk)
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    if (!IsLocalController() || !GetWorld()->GetGameViewport() || bRestartPromptOpen || IsOrderingPageOpen()
+        || !State || !State->IsDayInitialized() || State->IsOvernight() || !IsValid(Desk)
+        || ShopInteraction->GetHeldItem() || !ShopInteraction->CanReach(Desk)) return false;
+    OrderingDesk = Desk;
+    OrderingWidget = SNew(SShopOrderingPage).Controller(this).Desk(Desk);
+    GetWorld()->GetGameViewport()->AddViewportWidgetContent(OrderingWidget.ToSharedRef(), 20);
+    FlushPressedKeys();
+    SetIgnoreMoveInput(true);
+    SetIgnoreLookInput(true);
+    if (APawn* ControlledPawn = GetPawn())
+        if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent()) Movement->StopMovementImmediately();
+    bShowMouseCursor = true;
+    FInputModeGameAndUI Mode;
+    Mode.SetWidgetToFocus(OrderingWidget);
+    Mode.SetHideCursorDuringCapture(false);
+    SetInputMode(Mode);
+    return true;
+}
+
+void AShopPlayerController::CloseOrderingPage()
+{
+    if (!IsOrderingPageOpen()) return;
+    if (UGameViewportClient* Viewport = GetWorld()->GetGameViewport()) Viewport->RemoveViewportWidgetContent(OrderingWidget.ToSharedRef());
+    OrderingWidget.Reset();
+    OrderingDesk.Reset();
+    FlushPressedKeys();
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
+    bShowMouseCursor = false;
+    SetInputMode(FInputModeGameOnly());
+}
+
+bool AShopPlayerController::HandleOrderingKey(FKey Key)
+{
+    if (!IsOrderingPageOpen()) return false;
+    if (Key == EKeys::F10) { CloseOrderingPage(); return true; }
+    AShopSupplyCrate* Desk = OrderingDesk.Get();
+    if (!Desk || ShopInteraction->GetHeldItem() || !ShopInteraction->CanReach(Desk)) { CloseOrderingPage(); return true; }
+    if (Key == EKeys::R) Desk->CycleOffer(ShopInteraction);
+    else if (Key == EKeys::F || Key == EKeys::T) Desk->ChangeQuantity(ShopInteraction, Key == EKeys::T ? 1 : -1);
+    else if (Key == EKeys::Enter) Desk->Interact_Implementation(ShopInteraction);
+    return true;
+}
+
+void AShopPlayerController::PlayerTick(float DeltaTime)
+{
+    Super::PlayerTick(DeltaTime);
+    if (IsOrderingPageOpen())
+    {
+        const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+        if (!OrderingDesk.IsValid() || !State || State->IsOvernight() || ShopInteraction->GetHeldItem()
+            || !ShopInteraction->CanReach(OrderingDesk.Get())) CloseOrderingPage();
+    }
 }

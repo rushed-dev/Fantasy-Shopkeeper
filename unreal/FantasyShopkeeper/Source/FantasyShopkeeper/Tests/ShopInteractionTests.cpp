@@ -2364,4 +2364,51 @@ bool FShopFreshGameTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopIngredientPlanningTest, "FantasyShopkeeper.Supplies.ForecastAndFirstDayIngredients",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopIngredientPlanningTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(100);
+    AShopBrewingStation* Station = Test.BrewingStation(6, 6);
+    UShopBrewingRecipe* Tonic = Station->Recipe;
+    UShopBrewingRecipe* Ink = NewObject<UShopBrewingRecipe>(Station);
+    Ink->ProductId = TEXT("MoonlitInk"); Ink->DisplayName = FText::FromString(TEXT("Moonlit Ink"));
+    Ink->IngredientCosts = {{TEXT("Moonleaf"), 1}, {TEXT("Spring Water"), 2}};
+    Ink->OutputItemClass = AShopPickupItem::StaticClass();
+    Station->AvailableRecipes = {Tonic, Ink};
+    AShopCustomerFlow* Flow = DayFlow(Test);
+    FShopCustomerOrder TonicOrder; FShopCustomerOrder InkOrder; InkOrder.ProductId = TEXT("MoonlitInk");
+    Flow->Orders = {TonicOrder, InkOrder};
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0)); Crate->Station = Station;
+    State->InitializeDay(FString());
+    TMap<FName, int64> Needs; int32 Visits = 0;
+    TestTrue(TEXT("Configured recipes produce a forecast"), Crate->GetNextDayNeeds(Needs, Visits));
+    TestEqual(TEXT("Tomorrow follows finite three-visit sequence"), Visits, 3);
+    TestEqual(TEXT("Two tonics and one ink need five Moonleaf"), Needs.FindRef(TEXT("Moonleaf")), int64(5));
+    TestEqual(TEXT("Two tonics and one ink need four water"), Needs.FindRef(TEXT("Spring Water")), int64(4));
+    for (int32 Visit = 0; Visit < 3; ++Visit)
+    {
+        Station->Recipe = Visit == 1 ? Ink : Tonic;
+        Test.AimAt(Station);
+        TestTrue(TEXT("Fresh ingredients can brew every first-day request"), Station->TryBrew(Test.Interaction));
+        if (AShopPickupItem* Item = Station->OutputSlot->GetOccupyingItem()) Item->Destroy();
+    }
+    TestEqual(TEXT("First day leaves one Moonleaf"), Station->GetIngredientQuantity(TEXT("Moonleaf")), 1);
+    TestEqual(TEXT("First day leaves two water"), Station->GetIngredientQuantity(TEXT("Spring Water")), 2);
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -100, 0));
+    AShopPickupItem* Stock = Test.Spawn<AShopPickupItem>(FVector(100, -140, 0)); Stock->ProductId = TEXT("MoonlitInk");
+    Test.AimAt(Stock); TestTrue(TEXT("Pick up forecast stock"), Test.Interaction->Interact());
+    Test.AimAt(Shelf); TestTrue(TEXT("Stock forecast bottle"), Test.Interaction->Interact());
+    TestTrue(TEXT("Forecast deducts sale stock"), Crate->GetNextDayNeeds(Needs, Visits));
+    TestEqual(TEXT("Stocked ink leaves two tonics to brew"), Needs.FindRef(TEXT("Spring Water")), int64(2));
+    Shelf->bAvailableForSale = false;
+    Crate->GetNextDayNeeds(Needs, Visits);
+    TestEqual(TEXT("Non-sale storage cannot satisfy forecast"), Needs.FindRef(TEXT("Spring Water")), int64(4));
+    Flow->Orders[1].ProductId = TEXT("UnknownRecipe");
+    TestFalse(TEXT("Missing recipe reports unavailable forecast"), Crate->GetNextDayNeeds(Needs, Visits));
+    TestTrue(TEXT("Unknown recipe cannot leave misleading partial totals"), Needs.IsEmpty());
+    return true;
+}
+
 #endif

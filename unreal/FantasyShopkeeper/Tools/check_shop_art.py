@@ -59,6 +59,7 @@ for section in sections:
         assert hit and isinstance(hit.to_tuple()[9], unreal.StaticMeshActor), f"Unsupported position {section.get_actor_label()} [{index}]"
 station = next(a for a in all_actors if isinstance(a, unreal.ShopBrewingStation))
 assert station.get_editor_property("vessel_mesh").static_mesh.get_name() == "SM_BrewingVessel"
+assert {str(k): v for k, v in station.get_editor_property("starting_ingredients").items()} == {"Moonleaf": 6, "Spring Water": 6}
 assert station.get_editor_property("moonleaf_container").static_mesh.get_name() == "SM_MoonleafJar"
 assert station.get_editor_property("water_container").static_mesh.get_name() == "SM_SpringWaterJug"
 customer = next(a for a in all_actors if isinstance(a, unreal.ShopCustomer))

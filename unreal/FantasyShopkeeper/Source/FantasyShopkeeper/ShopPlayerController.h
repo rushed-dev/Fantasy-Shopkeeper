@@ -8,6 +8,8 @@ class UShopInteractionComponent;
 class UInputAction;
 class UInputMappingContext;
 class AShopTill;
+class AShopSupplyCrate;
+class SWidget;
 
 UCLASS(Blueprintable)
 class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
@@ -16,6 +18,11 @@ class FANTASYSHOPKEEPER_API AShopPlayerController : public APlayerController
 
 public:
     AShopPlayerController();
+    bool OpenOrderingPage(AShopSupplyCrate* Desk);
+    void CloseOrderingPage();
+    bool IsOrderingPageOpen() const { return OrderingWidget.IsValid(); }
+    bool HandleOrderingKey(FKey Key);
+    virtual void PlayerTick(float DeltaTime) override;
     bool IsFreshGameConfirmation() const { return bFreshGameConfirmation; }
     bool IsRestartPromptOpen() const { return bRestartPromptOpen; }
     virtual bool InputKey(const FInputKeyEventArgs& Params) override;
@@ -35,6 +42,8 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    TWeakObjectPtr<AShopSupplyCrate> OrderingDesk;
+    TSharedPtr<SWidget> OrderingWidget;
     bool bRestartPromptOpen = false;
     bool bFreshGameConfirmation = false;
     void SetRestartPrompt(bool bOpen);

@@ -3,6 +3,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "ShopBrewingStation.h"
+#include "ShopBrewingRecipe.h"
+#include "ShopShelfSlot.h"
+#include "ShopPickupItem.h"
 #include "ShopCustomerFlow.h"
 #include "ShopSupplyControl.h"
 #include "Components/TextRenderComponent.h"
@@ -168,10 +171,7 @@ FText AShopSupplyCrate::GetInteractionPrompt(UShopInteractionComponent* Interact
     {
         return NSLOCTEXT("Shop", "SupplyHandsFull", "Put down the held item to buy supplies");
     }
-    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
-    const FText BlockReason = GetBlockReason();
-    if (!State || State->GetDayPhase() != EShopDayPhase::Evening) return BlockReason;
-    return BlockReason.IsEmpty() ? FText::FromString(TEXT("E  Sign order | Book tabs: pack, less, more, rest")) : BlockReason;
+    return FText::FromString(TEXT("E  Read supplier book | Orders arrive next morning"));
 
 }
 
@@ -205,10 +205,49 @@ FString AShopSupplyCrate::GetPlanningText() const
         State->GetPendingIngredientQuantity(TEXT("Moonleaf")), Water, State->GetPendingIngredientQuantity(TEXT("Spring Water")),
         Quantities.FindRef(TEXT("Moonleaf")), Quantities.FindRef(TEXT("Spring Water")), PackCount, Cost,
         State->GetDayPhase() != EShopDayPhase::Evening ? TEXT("Orders taken in the evening")
-            : bOrderSubmitted ? TEXT("PAID - change tabs to add more") : TEXT("E : sign & pay this order"));
+            : bOrderSubmitted ? TEXT("PAID - change tabs to add more") : TEXT("E : open ordering page"));
 }
 void AShopSupplyCrate::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     Page->SetText(FText::FromString(GetPlanningText()));
+}
+
+bool AShopSupplyCrate::CanSubmitOrder() const
+{
+    const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
+    return State && State->CanOrderSupplies() && GetBlockReason().IsEmpty();
+}
+
+bool AShopSupplyCrate::GetNextDayNeeds(TMap<FName, int64>& Needs, int32& Visitors) const
+{
+    Needs.Empty();
+    Visitors = 0;
+    if (!IsValid(Station)) return false;
+    TActorIterator<AShopCustomerFlow> Flow(GetWorld());
+    if (!Flow || Flow->Orders.IsEmpty() || Flow->VisitsPerDay < 1 || Flow->VisitsPerDay > 100) return false;
+    Visitors = Flow->VisitsPerDay;
+    TMap<FName, int32> RequiredBottles;
+    // ResetMorning restarts the authored order sequence at its first entry.
+    for (int32 Visit = 0; Visit < Visitors; ++Visit)
+        ++RequiredBottles.FindOrAdd(Flow->Orders[Visit % Flow->Orders.Num()].ProductId);
+    for (TActorIterator<AShopShelfSlot> Slot(GetWorld()); Slot; ++Slot)
+        if (Slot->IsAvailableForSale())
+            if (const AShopPickupItem* Item = Slot->GetOccupyingItem())
+                if (int32* Count = RequiredBottles.Find(Item->ProductId)) *Count = FMath::Max(0, *Count - 1);
+    TArray<TObjectPtr<UShopBrewingRecipe>> Recipes = Station->AvailableRecipes;
+    Recipes.AddUnique(Station->Recipe);
+    for (const auto& Product : RequiredBottles)
+    {
+        if (Product.Value == 0) continue;
+        const TObjectPtr<UShopBrewingRecipe>* Match = Recipes.FindByPredicate([&Product](const UShopBrewingRecipe* Recipe)
+        { return IsValid(Recipe) && Recipe->IsRecipeValid() && Recipe->ProductId == Product.Key; });
+        if (!Match) { Needs.Empty(); return false; }
+        for (const auto& Cost : (*Match)->IngredientCosts)
+        {
+            if (!Station->StartingIngredients.Contains(Cost.Key)) { Needs.Empty(); return false; }
+            Needs.FindOrAdd(Cost.Key) += int64(Cost.Value) * Product.Value;
+        }
+    }
+    return true;
 }

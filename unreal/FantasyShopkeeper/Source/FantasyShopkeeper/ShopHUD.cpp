@@ -32,6 +32,8 @@ void AShopHUD::DrawHUD()
 
     if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsOvernight()) return;
 
+    if (Controller->IsOrderingPageOpen()) return;
+
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
     if (Controller->IsRestartPromptOpen())

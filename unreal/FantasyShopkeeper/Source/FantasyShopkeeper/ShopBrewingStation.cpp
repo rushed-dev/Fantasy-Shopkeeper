@@ -16,6 +16,7 @@
 AShopBrewingStation::AShopBrewingStation()
 {
     PrimaryActorTick.bCanEverTick = false;
+    StartingIngredients = {{TEXT("Moonleaf"), 6}, {TEXT("Spring Water"), 6}};
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("BenchRoot"));
     VesselMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VesselMesh"));
     VesselMesh->SetupAttachment(RootComponent);

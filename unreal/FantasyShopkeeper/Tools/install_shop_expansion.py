@@ -189,6 +189,7 @@ for old in list(actors.get_all_level_actors()):
         actors.destroy_actor(old)
 
 station = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.ShopBrewingStation))
+station.set_editor_property("starting_ingredients", {"Moonleaf": 6, "Spring Water": 6})
 till = next(a for a in actors.get_all_level_actors() if isinstance(a, unreal.ShopTill))
 customer = till.get_editor_property("customer")
 assert customer

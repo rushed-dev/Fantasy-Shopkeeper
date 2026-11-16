@@ -6,9 +6,10 @@ public class FantasyShopkeeper : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AIModule", "NavigationSystem" });
+        PrivateDependencyModuleNames.AddRange(new[] { "Slate", "SlateCore" });
         if (Target.bBuildEditor)
         {
-            PrivateDependencyModuleNames.AddRange(new[] { "UnrealEd", "Slate", "SlateCore" });
+            PrivateDependencyModuleNames.Add("UnrealEd");
         }
     }
 }

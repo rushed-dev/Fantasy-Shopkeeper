@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Editor.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Kismet2/DebuggerCommands.h"
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimInstance.h"
@@ -208,11 +209,11 @@ namespace
                 if (AShopGameState* DayState = World->GetGameState<AShopGameState>(); DayState && DayState->GetDayPhase() == EShopDayPhase::Preparation)
                 {
                     Test->TestEqual(TEXT("Map starts in preparation"), DayState->GetDayPhase(), EShopDayPhase::Preparation);
-                    TActorIterator<AShopDoorSign> Sign(World);
-                    if (!Test->TestTrue(TEXT("Shop has an open/closed sign"), bool(Sign))) return true;
-                    AimTarget = *Sign; AimHeight = 0;
-                    Pawn->SetActorLocation(Sign->GetActorLocation() + FVector(0, 110, -59), false, nullptr, ETeleportType::TeleportPhysics);
-                    Step = 51; NextStep = Now + 1; return false;
+                    Test->TestEqual(TEXT("Fresh shop starts with six Moonleaf"), Crate->Station->GetIngredientQuantity(TEXT("Moonleaf")), 6);
+                    Test->TestEqual(TEXT("Fresh shop starts with six water"), Crate->Station->GetIngredientQuantity(TEXT("Spring Water")), 6);
+                    AimTarget = Crate; AimHeight = 69;
+                    Pawn->SetActorLocation(Crate->GetActorLocation() + FVector(0, -140, 96), false, nullptr, ETeleportType::TeleportPhysics);
+                    Step = 84; NextStep = Now + 1; return false;
                 }
                 for (TActorIterator<AShopCustomer> It(World); It; ++It)
                 {
@@ -555,7 +556,52 @@ namespace
                 return false;
             case 29:
                 Key(EKeys::E, IE_Pressed);
-                break;
+                Step = 81; NextStep = Now + 0.5;
+                return false;
+            case 81:
+                Key(EKeys::E, IE_Released);
+                Test->TestTrue(TEXT("E opens the supplier ordering page"), Controller->IsOrderingPageOpen());
+                Test->TestEqual(TEXT("Reading the book cannot spend cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSupplies);
+                Test->TestTrue(TEXT("Reading the page blocks movement"), Controller->IsMoveInputIgnored());
+                // Route through the focused Slate page, not just the controller.
+                FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::T, FModifierKeysState(), 0, false, 0, 0));
+                Test->TestEqual(TEXT("Ordering page receives quantity keys through Slate"), Crate->GetPackCount(), 2);
+                FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::F, FModifierKeysState(), 0, false, 0, 0));
+                Test->TestEqual(TEXT("Page can reduce quantity before paying"), Crate->GetPackCount(), 1);
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopOrderingScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, true, false);
+                }
+                Step = 82; NextStep = Now + 0.5;
+                return false;
+            case 82:
+                Key(EKeys::Enter, IE_Pressed); Key(EKeys::Enter, IE_Released);
+                Key(EKeys::Enter, IE_Pressed); Key(EKeys::Enter, IE_Released);
+                Test->TestEqual(TEXT("Page confirmation charges once"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSupplies - Crate->PriceBits);
+                Key(EKeys::F10, IE_Pressed); Key(EKeys::F10, IE_Released);
+                Test->TestFalse(TEXT("F10 closes the ordering page"), Controller->IsOrderingPageOpen());
+                Test->TestFalse(TEXT("Closing book restores movement"), Controller->IsMoveInputIgnored());
+                Step = 30; NextStep = Now + 0.2;
+                return false;
+            case 84:
+                Key(EKeys::E, IE_Pressed);
+                Step = 85; NextStep = Now + 0.5;
+                return false;
+            case 85:
+                Key(EKeys::E, IE_Released);
+                Test->TestTrue(TEXT("Preparation allows reading the supplier page"), Controller->IsOrderingPageOpen());
+                Key(EKeys::Enter, IE_Pressed); Key(EKeys::Enter, IE_Released);
+                Test->TestFalse(TEXT("Preparation cannot submit supply orders"), World->GetGameState<AShopGameState>()->HasConfirmedSupplies());
+                Key(EKeys::F10, IE_Pressed); Key(EKeys::F10, IE_Released);
+                {
+                    TActorIterator<AShopDoorSign> Sign(World);
+                    if (!Test->TestTrue(TEXT("Shop has an open/closed sign"), bool(Sign))) return true;
+                    AimTarget = *Sign; AimHeight = 0;
+                    Pawn->SetActorLocation(Sign->GetActorLocation() + FVector(0, 110, -59), false, nullptr, ETeleportType::TeleportPhysics);
+                }
+                Step = 51; NextStep = Now + 1;
+                return false;
             case 30:
                 Key(EKeys::E, IE_Released);
                 Test->TestEqual(TEXT("Evening order does not deliver Moonleaf immediately"), Station->GetIngredientQuantity(TEXT("Moonleaf")), LeavesBeforeBrew);
