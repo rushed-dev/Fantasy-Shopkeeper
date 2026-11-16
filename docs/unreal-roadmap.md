@@ -132,4 +132,8 @@ For each work session, choose one observable outcome, implement it, verify it in
 
 ### Ingredient storage reinvestment
 
-Implemented one physical evening purchase: 24 bits for extra ingredient drawers, doubling each ingredient capacity from 30 to 60. It uses guarded economy transactions and the next morning checkpoint, with separate upgrade spending in the order book. Save schema 3 restores the upgrade alongside cash, ingredients and paid deliveries; schema 1/2 retains base capacity. This is a single storage tier; batch brewing and worker automation remain future work.
+Implemented one physical evening purchase: 24 bits for extra ingredient drawers, doubling each ingredient capacity from 30 to 60. It uses guarded economy transactions and the next morning checkpoint, with separate upgrade spending in the order book. Save schema 3 restores the upgrade alongside cash, ingredients and paid deliveries; schema 1/2 retains base capacity. This is a single storage tier; worker automation remains future work.
+
+### Batch bottling kit
+
+Implemented a 36-bit evening purchase at the bench, with a physical one/three-bottle selector and two additional non-sale output positions on a brass rack. Batches charge the authored per-bottle recipe costs only after every output acquires its slot. Version 4 mornings restore the kit, selection and all outputs together; versions 1-3 retain single brewing. Partial pickup blocks further brewing until the outputs are clear. No timed stirring, yield discount or staff automation was added.
