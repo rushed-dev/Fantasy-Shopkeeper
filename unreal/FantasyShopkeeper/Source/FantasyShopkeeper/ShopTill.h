@@ -51,6 +51,9 @@ public:
     AShopTillControl* FindControl(EShopTillControl Action, int32 Value = 0) const;
     int32 GetVisibleChangeCoins(int32 Denomination) const;
     void RefreshPresentation();
+    void AdvancePresentation(float DeltaSeconds);
+    bool IsPresentingGoods() const;
+    int32 GetPaymentClinkCount() const { return PaymentClinks; }
 
     UPROPERTY(EditAnywhere, Category = "Shop|Till")
     bool bPhysicalCounter = false;
@@ -92,6 +95,19 @@ public:
 
 private:
     friend class AShopGameState;
+    void FinishGoodsPresentation();
+    void PlayCoinAt(int32 Denomination, bool bReturning, const FVector& LocalPosition);
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> GoodsVisual;
+    UPROPERTY(Transient) TWeakObjectPtr<AShopPickupItem> PresentedItem;
+    FTransform GoodsStart;
+    FTransform GoodsEnd;
+    bool bOriginalGoodsVisible = true;
+    float PresentationTime = 2.f;
+    int32 PaymentClinks = 0;
+    float StampTime = 1.f;
+    float ChangeDropTime = 1.f;
+    int32 ChangeDropLane = INDEX_NONE;
+
     bool IsQuoteValid() const;
     bool CanCommitSale() const;
     void ResetTransaction();

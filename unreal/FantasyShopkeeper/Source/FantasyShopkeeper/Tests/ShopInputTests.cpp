@@ -436,7 +436,7 @@ namespace
                     }
                     return false;
                 }
-                Test->TestEqual(TEXT("Customer walks to and carries the brewed potion"), Customer->ShopInteraction->GetHeldItem(), Item.Get());
+                Test->TestTrue(TEXT("Customer carries the brewed potion or has just placed it on the counter"), Customer->ShopInteraction->GetHeldItem() == Item.Get() || Customer->CounterItem.Get() == Item.Get());
                 Test->TestTrue(TEXT("Moving customer enters the walking animation"), bObservedWalkAnimation);
                 Test->TestTrue(TEXT("Moving customer's foot pose advances"), bObservedFootMotion);
                 Test->TestNull(TEXT("Customer pickup frees the shelf before payment"), Slots[0]->GetOccupyingItem());
@@ -495,8 +495,27 @@ namespace
             case 26:
                 Key(EKeys::E, IE_Pressed);
                 break;
+            case 72:
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopPaidScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                AimAt(Till->FindControl(EShopTillControl::Confirm)); AimHeight = 0;
+                Step = 27; NextStep = Now + 0.2;
+                return false;
             case 27:
                 Key(EKeys::E, IE_Released);
+                {
+                    FString Screenshot;
+                    if (!bCapturedSale && FParse::Value(FCommandLine::Get(), TEXT("ShopPaidScreenshot="), Screenshot))
+                    {
+                        bCapturedSale = true;
+                        AimAt(Till.Get()); AimHeight = 115;
+                        Step = 72; NextStep = Now + 0.1;
+                        return false;
+                    }
+                }
                 Test->TestTrue(TEXT("Physical SALE key completes the customer order"), Customer->HasCompletedSale());
                 Test->TestEqual(TEXT("E sale credits the quoted price"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
                 Test->TestFalse(TEXT("Sold potion leaves the world"), Item.IsValid());
@@ -504,6 +523,7 @@ namespace
                 Test->TestNull(TEXT("Sale frees the stocked shelf"), Slots[0]->GetOccupyingItem());
                 Test->TestFalse(TEXT("Repeated physical confirmation cannot pay twice"), Controller->ShopInteraction->Interact());
                 Test->TestEqual(TEXT("Repeated confirmation earns no extra cash"), World->GetGameState<AShopGameState>()->GetCash(), CashBeforeSale + SalePrice);
+                bCapturedSale = false;
                 ++Visits;
                 if (Visits >= 2)
                 {
@@ -805,6 +825,7 @@ namespace
         bool bObservedFootMotion = false;
         bool bHaveFootSample = false;
         bool bOriginalIgnoreInput = false;
+        bool bCapturedSale = false;
         FVector PreviousFoot = FVector::ZeroVector;
     };
 }

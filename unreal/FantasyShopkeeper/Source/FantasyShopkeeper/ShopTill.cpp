@@ -17,13 +17,18 @@
 AShopTill::AShopTill()
 {
     PrimaryActorTick.bCanEverTick = true;
-    PrimaryActorTick.TickInterval = 0.1f;
+    PrimaryActorTick.TickInterval = 0.f;
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("TillRoot"));
     TillMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TillMesh"));
     TillMesh->SetupAttachment(RootComponent);
     TillMesh->SetRelativeLocation(FVector(0, 0, 10));
     TillMesh->SetRelativeScale3D(FVector(0.55, 0.32, 0.2));
     TillMesh->SetCollisionProfileName(TEXT("BlockAll"));
+    GoodsVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PresentedGoods"));
+    GoodsVisual->SetupAttachment(RootComponent);
+    GoodsVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    GoodsVisual->SetCanEverAffectNavigation(false);
+    GoodsVisual->SetVisibility(false);
     Ticket = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Ticket"));
     Ticket->SetupAttachment(RootComponent);
     Ticket->SetRelativeLocation(FVector(0, 38, 152));
@@ -72,6 +77,11 @@ bool AShopTill::IsQuoteValid() const
 
 void AShopTill::ResetTransaction()
 {
+    FinishGoodsPresentation();
+    PresentationTime = 2.f;
+    StampTime = ChangeDropTime = 1.f;
+    ChangeDropLane = INDEX_NONE;
+    if (AShopTillControl* Stamp = FindControl(EShopTillControl::Confirm)) Stamp->Visual->SetRelativeLocation(FVector(0, 0, -3));
     Phase = EShopTillPhase::Idle;
     QuotedCustomer = nullptr;
     QuotedItem = nullptr;
@@ -119,6 +129,7 @@ bool AShopTill::PresentCustomerGoods()
     AShopPickupItem* Item = Customer->ShopInteraction->GetHeldItem();
     if (!IsValid(Item) || Item->ProductId != Customer->RequestedProductId || Item->GetCurrentSlot()
         || Item->GetCarrier() != Customer->ShopInteraction) return false;
+    const FTransform HandTransform = Item->ItemMesh->GetComponentTransform();
     // The shared slot transfer owns attachment, collision and carrier release.
     const FVector Position = GetActorTransform().TransformPosition(bPhysicalCounter ? FVector(-22, -12, 101.0) : FVector(0, 0, 25));
     CheckoutSlot = GetWorld()->SpawnActor<AShopShelfSlot>(Position, GetActorRotation());
@@ -141,7 +152,23 @@ bool AShopTill::PresentCustomerGoods()
     QuotedProductId = Customer->RequestedProductId;
     QuotedProductName = Customer->RequestedProductName;
     Phase = EShopTillPhase::MakingChange;
-    UGameplayStatics::PlaySoundAtLocation(this, Item->PlacementSound, Position, 0.25f);
+    if (bPhysicalCounter)
+    {
+        PresentedItem = Item;
+        bOriginalGoodsVisible = Item->ItemMesh->IsVisible();
+        GoodsStart = HandTransform;
+        GoodsEnd = Item->ItemMesh->GetComponentTransform();
+        GoodsVisual->SetStaticMesh(Item->ItemMesh->GetStaticMesh());
+        GoodsVisual->EmptyOverrideMaterials();
+        for (int32 Index = 0; Index < Item->ItemMesh->GetNumMaterials(); ++Index)
+            GoodsVisual->SetMaterial(Index, Item->ItemMesh->GetMaterial(Index));
+        GoodsVisual->SetWorldTransform(GoodsStart);
+        GoodsVisual->SetVisibility(bOriginalGoodsVisible);
+        Item->ItemMesh->SetVisibility(false);
+        PresentationTime = 0;
+        PaymentClinks = 0;
+    }
+    else UGameplayStatics::PlaySoundAtLocation(this, Item->PlacementSound, Position, 0.35f);
     RefreshPresentation();
     return true;
 }
@@ -160,7 +187,9 @@ bool AShopTill::AddChangeCoin(int32 Denomination)
         return false;
     }
     ++TrayCoins.FindOrAdd(Denomination);
-    UGameplayStatics::PlaySound2D(this, CoinSound, 0.14f);
+    ChangeDropLane = Denomination == 1 ? 0 : Denomination == 10 ? 1 : 2;
+    ChangeDropTime = 0;
+    PlayCoinAt(Denomination, false, FVector(12 + ChangeDropLane * 18, -8, 102));
     Feedback = FText::GetEmpty();
     DisplayedChange = -1;
     RefreshPresentation();
@@ -175,7 +204,9 @@ bool AShopTill::RemoveChangeCoin(int32 Denomination)
         return false;
     }
     --*Count;
-    UGameplayStatics::PlaySound2D(this, CoinSound, 0.14f, 0.9f);
+    ChangeDropLane = INDEX_NONE;
+    ChangeDropTime = 1.f;
+    PlayCoinAt(Denomination, true, FVector(-65, -24 + (Denomination == 1 ? 0 : Denomination == 10 ? 1 : 2) * 24, 103));
     Feedback = FText::GetEmpty();
     DisplayedChange = -1;
     RefreshPresentation();
@@ -194,11 +225,16 @@ bool AShopTill::ConfirmSale(UShopInteractionComponent* Interactor)
     {
         return false;
     }
+    if (Phase == EShopTillPhase::Complete) return false;
     if (!CanCommitSale())
     {
-        Feedback = NSLOCTEXT("Shop", "TillCannotConfirm", "Check the order, payment and change tray before confirming.");
+        Feedback = IsQuoteValid()
+            ? NSLOCTEXT("Shop", "TillChangeMismatch", "Change does not balance. Check the mat.")
+            : NSLOCTEXT("Shop", "TillStaleOrder", "Order changed. Wait for the customer's goods.");
+        RefreshPresentation();
         return false;
     }
+    USoundBase* StampSound = QuotedItem.IsValid() ? QuotedItem->PlacementSound.Get() : nullptr;
     AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
     if (!IsValid(State) || !State->TryCompleteSale(this))
     {
@@ -207,7 +243,13 @@ bool AShopTill::ConfirmSale(UShopInteractionComponent* Interactor)
     }
     Feedback = FText::Format(NSLOCTEXT("Shop", "TillReceipt", "Sale complete. Received {0} bits, returned {1} bits."),
         FText::AsNumber(QuotedTender), FText::AsNumber(GetChangeTotal()));
-    UGameplayStatics::PlaySound2D(this, SaleSound, 0.22f);
+    FinishGoodsPresentation();
+    PresentationTime = 2.f;
+    StampTime = 0;
+    DisplayedTender = -1;
+    UGameplayStatics::PlaySoundAtLocation(this, StampSound ? StampSound : CoinSound.Get(), GetActorTransform().TransformPosition(FVector(55, -34, 103)), 0.45f, 0.65f);
+    UGameplayStatics::PlaySoundAtLocation(this, SaleSound, GetActorLocation(), 0.35f);
+    RefreshPresentation();
     return true;
 }
 
@@ -279,6 +321,7 @@ void AShopTill::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     PresentCustomerGoods();
     RefreshPresentation();
+    AdvancePresentation(DeltaSeconds);
 }
 
 void AShopTill::BuildControls()
@@ -386,6 +429,7 @@ void AShopTill::RefreshPresentation()
     {
         return;
     }
+    Ticket->SetTextRenderColor(Phase == EShopTillPhase::Complete ? FColor(42, 88, 40) : FColor(32, 36, 24));
     const bool bPaid = Phase == EShopTillPhase::MakingChange || Phase == EShopTillPhase::Complete;
     const int32 Tender = bPaid ? QuotedTender : 0;
     const int64 Change = GetChangeTotal();
@@ -446,7 +490,93 @@ void AShopTill::RefreshPresentation()
     }
     Ticket->SetText(FText::FromString(FString::Printf(TEXT("SHOP LEDGER\n%s\n%s"),
         *Header,
-        Phase == EShopTillPhase::Complete ? TEXT("PAID") : *Status)));
+        Phase == EShopTillPhase::Complete ? TEXT("PAID - Thank you") : *Status)));
     PaymentNote->SetText(FText::FromString(FString::Printf(TEXT("Payment: %d bits"), Tender)));
     ChangeNote->SetText(FText::FromString(FString::Printf(TEXT("Change counted: %lld"), Change)));
+}
+
+
+bool AShopTill::IsPresentingGoods() const { return GoodsVisual->IsVisible(); }
+
+void AShopTill::FinishGoodsPresentation()
+{
+    if (PresentedItem.IsValid()) PresentedItem->ItemMesh->SetVisibility(bOriginalGoodsVisible);
+    PresentedItem.Reset();
+    GoodsVisual->SetVisibility(false);
+}
+
+void AShopTill::PlayCoinAt(int32 Denomination, bool bReturning, const FVector& LocalPosition)
+{
+    const float Pitch = Denomination == 1 ? 1.25f : Denomination == 10 ? 1.f : 0.78f;
+    UGameplayStatics::PlaySoundAtLocation(this, CoinSound, GetActorTransform().TransformPosition(LocalPosition),
+        bReturning ? 0.32f : 0.45f, Pitch * (bReturning ? 0.86f : 1.f));
+}
+
+void AShopTill::AdvancePresentation(float DeltaSeconds)
+{
+    const float Step = FMath::Max(0.f, DeltaSeconds);
+    if (PresentationTime < 1.2f)
+    {
+        if (!IsQuoteValid())
+        {
+            FinishGoodsPresentation();
+            PresentationTime = 2.f;
+        }
+        else
+        {
+            const float Previous = PresentationTime;
+            PresentationTime += Step;
+            if (PresentedItem.IsValid())
+            {
+                const float Alpha = FMath::Clamp(PresentationTime / 0.45f, 0.f, 1.f);
+                FTransform Pose;
+                Pose.Blend(GoodsStart, GoodsEnd, FMath::SmoothStep(0.f, 1.f, Alpha));
+                Pose.AddToTranslation(FVector(0, 0, 8.f * FMath::Sin(Alpha * PI)));
+                GoodsVisual->SetWorldTransform(Pose);
+                if (Alpha >= 1.f)
+                {
+                    UGameplayStatics::PlaySoundAtLocation(this, PresentedItem->PlacementSound, GoodsEnd.GetLocation(), 0.45f);
+                    FinishGoodsPresentation();
+                }
+            }
+            int32 Sequence = 0;
+            for (int32 Lane = 0; Lane < 3; ++Lane)
+            {
+                UInstancedStaticMeshComponent* Coins = TenderVisuals[Lane];
+                for (int32 Coin = 0; Coin < Coins->GetInstanceCount(); ++Coin, ++Sequence)
+                {
+                    const float Landing = 0.65f + FMath::Min(Sequence, 6) * 0.06f;
+                    const float Drop = 1.f - FMath::Clamp((PresentationTime - Landing + 0.22f) / 0.22f, 0.f, 1.f);
+                    const FVector Position(46 + Lane * 4, 27, 102 + Coin * 0.55 + 18.f * Drop * Drop);
+                    Coins->UpdateInstanceTransform(Coin, FTransform(Position), false, true);
+                    if (Sequence < 7 && Previous < Landing && PresentationTime >= Landing)
+                    {
+                        PlayCoinAt(Lane == 0 ? 1 : Lane == 1 ? 10 : 100, false, Position);
+                        ++PaymentClinks;
+                    }
+                }
+            }
+        }
+    }
+    ChangeDropTime += Step;
+    if (ChangeDropLane != INDEX_NONE && ChangeDropTime < 0.2f)
+    {
+        UInstancedStaticMeshComponent* Coins = ChangeVisuals[ChangeDropLane];
+        const int32 Coin = Coins->GetInstanceCount() - 1;
+        if (Coin >= 0)
+        {
+            const FVector Position(12 + ChangeDropLane * 18 + (Coin % 2 ? 3.2 : -3.2),
+                -8 + ((Coin / 2) % 2 ? 3.2 : -3.2), 101.5 + (Coin / 4) * 0.5 + 10.f * FMath::Square(1.f - ChangeDropTime / 0.2f));
+            Coins->UpdateInstanceTransform(Coin, FTransform(Position), false, true);
+        }
+    }
+    else if (ChangeDropLane != INDEX_NONE)
+    {
+        ChangeDropLane = INDEX_NONE;
+        DisplayedChange = -1;
+        RefreshPresentation();
+    }
+    StampTime = FMath::Min(1.f, StampTime + Step);
+    if (AShopTillControl* Stamp = FindControl(EShopTillControl::Confirm))
+        Stamp->Visual->SetRelativeLocation(FVector(0, 0, -3 + (StampTime < 0.4f ? 7.f * FMath::Sin(PI * StampTime / 0.4f) : 0.f)));
 }

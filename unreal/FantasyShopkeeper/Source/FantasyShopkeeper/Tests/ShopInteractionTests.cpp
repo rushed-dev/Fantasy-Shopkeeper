@@ -1247,6 +1247,21 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
     };
     TestTrue(TEXT("Customer puts their goods and payment on the desk"), Till->PresentCustomerGoods());
     TestEqual(TEXT("No price-entry phase"), Till->GetPhase(), EShopTillPhase::MakingChange);
+    TestTrue(TEXT("Goods have a visible travel presentation"), Till->IsPresentingGoods());
+    TestFalse(TEXT("Reserved item is not drawn twice"), Item->ItemMesh->IsVisible());
+    TestEqual(TEXT("Animation does not change reserved ownership"), Item->GetCurrentSlot()->GetCheckoutTill(), Till);
+    Till->AdvancePresentation(0.2f);
+    TestTrue(TEXT("Placement takes time"), Till->IsPresentingGoods());
+    Till->AdvancePresentation(0.3f);
+    TestFalse(TEXT("Bottle settles on the mat"), Till->IsPresentingGoods());
+    TestTrue(TEXT("Real item becomes visible after settling"), Item->ItemMesh->IsVisible());
+    Till->AdvancePresentation(0.7f);
+    TestEqual(TEXT("Two tender coins each clink once"), Till->GetPaymentClinkCount(), 2);
+    Till->PresentCustomerGoods(); Till->AdvancePresentation(3.f);
+    TestEqual(TEXT("Repeated presentation cannot replay payment clinks"), Till->GetPaymentClinkCount(), 2);
+    TestFalse(TEXT("Wrong change is still rejected"), Press(EShopTillControl::Confirm));
+    TestTrue(TEXT("Mismatch gives feedback without supplying the answer"), Till->GetFeedback().ToString().Contains(TEXT("does not balance")));
+
     TestTrue(TEXT("A physical bit stack supplies a coin"), Press(EShopTillControl::AddCoin, 1));
     TestEqual(TEXT("One tray coin is rendered"), Till->GetVisibleChangeCoins(1), 1);
     TestTrue(TEXT("A tray lane returns its coin"), Press(EShopTillControl::RemoveCoin, 1));
@@ -1260,6 +1275,12 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Physical confirmation completes the guarded sale"), Press(EShopTillControl::Confirm));
     TestEqual(TEXT("Sale credits the price once"), State->GetCash(), int64(12));
     TestFalse(TEXT("Physical confirmation cannot repeat payment"), Press(EShopTillControl::Confirm));
+    TestTrue(TEXT("Repeated stamp preserves the successful receipt"), Till->GetFeedback().ToString().Contains(TEXT("Sale complete")));
+    Till->AdvancePresentation(0.15f);
+    TestTrue(TEXT("PAID stamp moves after success"), Till->FindControl(EShopTillControl::Confirm)->Visual->GetRelativeLocation().Z > -3.f);
+    Till->AdvancePresentation(0.5f);
+    TestEqual(TEXT("Stamp returns to rest"), Till->FindControl(EShopTillControl::Confirm)->Visual->GetRelativeLocation().Z, -3.0);
+
     Test.Camera->SetWorldLocation(FVector(0, -600, 155));
     AShopTillControl* RemoteKey = Till->FindControl(EShopTillControl::AddCoin, 1);
     Test.Camera->SetWorldRotation((RemoteKey->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
@@ -1858,6 +1879,33 @@ bool FShopOvernightTest::RunTest(const FString& Parameters)
     }
     TestFalse(TEXT("Night completes"), State->IsOvernight());
     TestEqual(TEXT("One morning committed"), State->GetDay(), 2);
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopCheckoutPresentationCancelTest, "FantasyShopkeeper.Till.PresentationCancellationPreservesGoods",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopCheckoutPresentationCancelTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    AShopBrewingStation* Station = Test.BrewingStation();
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, 60, 0));
+    AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+    AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+    if (!TestTrue(TEXT("Customer collects goods"), Test.CollectAndReturn(Buyer, Item))) return false;
+    AShopTill* Till = Test.Spawn<AShopTill>(FVector(0, 84, 0));
+    Till->bPhysicalCounter = true;
+    Till->AssignCustomer(Buyer);
+    TestTrue(TEXT("Goods presentation starts"), Till->PresentCustomerGoods());
+    Till->AdvancePresentation(0.1f);
+    Till->AssignCustomer(nullptr);
+    TestTrue(TEXT("Cancelling restores the item's visibility"), Item->ItemMesh->IsVisible());
+    TestNull(TEXT("Cancelled item becomes loose stock"), Item->GetCurrentSlot());
+    TestFalse(TEXT("Cancelled cosmetic copy disappears"), Till->IsPresentingGoods());
+    Till->AdvancePresentation(5.f);
+    TestEqual(TEXT("Cancelled payment never clinks"), Till->GetPaymentClinkCount(), 0);
+    TestEqual(TEXT("Animation never credits money"), State->GetCash(), int64(0));
     return true;
 }
 
