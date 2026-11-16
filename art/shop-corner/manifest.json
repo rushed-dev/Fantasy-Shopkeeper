@@ -358,31 +358,35 @@
       ]
     },
     "SM_CheckoutCounter": {
-      "triangles": 3572,
+      "triangles": 2928,
       "dimensions_cm": [
         170.00001525878906,
         100.00001525878906,
-        159.5
+        102.20000457763672
       ],
-      "collision_hulls": 2,
+      "collision_hulls": 1,
       "materials": [
         "HoneyWood",
         "SagePaint",
         "DarkWood",
+        "Leather",
         "CreamLabel",
+        "LabelInk",
         "Brass"
       ]
     },
     "SM_TillKey": {
-      "triangles": 188,
+      "triangles": 664,
       "dimensions_cm": [
-        9.000000953674316,
-        9.000000953674316,
-        3.0
+        12.000000953674316,
+        9.106000900268555,
+        11.0
       ],
       "collision_hulls": 0,
       "materials": [
-        "Brass"
+        "Brass",
+        "DarkWood",
+        "LabelInk"
       ]
     },
     "SM_Coin1": {
@@ -422,16 +426,15 @@
       ]
     },
     "SM_CoinPouch": {
-      "triangles": 1172,
+      "triangles": 668,
       "dimensions_cm": [
-        27.403608322143555,
-        26.0,
-        24.0
+        28.0,
+        28.0,
+        5.0
       ],
       "collision_hulls": 1,
       "materials": [
-        "Leather",
-        "Cork"
+        "SagePaint"
       ]
     },
     "SM_GardenGround": {

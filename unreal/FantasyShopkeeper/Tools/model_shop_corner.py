@@ -5,6 +5,7 @@ Produces editable .blend, per-asset FBX with authored UCX collision, and a previ
 """
 
 import json
+import os
 import math
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from mathutils import Vector
 ROOT = Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / "art/shop-corner"
 OUTPUT.mkdir(parents=True, exist_ok=True)
+SELECTED = set(filter(None, os.environ.get("SHOP_ART_ASSETS", "").split(",")))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene.unit_settings.system = "METRIC"
@@ -187,7 +189,8 @@ def export_asset(name, parts, collisions):
     for hull in collision_objects:
         hull.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.export_scene.fbx(filepath=str(OUTPUT / f"{name}.fbx"), use_selection=True,
+    if not SELECTED or name in SELECTED:
+        bpy.ops.export_scene.fbx(filepath=str(OUTPUT / f"{name}.fbx"), use_selection=True,
                              object_types={"MESH"}, axis_forward="-Y", axis_up="Z",
                              apply_unit_scale=True, bake_anim=False, use_mesh_modifiers=True,
                              mesh_smooth_type="FACE")
@@ -522,22 +525,33 @@ window_wall = export_asset("SM_WindowWall", parts, hulls)
 parts = [box("CounterTop", (0, 0, 96), (170, 100, 8), "HoneyWood", 1.5),
          box("CounterFront", (0, 43, 48), (162, 8, 88), "SagePaint", 1),
          box("CounterShelf", (0, 0, 20), (158, 88, 5), "DarkWood", 0.8),
-         box("TicketFrame", (0, 42, 138), (146, 5, 43), "DarkWood", 1),
-         box("TicketPaper", (0, 38.8, 138), (140, 0.6, 38), "CreamLabel", 0.4)]
+         box("LedgerCover", (-22, 3, 100.6), (49, 86, 1.2), "Leather", 0.7),
+         box("LedgerPages", (-22, 3, 101.5), (46, 82, 1.2), "CreamLabel", 0.5),
+         box("ChangeMat", (30, -8, 100.4), (58, 34, 0.8), "SagePaint", 1),
+         box("ChangeTally", (30, 13, 100.6), (58, 8, 0.6), "CreamLabel", 0.3),
+         box("PaymentSlip", (50, 39, 100.5), (40, 9, 0.6), "CreamLabel", 0.3)]
 for x in (-76, 76):
     for y in (-41, 41):
         parts.append(box("CounterLeg", (x, y, 47), (10, 10, 94), "DarkWood", 1))
 for x in (2, 21, 39, 58):
-    parts.append(box("ChangeTrayDivider", (x, -8, 102), (1.2, 30, 4), "Brass", 0.3))
-for y in (-23, 7):
-    parts.append(box("ChangeTrayRim", (30, y, 102), (57, 1.2, 4), "Brass", 0.3))
-parts.append(box("KeypadBacking", (-22, -8, 100.7), (40, 49, 1.4), "DarkWood", 0.5))
+    parts.append(box("MatStitching", (x, -8, 100.9), (0.25, 30, 0.15), "CreamLabel", 0))
+# The ledger's lower half is a written number grid rather than mechanical keys.
+for y in (-32, -20, -8, 4, 16):
+    parts.append(box("LedgerRule", (-22, y, 102.15), (39, 0.15, 0.1), "LabelInk", 0))
 for y in (-24, 0, 24):
     parts.append(lathe("CoinWell", [(10, 100), (10, 101), (8.5, 101)], "Brass", segments=32))
     parts[-1].location.x = -65
     parts[-1].location.y = y
-counter = export_asset("SM_CheckoutCounter", parts, [((0, 0, 50), (170, 100, 100)), ((0, 42, 138), (146, 5, 43))])
-key = export_asset("SM_TillKey", [box("PressedBrassKey", (0, 0, 0), (9, 9, 3), "Brass", 0.6)], [])
+# Counter interaction coordinates are authored in Unreal local space. The
+# shared FBX front conversion mirrors X, so compensate this asymmetric layout.
+for part in parts:
+    part.location.x *= -1
+counter = export_asset("SM_CheckoutCounter", parts, [((0, 0, 50), (170, 100, 100))])
+parts = [box("StampBase", (0, 0, 1), (12, 9, 2), "Brass", 0.5),
+         lathe("StampHandle", [(2.5, 2), (2, 5), (3.5, 7), (3.5, 10), (2, 11)], "DarkWood", segments=24)]
+stamp_label = text("PAID", 2.2, (0, -4.6, 1))
+parts.append(stamp_label)
+key = export_asset("SM_TillKey", parts, [])
 coin_assets = []
 for denomination, radius, material in ((1, 2.1, "Copper"), (10, 2.5, "Silver"), (100, 2.9, "Brass")):
     parts = [lathe("StampedCoin", [(radius - 0.1, 0), (radius, 0.12), (radius, 0.36), (radius - 0.1, 0.48)], material, segments=32),
@@ -548,10 +562,9 @@ for denomination, radius, material in ((1, 2.1, "Copper"), (10, 2.5, "Silver"), 
     stamp.data.materials.append(materials[material])
     parts.append(stamp)
     coin_assets.append(export_asset(f"SM_Coin{denomination}", parts, [((0, 0, 0.25), (radius * 2, radius * 2, 0.5))]))
-parts = [lathe("OpenLeatherPouch", [(7, 0), (11, 2), (13, 9), (12, 16), (9, 21), (9.5, 24), (7.8, 24), (7.5, 21), (10.5, 16), (11.5, 9), (9.5, 3), (7, 2)], "Leather", segments=32),
-         line("PouchDrawstring", [(9.6 * math.cos(i * math.tau / 32), 9.6 * math.sin(i * math.tau / 32), 21) for i in range(33)], 0.45, "Cork"),
-         line("LoosePouchCord", [(9, -1, 21), (14, -6, 13), (13, -9, 10)], 0.45, "Cork")]
-pouch = export_asset("SM_CoinPouch", parts, [((0, 0, 12), (26, 26, 24))])
+# Legacy asset name retained so existing Blueprint bindings remain compatible.
+parts = [lathe("CeramicPaymentDish", [(11, 0), (12, 1), (14, 4), (14, 5), (12.8, 5), (11, 1.5), (0, 1.5)], "SagePaint", segments=48)]
+pouch = export_asset("SM_CoinPouch", parts, [((0, 0, 1), (24, 24, 2))])
 # Simple original garden pieces make the view through the glazing legible.
 garden_ground = export_asset("SM_GardenGround", [box("GardenBed", (0, 0, -3), (900, 900, 6), "GardenGrass", 1)], [((0, 0, -3), (900, 900, 6))])
 parts = [box("GardenFenceRail", (0, 0, z), (300, 7, 9), "HoneyWood", 1) for z in (35, 75)]
@@ -631,7 +644,8 @@ scene.world.node_tree.nodes["Background"].inputs[0].default_value = (0.3, 0.36, 
 scene.world.node_tree.nodes["Background"].inputs[1].default_value = 0.4
 scene.render.filepath = str(OUTPUT / "shop-kit-preview.png")
 bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT / "shop-corner.blend"))
-bpy.ops.render.render(write_still=True)
+if not SELECTED:
+    bpy.ops.render.render(write_still=True)
 for obj in scene.objects:
     if obj.type == "MESH" and obj != bottle:
         obj.hide_render = True
@@ -641,5 +655,6 @@ camera.data.ortho_scale = 32
 scene.render.resolution_x = 900
 scene.render.resolution_y = 1100
 scene.render.filepath = str(OUTPUT / "bottle-fit-preview.png")
-bpy.ops.render.render(write_still=True)
+if not SELECTED:
+    bpy.ops.render.render(write_still=True)
 print("SHOP_MODELS_COMPLETE " + json.dumps(assets))

@@ -5,6 +5,7 @@ Save and close the interactive editor before running this installer.
 """
 
 import json
+import os
 from pathlib import Path
 import shutil
 
@@ -89,9 +90,15 @@ def create_material(name, settings):
     return material
 
 
-materials = {name: create_material(name, settings) for name, settings in MANIFEST["palette"].items()}
+# Partial reimports update selected meshes without rewriting materials or the map.
+SELECTED = set(filter(None, os.environ.get("SHOP_ART_ASSETS", "").split(",")))
+assert SELECTED <= MANIFEST["assets"].keys(), SELECTED
+materials = {name: (LIBRARY.load_asset(f"{DESTINATION}/Materials/M_{name}") if SELECTED else create_material(name, settings))
+             for name, settings in MANIFEST["palette"].items()}
 meshes = {}
 for name, expected in MANIFEST["assets"].items():
+    if SELECTED and name not in SELECTED:
+        continue
     options = unreal.FbxImportUI()
     options.set_editor_property("import_mesh", True)
     options.set_editor_property("import_as_skeletal", False)
@@ -135,120 +142,121 @@ for name, expected in MANIFEST["assets"].items():
     meshes[name] = mesh
     unreal.log(f"SHOP_ART_MESH {name} dimensions={dimensions} collision={count}")
 
-# A recipe-specific presentation child keeps the generic pickup class reusable.
-path = "/Game/Shop/Native/BP_DawnTonic"
-blueprint = LIBRARY.load_asset(path) if LIBRARY.does_asset_exist(path) else None
-if not blueprint:
-    factory = unreal.BlueprintFactory()
-    factory.set_editor_property("parent_class", unreal.ShopPickupItem)
-    blueprint = ASSETS.create_asset("BP_DawnTonic", "/Game/Shop/Native", unreal.Blueprint, factory)
-subobjects = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
-for handle in subobjects.k2_gather_subobject_data_for_blueprint(blueprint):
-    data = unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle)
-    component = unreal.SubobjectDataBlueprintFunctionLibrary.get_object_for_blueprint(data, blueprint)
-    if isinstance(component, unreal.StaticMeshComponent):
-        component.set_static_mesh(meshes["SM_DawnTonic"])
-        component.set_relative_location(unreal.Vector(0, 0, 0), False, False)
-        component.set_relative_scale3d(unreal.Vector(1, 1, 1))
-        component.set_relative_rotation(unreal.Rotator(), False, False)
-        component.set_editor_property("override_materials", [])
-unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
-LIBRARY.save_loaded_asset(blueprint)
-tonic_class = LIBRARY.load_blueprint_class(path)
-tonic_defaults = unreal.get_default_object(tonic_class)
-tonic_defaults.set_editor_property("product_id", "DawnTonic")
-tonic_defaults.set_editor_property("display_name", unreal.Text("Dawn Tonic"))
-LIBRARY.save_loaded_asset(blueprint)
-recipe = LIBRARY.load_asset("/Game/Shop/Recipes/DA_DawnTonic")
-recipe.set_editor_property("output_item_class", tonic_class)
-LIBRARY.save_loaded_asset(recipe)
+if not SELECTED:
+    # A recipe-specific presentation child keeps the generic pickup class reusable.
+    path = "/Game/Shop/Native/BP_DawnTonic"
+    blueprint = LIBRARY.load_asset(path) if LIBRARY.does_asset_exist(path) else None
+    if not blueprint:
+        factory = unreal.BlueprintFactory()
+        factory.set_editor_property("parent_class", unreal.ShopPickupItem)
+        blueprint = ASSETS.create_asset("BP_DawnTonic", "/Game/Shop/Native", unreal.Blueprint, factory)
+    subobjects = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+    for handle in subobjects.k2_gather_subobject_data_for_blueprint(blueprint):
+        data = unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle)
+        component = unreal.SubobjectDataBlueprintFunctionLibrary.get_object_for_blueprint(data, blueprint)
+        if isinstance(component, unreal.StaticMeshComponent):
+            component.set_static_mesh(meshes["SM_DawnTonic"])
+            component.set_relative_location(unreal.Vector(0, 0, 0), False, False)
+            component.set_relative_scale3d(unreal.Vector(1, 1, 1))
+            component.set_relative_rotation(unreal.Rotator(), False, False)
+            component.set_editor_property("override_materials", [])
+    unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+    LIBRARY.save_loaded_asset(blueprint)
+    tonic_class = LIBRARY.load_blueprint_class(path)
+    tonic_defaults = unreal.get_default_object(tonic_class)
+    tonic_defaults.set_editor_property("product_id", "DawnTonic")
+    tonic_defaults.set_editor_property("display_name", unreal.Text("Dawn Tonic"))
+    LIBRARY.save_loaded_asset(blueprint)
+    recipe = LIBRARY.load_asset("/Game/Shop/Recipes/DA_DawnTonic")
+    recipe.set_editor_property("output_item_class", tonic_class)
+    LIBRARY.save_loaded_asset(recipe)
 
-backup = PROJECT / "Saved/BeforeShopArt/L_Shop.umap"
-backup.parent.mkdir(parents=True, exist_ok=True)
-if not backup.exists():
-    shutil.copy2(PROJECT / "Content/Levels/L_Shop.umap", backup)
-if not LEVEL.load_level("/Game/Levels/L_Shop"):
-    raise RuntimeError("Could not load the shop map")
-
-
-def actor_with_label(label, actor_class, location):
-    actor = next((a for a in ACTORS.get_all_level_actors() if a.get_actor_label() == label), None)
-    if not actor:
-        actor = ACTORS.spawn_actor_from_class(actor_class, unreal.Vector(*location))
-        actor.set_actor_label(label)
-    return actor
+    backup = PROJECT / "Saved/BeforeShopArt/L_Shop.umap"
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    if not backup.exists():
+        shutil.copy2(PROJECT / "Content/Levels/L_Shop.umap", backup)
+    if not LEVEL.load_level("/Game/Levels/L_Shop"):
+        raise RuntimeError("Could not load the shop map")
 
 
-def furniture(label, mesh, location):
-    actor = actor_with_label(label, unreal.StaticMeshActor, location)
-    component = actor.get_component_by_class(unreal.StaticMeshComponent)
-    component.set_static_mesh(mesh)
-    component.set_collision_profile_name("BlockAll")
-    actor.set_folder_path("ShopArt")
-    return actor
+    def actor_with_label(label, actor_class, location):
+        actor = next((a for a in ACTORS.get_all_level_actors() if a.get_actor_label() == label), None)
+        if not actor:
+            actor = ACTORS.spawn_actor_from_class(actor_class, unreal.Vector(*location))
+            actor.set_actor_label(label)
+        return actor
 
 
-furniture("Art_BrewingBench", meshes["SM_ApothecaryBench"], (600, 350, 0))
-furniture("Art_ApothecaryShelving", meshes["SM_ApothecaryShelving"], (780, 440, 0))
-furniture("Art_MortarAndPestle", meshes["SM_MortarAndPestle"], (665, 375, 100))
-pendant = furniture("Art_BrassPendant", meshes["SM_BrassPendant"], (600, 350, 220))
-pendant.get_component_by_class(unreal.StaticMeshComponent).set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    def furniture(label, mesh, location):
+        actor = actor_with_label(label, unreal.StaticMeshActor, location)
+        component = actor.get_component_by_class(unreal.StaticMeshComponent)
+        component.set_static_mesh(mesh)
+        component.set_collision_profile_name("BlockAll")
+        actor.set_folder_path("ShopArt")
+        return actor
 
-for actor in ACTORS.get_all_level_actors():
-    if isinstance(actor, unreal.ShopBrewingStation):
-        for component in actor.get_components_by_class(unreal.StaticMeshComponent):
-            replacements = {"VesselMesh": "SM_BrewingVessel", "MoonleafContainer": "SM_MoonleafJar", "WaterContainer": "SM_SpringWaterJug"}
-            if component.get_name() in replacements:
-                component.set_editor_property("static_mesh", meshes[replacements[component.get_name()]])
-                component.set_relative_scale3d(unreal.Vector(1, 1, 1))
-                old = component.get_relative_transform().translation
-                if component.get_name() == "MoonleafContainer" and old.x == -36 and old.y == 0:
-                    old = unreal.Vector(-45, 25, 0)
-                if component.get_name() == "WaterContainer" and old.x == 36 and old.y == 0:
-                    old = unreal.Vector(45, 35, 0)
-                component.set_relative_location(unreal.Vector(old.x, old.y, 0), False, False)
-                component.set_editor_property("override_materials", [])
 
-# Soft local lighting makes the first material set readable in the greybox room.
-for label, position, target, intensity, color in (
-    ("Art_WarmKey", (590, 220, 260), (650, 350, 80), 1200, (255, 219, 171)),
-    ("Art_CoolFill", (840, 260, 230), (750, 440, 100), 600, (194, 221, 255)),
-):
-    light = actor_with_label(label, unreal.RectLight, position)
-    light.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(unreal.Vector(*position), unreal.Vector(*target)), False)
-    component = light.get_component_by_class(unreal.RectLightComponent)
-    component.set_mobility(unreal.ComponentMobility.MOVABLE)
-    component.set_intensity(intensity)
-    component.set_editor_property("cast_raytraced_shadow", unreal.CastRayTracedShadow.DISABLED)
-    component.set_editor_property("allow_mega_lights", False)
-    component.set_light_color(unreal.LinearColor(color[0] / 255, color[1] / 255, color[2] / 255, 1))
-    component.set_editor_property("source_width", 160)
-    component.set_editor_property("source_height", 100)
-    component.set_editor_property("attenuation_radius", 650)
-    light.set_folder_path("ShopArt")
+    furniture("Art_BrewingBench", meshes["SM_ApothecaryBench"], (600, 350, 0))
+    furniture("Art_ApothecaryShelving", meshes["SM_ApothecaryShelving"], (780, 440, 0))
+    furniture("Art_MortarAndPestle", meshes["SM_MortarAndPestle"], (665, 375, 100))
+    pendant = furniture("Art_BrassPendant", meshes["SM_BrassPendant"], (600, 350, 220))
+    pendant.get_component_by_class(unreal.StaticMeshComponent).set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 
-# Replace only the six measured one-metre blocks supporting the brewing table.
-removed = []
-for actor in list(ACTORS.get_all_level_actors()):
-    p = actor.get_actor_location()
-    if isinstance(actor, unreal.StaticMeshActor) and actor.get_actor_label() in {
-        "SM_Cube60", "SM_Cube61", "SM_Cube62", "SM_Cube63", "SM_Cube64", "SM_Cube65"
-    } and p.x in (500, 600, 700) and p.y in (300, 400) and p.z == 0:
-        removed.append(actor.get_actor_label())
-        ACTORS.destroy_actor(actor)
+    for actor in ACTORS.get_all_level_actors():
+        if isinstance(actor, unreal.ShopBrewingStation):
+            for component in actor.get_components_by_class(unreal.StaticMeshComponent):
+                replacements = {"VesselMesh": "SM_BrewingVessel", "MoonleafContainer": "SM_MoonleafJar", "WaterContainer": "SM_SpringWaterJug"}
+                if component.get_name() in replacements:
+                    component.set_editor_property("static_mesh", meshes[replacements[component.get_name()]])
+                    component.set_relative_scale3d(unreal.Vector(1, 1, 1))
+                    old = component.get_relative_transform().translation
+                    if component.get_name() == "MoonleafContainer" and old.x == -36 and old.y == 0:
+                        old = unreal.Vector(-45, 25, 0)
+                    if component.get_name() == "WaterContainer" and old.x == 36 and old.y == 0:
+                        old = unreal.Vector(45, 35, 0)
+                    component.set_relative_location(unreal.Vector(old.x, old.y, 0), False, False)
+                    component.set_editor_property("override_materials", [])
 
-# Give the loose sample the same product identity as its authored bottle.
-for actor in ACTORS.get_all_level_actors():
-    if isinstance(actor, unreal.ShopPickupItem) and actor.get_actor_label() == "BP_Bottle":
-        actor.set_editor_property("product_id", "DawnTonic")
-        actor.set_editor_property("display_name", unreal.Text("Dawn Tonic"))
-        component = actor.get_editor_property("item_mesh")
-        component.set_static_mesh(meshes["SM_DawnTonic"])
-        component.set_relative_location(unreal.Vector(0, 0, 0), False, False)
-        component.set_relative_scale3d(unreal.Vector(1, 1, 1))
-        component.set_relative_rotation(unreal.Rotator(), False, False)
-        component.set_editor_property("override_materials", [])
+    # Soft local lighting makes the first material set readable in the greybox room.
+    for label, position, target, intensity, color in (
+        ("Art_WarmKey", (590, 220, 260), (650, 350, 80), 1200, (255, 219, 171)),
+        ("Art_CoolFill", (840, 260, 230), (750, 440, 100), 600, (194, 221, 255)),
+    ):
+        light = actor_with_label(label, unreal.RectLight, position)
+        light.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(unreal.Vector(*position), unreal.Vector(*target)), False)
+        component = light.get_component_by_class(unreal.RectLightComponent)
+        component.set_mobility(unreal.ComponentMobility.MOVABLE)
+        component.set_intensity(intensity)
+        component.set_editor_property("cast_raytraced_shadow", unreal.CastRayTracedShadow.DISABLED)
+        component.set_editor_property("allow_mega_lights", False)
+        component.set_light_color(unreal.LinearColor(color[0] / 255, color[1] / 255, color[2] / 255, 1))
+        component.set_editor_property("source_width", 160)
+        component.set_editor_property("source_height", 100)
+        component.set_editor_property("attenuation_radius", 650)
+        light.set_folder_path("ShopArt")
 
-if not LEVEL.save_current_level():
-    raise RuntimeError("Could not save the art checkpoint")
-unreal.log(f"SHOP_ART_INSTALL_COMPLETE replaced={removed}")
+    # Replace only the six measured one-metre blocks supporting the brewing table.
+    removed = []
+    for actor in list(ACTORS.get_all_level_actors()):
+        p = actor.get_actor_location()
+        if isinstance(actor, unreal.StaticMeshActor) and actor.get_actor_label() in {
+            "SM_Cube60", "SM_Cube61", "SM_Cube62", "SM_Cube63", "SM_Cube64", "SM_Cube65"
+        } and p.x in (500, 600, 700) and p.y in (300, 400) and p.z == 0:
+            removed.append(actor.get_actor_label())
+            ACTORS.destroy_actor(actor)
+
+    # Give the loose sample the same product identity as its authored bottle.
+    for actor in ACTORS.get_all_level_actors():
+        if isinstance(actor, unreal.ShopPickupItem) and actor.get_actor_label() == "BP_Bottle":
+            actor.set_editor_property("product_id", "DawnTonic")
+            actor.set_editor_property("display_name", unreal.Text("Dawn Tonic"))
+            component = actor.get_editor_property("item_mesh")
+            component.set_static_mesh(meshes["SM_DawnTonic"])
+            component.set_relative_location(unreal.Vector(0, 0, 0), False, False)
+            component.set_relative_scale3d(unreal.Vector(1, 1, 1))
+            component.set_relative_rotation(unreal.Rotator(), False, False)
+            component.set_editor_property("override_materials", [])
+
+    if not LEVEL.save_current_level():
+        raise RuntimeError("Could not save the art checkpoint")
+    unreal.log(f"SHOP_ART_INSTALL_COMPLETE replaced={removed}")
