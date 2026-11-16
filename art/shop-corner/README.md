@@ -65,7 +65,7 @@ $env:PYTHONPATH = "$PWD/.tools/blender-python"
 python unreal/FantasyShopkeeper/Tools/model_shop_corner.py
 ```
 
-Run import tools when Unreal Editor is closed. Use `UnrealEditor-Cmd` with the project path, `-run=pythonscript`, `-script=<absolute script path>`, `-EnablePlugins=PythonScriptPlugin,EditorScriptingUtilities`, `-unattended` and `-nullrhi`.
+Run import tools when Unreal Editor is closed. Use the [shared tooling runner](../../docs/local-tooling.md) with `-Action Editor -EditorArguments`, passing `-run=pythonscript`, `-script=<absolute script path>`, `-EnablePlugins=PythonScriptPlugin,EditorScriptingUtilities`, `-unattended` and `-nullrhi`.
 
 The seven retained Python tools each support a repeatable production task.
 

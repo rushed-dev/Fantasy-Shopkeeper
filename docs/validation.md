@@ -1,3 +1,14 @@
+# Local execution tooling — 2026-11-16
+
+The maintained PowerShell runner now shares local build, shader, cache and discovery settings across gameplay, rendered checks, asset checks, editor tools and packaging. See [local tooling](local-tooling.md) for commands and the retained stock-engine trace-control limitation. No firewall rules or installed engine binaries were changed; no scripts were added.
+
+- Forced editor compile/link passed with `[NoUba]` actions and no UBA listening service (`Saved/Logs/LocalToolingRebuild.log`).
+- Gameplay: **31 passed, 0 automation warnings**, report `Saved/Automation/Gameplay-20261116-130438-984`. Rendered keyboard workflow: **1 passed, 0 automation warnings**, report `Saved/Automation/Rendered-20261116-125924-572`; inspected the counter capture under `Saved/ArtReview/20261116-125924-572`.
+- Final asset checks: **34 meshes, 87 hulls, four sections / 32 positions, two windows, four pendants; 0 errors and 0 warnings** (`Saved/Logs/Assets-20261116-130523-264.log`). The log explicitly confirms distributed shader compilation is disabled.
+- Windows packaging passed with the final settings forwarded to UBT and the cooker (`Saved/Logs/LocalToolingPackageFinal.log`). Output: `builds/unreal-local-tooling/Windows/FantasyShopkeeper.exe`. Zen emitted one sponsor-attachment warning during packaging, restarted on loopback and completed successfully. The forced build also reported the installed compiler's existing preferred-version warning.
+- Automated packaged startup and reopening used isolated `Saved/LocalToolingPackageSmoke` data; the morning checkpoint retained its hash and modification time. Launch/restore logs have no warnings or errors.
+- Process/socket snapshots (`Saved/Logs/LocalToolingSockets.json`) showed Zen bound only to loopback, no UDP endpoints for the inspected processes and no separate trace server or UBA service. The editor's built-in wildcard trace-control socket remained, including its fallback port when two editor processes ran concurrently. This is an observed snapshot, not a continuous network audit or a guarantee of no firewall prompts.
+
 # Door sign, counter goods and additional orders — 2026-11-16
 
 Implemented the latest playtest revision. E on the entrance sign replaces O for opening/closing. Customers put the actual pickup item into a reserved counter slot and present tender immediately. Total-entry controls are removed; the player works out change and confirms with the PAID stamp. Closing still waits for an active visit. Unsold counter goods are protected from player/customer pickup, retained after rejected sales, and released as loose stock if their checkout is cancelled. Temporary checkout slots are excluded from morning destinations.
