@@ -1,5 +1,5 @@
 #include "ShopTill.h"
-#include "Algo/AllOf.h"
+#include "ShopShelfSlot.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
@@ -65,8 +65,9 @@ bool AShopTill::IsQuoteValid() const
         && Customer->RequestedProductId == QuotedProductId && Customer->PriceBits == QuotedPrice
         && Customer->TenderBits == QuotedTender && QuotedPrice > 0 && QuotedTender >= QuotedPrice
         && QuotedItem->ProductId == QuotedProductId && !QuotedItem->IsActorBeingDestroyed()
-        && QuotedItem->GetCarrier() == Customer->ShopInteraction && !QuotedItem->GetCurrentSlot()
-        && Customer->ShopInteraction->GetHeldItem() == QuotedItem.Get();
+        && !QuotedItem->GetCarrier() && IsValid(CheckoutSlot)
+        && QuotedItem->GetCurrentSlot() == CheckoutSlot && CheckoutSlot->GetOccupyingItem() == QuotedItem.Get()
+        && Customer->CounterItem.Get() == QuotedItem.Get();
 }
 
 void AShopTill::ResetTransaction()
@@ -75,7 +76,9 @@ void AShopTill::ResetTransaction()
     QuotedCustomer = nullptr;
     QuotedItem = nullptr;
     TrayCoins.Empty();
-    EnteredTotalText.Empty();
+    // Cancelling releases unsold goods as ordinary loose stock, never deletes them.
+    if (IsValid(CheckoutSlot)) CheckoutSlot->Destroy();
+    CheckoutSlot = nullptr;
     QuotedPrice = 0;
     QuotedTender = 0;
     Feedback = FText::GetEmpty();
@@ -98,59 +101,47 @@ bool AShopTill::AssignCustomer(AShopCustomer* NewCustomer)
 
 bool AShopTill::BeginCheckout(UShopInteractionComponent* Interactor)
 {
-    if (!HasAuthority() || IsActorBeingDestroyed() || !IsValid(Interactor) || Interactor->GetHeldItem() || !Interactor->CanReach(this))
-    {
-        return false;
-    }
-    if (Phase == EShopTillPhase::Complete && IsValid(Customer) && Customer == QuotedCustomer.Get())
-    {
-        return true;
-    }
-    if (IsQuoteValid())
-    {
-        return true;
-    }
+    if (!HasAuthority() || IsActorBeingDestroyed() || !IsValid(Interactor) || Interactor->GetHeldItem() || !Interactor->CanReach(this)) return false;
+    return PresentCustomerGoods();
+}
+
+bool AShopTill::PresentCustomerGoods()
+{
+    if (!HasAuthority() || IsActorBeingDestroyed()) return false;
+    if (const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>(); State && State->IsChangingEconomy()) return false;
+    if (Phase == EShopTillPhase::Complete && IsValid(Customer) && Customer == QuotedCustomer.Get()) return true;
+    if (IsQuoteValid()) return true;
     ResetTransaction();
-    if (!IsValid(Customer) || Customer->Activity != EShopCustomerActivity::ReadyToPay
-        || Customer->PriceBits <= 0 || Customer->TenderBits < Customer->PriceBits)
+    if (!IsValid(Customer) || Customer->IsActorBeingDestroyed() || Customer->GetWorld() != GetWorld()
+        || Customer->Activity != EShopCustomerActivity::ReadyToPay || Customer->HasCompletedSale()
+        || FVector::Dist2D(Customer->GetActorLocation(), GetActorLocation()) > 200
+        || Customer->PriceBits <= 0 || Customer->TenderBits < Customer->PriceBits) return false;
+    AShopPickupItem* Item = Customer->ShopInteraction->GetHeldItem();
+    if (!IsValid(Item) || Item->ProductId != Customer->RequestedProductId || Item->GetCurrentSlot()
+        || Item->GetCarrier() != Customer->ShopInteraction) return false;
+    // The shared slot transfer owns attachment, collision and carrier release.
+    const FVector Position = GetActorTransform().TransformPosition(bPhysicalCounter ? FVector(-22, -12, 101.0) : FVector(0, 0, 25));
+    CheckoutSlot = GetWorld()->SpawnActor<AShopShelfSlot>(Position, GetActorRotation());
+    if (!CheckoutSlot) return false;
+    CheckoutSlot->SetOwner(this);
+    CheckoutSlot->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+    CheckoutSlot->bAvailableForSale = false;
+    CheckoutSlot->CheckoutTill = this;
+    CheckoutSlot->SlotMarker->SetVisibility(false);
+    if (!Item->PlaceAtSlot(CheckoutSlot))
     {
-        Feedback = NSLOCTEXT("Shop", "TillCustomerNotReady", "Waiting for a customer with a valid payment");
+        CheckoutSlot->Destroy(); CheckoutSlot = nullptr;
         return false;
     }
     QuotedCustomer = Customer;
-    QuotedItem = Customer->ShopInteraction->GetHeldItem();
+    QuotedItem = Item;
+    Customer->CounterItem = Item;
     QuotedPrice = Customer->PriceBits;
     QuotedTender = Customer->TenderBits;
     QuotedProductId = Customer->RequestedProductId;
     QuotedProductName = Customer->RequestedProductName;
-    if (!IsQuoteValid())
-    {
-        ResetTransaction();
-        return false;
-    }
-    Phase = EShopTillPhase::EnteringTotal;
-    return true;
-}
-
-bool AShopTill::SubmitTotal(const FString& Text)
-{
-    if (Phase != EShopTillPhase::EnteringTotal || !IsQuoteValid())
-    {
-        Feedback = NSLOCTEXT("Shop", "TillOrderChanged", "Order changed. Start checkout again.");
-        return false;
-    }
-    EnteredTotalText = Text;
-    const FString Trimmed = Text.TrimStartAndEnd();
-    int64 Total = 0;
-    const bool DigitsOnly = !Trimmed.IsEmpty()
-        && Algo::AllOf(Trimmed, [](TCHAR Character) { return Character >= TEXT('0') && Character <= TEXT('9'); });
-    if (!DigitsOnly || !LexTryParseString(Total, *Trimmed) || Total != QuotedPrice)
-    {
-        Feedback = NSLOCTEXT("Shop", "TillWrongTotal", "Check the item price and enter the correct total in bits.");
-        return false;
-    }
     Phase = EShopTillPhase::MakingChange;
-    Feedback = NSLOCTEXT("Shop", "TillPaymentReceived", "Payment received. Count the customer's change into the tray.");
+    UGameplayStatics::PlaySoundAtLocation(this, Item->PlacementSound, Position, 0.25f);
     RefreshPresentation();
     return true;
 }
@@ -233,17 +224,13 @@ FText AShopTill::GetInteractionPrompt() const
     {
         return NSLOCTEXT("Shop", "TillReviewReceipt", "Sale complete");
     }
-    if (Phase == EShopTillPhase::EnteringTotal)
-    {
-        return NSLOCTEXT("Shop", "TillEnterPhysicalTotal", "Write the total in the ledger, then E on the payment dish");
-    }
     if (Phase == EShopTillPhase::MakingChange)
     {
         return NSLOCTEXT("Shop", "TillCountPhysicalChange", "Count change on the mat, then E on the PAID stamp");
     }
     if (IsValid(Customer) && Customer->Activity == EShopCustomerActivity::ReadyToPay)
     {
-        return NSLOCTEXT("Shop", "TillOpenCheckout", "E  Open ledger | Write the total in the number grid");
+        return NSLOCTEXT("Shop", "TillOpenCheckout", "Goods and payment are ready | Count change on the mat");
     }
     return NSLOCTEXT("Shop", "TillWaiting", "Till | Waiting for the customer to return");
 }
@@ -283,12 +270,14 @@ void AShopTill::EndPlay(const EEndPlayReason::Type Reason)
         }
     }
     Controls.Empty();
+    ResetTransaction();
     Super::EndPlay(Reason);
 }
 
 void AShopTill::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    PresentCustomerGoods();
     RefreshPresentation();
 }
 
@@ -310,12 +299,6 @@ void AShopTill::BuildControls()
         Control->HitBox->SetBoxExtent(Extent);
         Control->Visual->SetStaticMesh(Mesh);
         Control->Label->SetText(FText::FromString(Text));
-        if (Action == EShopTillControl::Digit || Action == EShopTillControl::Clear)
-        {
-            Control->Label->SetTextRenderColor(FColor(32, 36, 24));
-            Control->Label->SetWorldSize(4.2f);
-            Control->Label->SetRelativeLocation(FVector(0, 0, -0.6));
-        }
         if (Action == EShopTillControl::AddCoin)
         {
             UInstancedStaticMeshComponent* Stack = NewObject<UInstancedStaticMeshComponent>(Control);
@@ -333,13 +316,6 @@ void AShopTill::BuildControls()
         }
         Controls.Add(Control);
     };
-    for (int32 Digit = 1; Digit <= 9; ++Digit)
-    {
-        Add(EShopTillControl::Digit, Digit, FVector(-34 + ((Digit - 1) % 3) * 12, -26 + ((Digit - 1) / 3) * 12, 103),
-            FVector(4.5, 4.5, 1), nullptr, FString::FromInt(Digit));
-    }
-    Add(EShopTillControl::Digit, 0, FVector(-22, 10, 103), FVector(4.5, 4.5, 1), nullptr, TEXT("0"));
-    Add(EShopTillControl::Clear, 0, FVector(-34, 10, 103), FVector(4.5, 4.5, 1), nullptr, TEXT("C"));
     Add(EShopTillControl::Confirm, 0, FVector(55, -34, 103), FVector(8, 7, 7), KeyMesh, TEXT(""));
     Add(EShopTillControl::AcceptPayment, 0, FVector(50, 27, 103), FVector(14, 12, 3), PouchMesh, TEXT(""));
     if (AShopTillControl* Pouch = FindControl(EShopTillControl::AcceptPayment))
@@ -382,26 +358,7 @@ bool AShopTill::UseControl(UShopInteractionComponent* Interactor, EShopTillContr
         return false;
     }
     bool Result = false;
-    if (Action == EShopTillControl::Digit && Phase == EShopTillPhase::EnteringTotal && Value >= 0 && Value <= 9)
-    {
-        if (EnteredTotalText.Len() < 10)
-        {
-            EnteredTotalText += FString::FromInt(Value);
-            Feedback = FText::GetEmpty();
-            Result = true;
-        }
-    }
-    else if (Action == EShopTillControl::Clear && Phase == EShopTillPhase::EnteringTotal)
-    {
-        EnteredTotalText.Empty();
-        Feedback = FText::GetEmpty();
-        Result = true;
-    }
-    else if (Action == EShopTillControl::AcceptPayment)
-    {
-        Result = SubmitTotal(EnteredTotalText);
-    }
-    else if (Action == EShopTillControl::AddCoin)
+    if (Action == EShopTillControl::AddCoin)
     {
         Result = AddChangeCoin(Value);
     }
@@ -487,8 +444,8 @@ void AShopTill::RefreshPresentation()
         Status += Word;
         LineLength += Word.Len();
     }
-    Ticket->SetText(FText::FromString(FString::Printf(TEXT("SHOP LEDGER\n%s\nTotal: %s bits\n%s"),
-        *Header, EnteredTotalText.IsEmpty() ? TEXT("_") : *EnteredTotalText,
+    Ticket->SetText(FText::FromString(FString::Printf(TEXT("SHOP LEDGER\n%s\n%s"),
+        *Header,
         Phase == EShopTillPhase::Complete ? TEXT("PAID") : *Status)));
     PaymentNote->SetText(FText::FromString(FString::Printf(TEXT("Payment: %d bits"), Tender)));
     ChangeNote->SetText(FText::FromString(FString::Printf(TEXT("Change counted: %lld"), Change)));

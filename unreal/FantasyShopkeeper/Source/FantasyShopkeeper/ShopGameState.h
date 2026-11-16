@@ -28,8 +28,10 @@ public:
     void UpdateDay();
     bool CanStartVisit() const;
     bool ConfirmNoSupplies();
+    bool CanReceiveOrder(AShopBrewingStation* Station, const TMap<FName, int32>& Additional) const;
+    int32 GetPendingIngredientQuantity(FName Ingredient) const { return PendingDelivery.FindRef(Ingredient); }
     bool HasConfirmedSupplies() const { return bSuppliesConfirmed; }
-    bool CanOrderSupplies() const { return bDayInitialized && DayPhase == EShopDayPhase::Evening && !bSuppliesConfirmed && !bChangingEconomy; }
+    bool CanOrderSupplies() const { return bDayInitialized && DayPhase == EShopDayPhase::Evening && !bChangingEconomy; }
     bool IsDayInitialized() const { return bDayInitialized; }
     bool IsChangingEconomy() const { return bChangingEconomy; }
     EShopDayPhase GetDayPhase() const { return DayPhase; }

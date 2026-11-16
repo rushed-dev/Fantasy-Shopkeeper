@@ -30,6 +30,7 @@
 #include "../ShopCustomer.h"
 #include "../ShopGameState.h"
 #include "../ShopTill.h"
+#include "../ShopDoorSign.h"
 #include "../ShopTillControl.h"
 #include "../ShopShelfSection.h"
 #include "../ShopCustomerFlow.h"
@@ -200,11 +201,14 @@ namespace
                     Test->AddError(TEXT("Shop map needs a customer flow and supply crate"));
                     return true;
                 }
-                if (AShopGameState* DayState = World->GetGameState<AShopGameState>(); DayState && DayState->IsDayInitialized())
+                if (AShopGameState* DayState = World->GetGameState<AShopGameState>(); DayState && DayState->GetDayPhase() == EShopDayPhase::Preparation)
                 {
                     Test->TestEqual(TEXT("Map starts in preparation"), DayState->GetDayPhase(), EShopDayPhase::Preparation);
-                    Controller->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0), EKeys::O, IE_Pressed, FPlatformTime::Cycles64()));
-                    Test->TestTrue(TEXT("Opening permits the first visit"), Flow->StartNextVisit());
+                    TActorIterator<AShopDoorSign> Sign(World);
+                    if (!Test->TestTrue(TEXT("Shop has an open/closed sign"), bool(Sign))) return true;
+                    AimTarget = *Sign; AimHeight = 0;
+                    Pawn->SetActorLocation(Sign->GetActorLocation() + FVector(0, 110, -59), false, nullptr, ETeleportType::TeleportPhysics);
+                    Step = 51; NextStep = Now + 1; return false;
                 }
                 for (TActorIterator<AShopCustomer> It(World); It; ++It)
                 {
@@ -447,35 +451,11 @@ namespace
                 break;
             case 22:
                 Key(EKeys::E, IE_Released);
-                if (!Test->TestTrue(TEXT("E starts checkout on the counter"), Till->GetPhase() == EShopTillPhase::EnteringTotal))
-                {
-                    Test->AddInfo(FString::Printf(TEXT("Till rejection: %s; target=%s"), *Till->GetFeedback().ToString(), *GetNameSafe(Controller->ShopInteraction->GetInteractionTarget())));
-                    return true;
-                }
-                Test->TestTrue(TEXT("Physical ticket text flows down inside its paper"), Till->Ticket->VerticalAlignment == EVRTA_TextTop);
+                Test->TestEqual(TEXT("Customer automatically presents payment"), Till->GetPhase(), EShopTillPhase::MakingChange);
+                Test->TestEqual(TEXT("Real goods rest on this counter"), Item->GetCurrentSlot() ? Item->GetCurrentSlot()->GetCheckoutTill() : nullptr, Till.Get());
+                Test->TestNull(TEXT("Customer has put goods down"), Customer->ShopInteraction->GetHeldItem());
                 Test->TestFalse(TEXT("Physical checkout preserves mouse look"), Controller->IsLookInputIgnored());
                 Test->TestFalse(TEXT("Physical checkout preserves movement"), Controller->IsMoveInputIgnored());
-                Key(EKeys::One, IE_Pressed);
-                Key(EKeys::One, IE_Released);
-                Key(EKeys::One, IE_Pressed);
-                Key(EKeys::One, IE_Released);
-                Key(EKeys::Enter, IE_Pressed);
-                Key(EKeys::Enter, IE_Released);
-                Test->TestTrue(TEXT("Wrong total keeps total-entry phase"), Till->GetPhase() == EShopTillPhase::EnteringTotal);
-                Key(EKeys::Delete, IE_Pressed);
-                Key(EKeys::Delete, IE_Released);
-                {
-                    const FKey Digits[] = {EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
-                        EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight, EKeys::Nine};
-                    for (TCHAR Digit : FString::FromInt(SalePrice))
-                    {
-                        Key(Digits[Digit - TEXT('0')], IE_Pressed);
-                        Key(Digits[Digit - TEXT('0')], IE_Released);
-                    }
-                }
-                Key(EKeys::Enter, IE_Pressed);
-                Key(EKeys::Enter, IE_Released);
-                Test->TestTrue(TEXT("Correct total accepts the pouch"), Till->GetPhase() == EShopTillPhase::MakingChange);
                 AimAt(Till->FindControl(EShopTillControl::AddCoin, 1));
                 AimHeight = 0;
                 break;
@@ -526,11 +506,10 @@ namespace
                 ++Visits;
                 if (Visits >= 2)
                 {
-                    AimTarget.Reset();
-                    Key(EKeys::O, IE_Pressed);
-                    Key(EKeys::O, IE_Released);
-                    Step = 44;
-                    NextStep = Now + 0.2;
+                    TActorIterator<AShopDoorSign> Sign(World);
+                    AimTarget = *Sign; AimHeight = 0;
+                    Pawn->SetActorLocation(Sign->GetActorLocation() + FVector(0, 110, -59), false, nullptr, ETeleportType::TeleportPhysics);
+                    Step = 53; NextStep = Now + 1;
                     return false;
                 }
                 Step = 31;
@@ -707,6 +686,27 @@ namespace
                     NextStep = Now + 3;
                     return false;
                 }
+            case 51:
+                Key(EKeys::E, IE_Pressed);
+                break;
+            case 52:
+                Key(EKeys::E, IE_Released);
+                Test->TestEqual(TEXT("E turns the sign to open"), World->GetGameState<AShopGameState>()->GetDayPhase(), EShopDayPhase::Trading);
+                {
+                    FString Screenshot;
+                    if (FParse::Value(FCommandLine::Get(), TEXT("ShopSignScreenshot="), Screenshot))
+                        FScreenshotRequest::RequestScreenshot(Screenshot, false, false);
+                }
+                if (!Flow->GetActiveCustomer()) Flow->StartNextVisit();
+                Step = 0; NextStep = Now + 0.2; return false;
+            case 53:
+                Key(EKeys::E, IE_Pressed);
+                break;
+            case 54:
+                Key(EKeys::E, IE_Released);
+                AimTarget.Reset();
+                Test->TestTrue(TEXT("E turns the sign to closed"), World->GetGameState<AShopGameState>()->GetDayPhase() != EShopDayPhase::Trading);
+                Step = 44; NextStep = Now + 0.2; return false;
             case 40:
                 Key(EKeys::R, IE_Pressed);
                 break;

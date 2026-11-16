@@ -13,15 +13,13 @@ class UTextRenderComponent;
 UENUM()
 enum class EShopTillControl : uint8
 {
-    Digit,
-    Clear,
     AcceptPayment,
     AddCoin,
     RemoveCoin,
     Confirm
 };
 
-/** A reachable, world-space till key, coin stack or payment pouch. */
+/** A reachable, world-space stamp, coin stack or payment dish. */
 UCLASS()
 class FANTASYSHOPKEEPER_API AShopTillControl : public AActor, public IShopInteractable
 {
@@ -35,7 +33,7 @@ public:
 
     UPROPERTY(Transient)
     TObjectPtr<AShopTill> Till;
-    EShopTillControl Action = EShopTillControl::Digit;
+    EShopTillControl Action = EShopTillControl::AcceptPayment;
     int32 Value = 0;
 
     UPROPERTY(VisibleAnywhere)

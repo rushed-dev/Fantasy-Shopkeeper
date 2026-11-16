@@ -20,6 +20,7 @@ namespace
         {
             Slot = Item->GetCurrentSlot();
         }
+        if (Slot && Slot->GetCheckoutTill()) return Slot->GetCheckoutTill();
         if (Slot && Slot->GetSection())
         {
             return Slot->GetSection();

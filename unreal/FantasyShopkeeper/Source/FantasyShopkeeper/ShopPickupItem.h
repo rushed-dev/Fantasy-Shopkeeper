@@ -57,6 +57,7 @@ private:
     friend class UShopInteractionComponent;
     friend class AShopBrewingStation;
     friend class AShopGameState;
+    friend class AShopTill;
 
     void ReleaseFromCarrier();
     bool PlaceAtSlot(AShopShelfSlot* DestinationSlot, bool bRestoreMorning = false);

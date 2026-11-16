@@ -48,13 +48,11 @@ FText AShopTillControl::GetInteractionPrompt() const
     }
     if (Action == EShopTillControl::AcceptPayment)
     {
-        return NSLOCTEXT("Shop", "TakePouch", "E  Accept the payment dish after writing the total");
+        return NSLOCTEXT("Shop", "TakePouch", "Payment already on the counter | Count the change");
     }
     if (Action == EShopTillControl::Confirm)
     {
         return NSLOCTEXT("Shop", "SealSale", "E  Stamp PAID with the counted change");
     }
-    return Action == EShopTillControl::Clear
-        ? NSLOCTEXT("Shop", "ClearTill", "E  Erase the written total")
-        : FText::Format(NSLOCTEXT("Shop", "TillDigit", "E  Write {0}"), FText::AsNumber(Value));
+    return FText::GetEmpty();
 }

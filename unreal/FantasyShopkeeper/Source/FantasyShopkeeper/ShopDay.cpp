@@ -69,7 +69,7 @@ namespace
         TMap<FString, AShopShelfSlot*> Slots;
         for (TActorIterator<AShopShelfSlot> It(World); It; ++It)
         {
-            Slots.Add(SlotKey(*It), *It);
+            if (!It->GetCheckoutTill()) Slots.Add(SlotKey(*It), *It);
         }
         return Slots;
     }
@@ -159,7 +159,7 @@ bool AShopGameState::AdvanceMorning()
     UShopMorningSave* Save = CaptureMorning(Day + 1);
     if (!Save)
     {
-        CheckpointMessage = TEXT("Put down carried items before the next morning.");
+        CheckpointMessage = TEXT("Finish checkout and put down carried items before the next morning.");
         return false;
     }
     if (!PendingDelivery.IsEmpty())
@@ -187,6 +187,7 @@ bool AShopGameState::AdvanceMorning()
     PendingDelivery.Empty();
     DeliveryStation.Reset();
     bSuppliesConfirmed = false;
+    for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It) It->ResetOrder();
     ++Day;
     Takings = SupplySpending = 0;
     DayPhase = EShopDayPhase::Preparation;
@@ -209,7 +210,7 @@ UShopMorningSave* AShopGameState::CaptureMorning(int32 MorningDay) const
     }
     for (TActorIterator<AShopPickupItem> It(GetWorld()); It; ++It)
     {
-        if (It->GetCarrier()) return nullptr;
+        if (It->GetCarrier() || (It->GetCurrentSlot() && It->GetCurrentSlot()->GetCheckoutTill())) return nullptr;
         FShopSavedStock Entry;
         Entry.ItemClass = It->GetClass()->GetPathName();
         Entry.Product = It->ProductId;
@@ -358,6 +359,7 @@ bool AShopGameState::RestoreMorning()
     PendingDelivery.Empty();
     DeliveryStation.Reset();
     bSuppliesConfirmed = false;
+    for (TActorIterator<AShopSupplyCrate> It(GetWorld()); It; ++It) It->ResetOrder();
     Cash = Save->Cash;
     Day = Save->Day;
     Takings = SupplySpending = 0;
@@ -375,9 +377,9 @@ FString AShopGameState::GetDayText() const
     switch (DayPhase)
     {
     case EShopDayPhase::Preparation:
-        return FString::Printf(TEXT("Day %d | Preparation | O: Open shop (%d visits)"), Day, Limit);
+        return FString::Printf(TEXT("Day %d | Preparation | Use the door sign to open (%d visits)"), Day, Limit);
     case EShopDayPhase::Trading:
-        return FString::Printf(TEXT("Day %d | Trading | %d/%d visits started | O: Close, skip %d unstarted visits"), Day, Started, Limit, FMath::Max(0, Limit - Started));
+        return FString::Printf(TEXT("Day %d | Trading | %d/%d visits started | Use the door sign to close, skip %d unstarted visits"), Day, Started, Limit, FMath::Max(0, Limit - Started));
     case EShopDayPhase::Closing:
         return TEXT("Closing | Finish the active customer; no new arrivals. Brew missing stock if needed.");
     default:

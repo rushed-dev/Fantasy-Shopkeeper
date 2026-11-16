@@ -29,6 +29,8 @@ class FANTASYSHOPKEEPER_API AShopCustomer : public ACharacter, public IShopInter
 
 public:
     AShopCustomer();
+    bool HasGoodsOnCounter() const;
+    UPROPERTY(Transient) TWeakObjectPtr<AShopPickupItem> CounterItem;
     virtual void Tick(float DeltaSeconds) override;
     virtual bool Interact_Implementation(UShopInteractionComponent* Interactor) override;
 

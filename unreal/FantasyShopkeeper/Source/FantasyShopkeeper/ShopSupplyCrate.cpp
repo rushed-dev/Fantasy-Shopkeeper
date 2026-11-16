@@ -57,6 +57,7 @@ bool AShopSupplyCrate::ChangeQuantity(UShopInteractionComponent* Interactor, int
     const int32 Next = FMath::Clamp(PackCount + Delta, 0, 10);
     if (Next == PackCount) return false;
     PackCount = Next;
+    bOrderSubmitted = false;
     return true;
 }
 
@@ -65,14 +66,14 @@ FText AShopSupplyCrate::GetBlockReason() const
     const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
     if (!State || !State->IsDayInitialized() || State->GetDayPhase() != EShopDayPhase::Evening)
         return FText::FromString(TEXT("Order in the evening | Paid supplies arrive next morning"));
-    if (State->HasConfirmedSupplies()) return FText::FromString(TEXT("Order confirmed | Delivery next morning"));
+    if (bOrderSubmitted) return FText::FromString(TEXT("Order confirmed | Select another pack or quantity to order more"));
     if (PackCount == 0) return FText::GetEmpty();
     TMap<FName, int32> Quantities;
     int64 Cost = 0;
     if (!IsValid(Station) || Station->GetWorld() != GetWorld() || !GetOrder(Quantities, Cost))
         return FText::FromString(TEXT("Supply order is not configured correctly"));
-    if (!Station->CanReceiveIngredients(Quantities))
-        return FText::FromString(TEXT("Order exceeds ingredient storage | Reduce quantity"));
+    if (!State->CanReceiveOrder(Station, Quantities))
+        return FText::FromString(TEXT("Orders exceed ingredient storage | Reduce quantity"));
     if (State->GetCash() < Cost) return FText::FromString(TEXT("Not enough cash for this order | Reduce quantity"));
     return FText::GetEmpty();
 }
@@ -105,6 +106,7 @@ bool AShopSupplyCrate::CycleOffer(UShopInteractionComponent* Interactor)
         }
         if (bValid && (Offer.PriceBits != PriceBits || !Offer.Ingredients.OrderIndependentCompareEqual(Delivery)))
         {
+            bOrderSubmitted = false;
             PriceBits = Offer.PriceBits;
             Delivery = Offer.Ingredients;
             return true;
@@ -137,7 +139,7 @@ FText AShopSupplyCrate::GetInteractionPrompt(UShopInteractionComponent* Interact
     }
     const AShopGameState* State = GetWorld()->GetGameState<AShopGameState>();
     const FText BlockReason = GetBlockReason();
-    if (!State || State->GetDayPhase() != EShopDayPhase::Evening || State->HasConfirmedSupplies()) return BlockReason;
+    if (!State || State->GetDayPhase() != EShopDayPhase::Evening) return BlockReason;
     TMap<FName, int32> Quantities;
     int64 Cost = 0;
     GetOrder(Quantities, Cost);
@@ -146,11 +148,12 @@ FText AShopSupplyCrate::GetInteractionPrompt(UShopInteractionComponent* Interact
     Delivery.GetKeys(Keys);
     Keys.Sort(FNameLexicalLess());
     for (const FName Key : Keys)
-        Contents += FString::Printf(TEXT(" %s %d/%d (+%lld)"), *Key.ToString(),
+        Contents += FString::Printf(TEXT("%s %d/%d | Ordered %d | Add %lld\n"), *Key.ToString(),
             IsValid(Station) ? Station->GetIngredientQuantity(Key) : 0,
-            IsValid(Station) ? Station->IngredientCapacity : 0, int64(Delivery[Key]) * PackCount);
+            IsValid(Station) ? Station->IngredientCapacity : 0, State->GetPendingIngredientQuantity(Key),
+            bOrderSubmitted ? int64(0) : int64(Delivery[Key]) * PackCount);
     const FString Action = BlockReason.IsEmpty()
         ? (PackCount == 0 ? TEXT("E Confirm no order") : TEXT("E Pay for tomorrow")) : BlockReason.ToString();
-    return FText::FromString(FString::Printf(TEXT("%s | %d packs / %lld bits\n%s\nR Pack | F Less | T More"),
+    return FText::FromString(FString::Printf(TEXT("%s | %d packs / %lld bits\n%sR Pack | F Less | T More"),
         *Action, PackCount, Cost, *Contents));
 }

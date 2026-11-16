@@ -201,7 +201,8 @@ void AShopCustomer::PreparePurchasePresentation(const AShopPickupItem* Item)
     PurchasedItemVisual->SetVisibility(false);
     PurchasedItemVisual->EmptyOverrideMaterials();
     PurchasedItemVisual->SetStaticMesh(Item->ItemMesh->GetStaticMesh());
-    PurchasedItemVisual->SetRelativeTransform(Item->ItemMesh->GetComponentTransform().GetRelativeTransform(CarryAnchor->GetComponentTransform()));
+    PurchasedItemVisual->SetRelativeTransform(Item->ItemMesh->GetRelativeTransform());
+    PurchasedItemVisual->SetRelativeScale3D(Item->ItemMesh->GetComponentScale());
     for (int32 Index = 0; Index < Item->ItemMesh->GetNumMaterials(); ++Index)
     {
         PurchasedItemVisual->SetMaterial(Index, Item->ItemMesh->GetMaterial(Index));
@@ -266,6 +267,11 @@ bool AShopCustomer::BeginDeparture(const FVector& Exit)
     return true;
 }
 
+bool AShopCustomer::HasGoodsOnCounter() const
+{
+    return CounterItem.IsValid() && CounterItem->GetCurrentSlot() && CounterItem->GetCurrentSlot()->GetCheckoutTill();
+}
+
 void AShopCustomer::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -322,7 +328,7 @@ void AShopCustomer::Tick(float DeltaSeconds)
             ReturnToCheckout();
         }
     }
-    if (Activity == EShopCustomerActivity::ReadyToPay && !ShopInteraction->GetHeldItem())
+    if (Activity == EShopCustomerActivity::ReadyToPay && !ShopInteraction->GetHeldItem() && !HasGoodsOnCounter())
     {
         Activity = EShopCustomerActivity::Browsing;
     }

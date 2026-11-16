@@ -18,23 +18,42 @@ bool AShopGameState::ConfirmNoSupplies()
 {
     if (!HasAuthority() || !CanOrderSupplies()) return false;
     bSuppliesConfirmed = true;
-    CheckpointMessage = TEXT("No supplies ordered. N: Next morning.");
+    CheckpointMessage = TEXT("No additional supplies ordered. N: Next morning.");
     return true;
+}
+
+bool AShopGameState::CanReceiveOrder(AShopBrewingStation* Station, const TMap<FName, int32>& Additional) const
+{
+    if (!IsValid(Station) || Station->GetWorld() != GetWorld()
+        || (!PendingDelivery.IsEmpty() && DeliveryStation.Get() != Station)) return false;
+    TMap<FName, int32> Combined = PendingDelivery;
+    for (const auto& Entry : Additional)
+    {
+        if (Entry.Value <= 0 || int64(Combined.FindRef(Entry.Key)) + Entry.Value > MAX_int32) return false;
+        Combined.FindOrAdd(Entry.Key) += Entry.Value;
+    }
+    return Station->CanReceiveIngredients(Combined);
 }
 
 bool AShopGameState::TryBuySupplies(AShopSupplyCrate* Crate)
 {
     if (!HasAuthority() || !CanOrderSupplies() || !IsValid(Crate) || Crate->IsActorBeingDestroyed()
-        || Crate->GetWorld() != GetWorld()) return false;
-    if (Crate->GetPackCount() == 0) return ConfirmNoSupplies();
+        || Crate->GetWorld() != GetWorld() || Crate->bOrderSubmitted) return false;
+    if (Crate->GetPackCount() == 0)
+    {
+        if (!ConfirmNoSupplies()) return false;
+        Crate->bOrderSubmitted = true;
+        return true;
+    }
     TMap<FName, int32> Delivery;
     int64 Cost = 0;
     if (!Crate->GetOrder(Delivery, Cost) || Cash < Cost || SupplySpending > MAX_int64 - Cost
         || !IsValid(Crate->Station) || Crate->Station->GetWorld() != GetWorld()
-        || !Crate->Station->CanReceiveIngredients(Delivery)) return false;
+        || !CanReceiveOrder(Crate->Station, Delivery)) return false;
     TGuardValue<bool> TransactionGuard(bChangingEconomy, true);
     // Snapshot the paid order; later changes to the crate cannot change a delivery.
-    PendingDelivery = Delivery;
+    for (const auto& Entry : Delivery) PendingDelivery.FindOrAdd(Entry.Key) += Entry.Value;
+    Crate->bOrderSubmitted = true;
     DeliveryStation = Crate->Station;
     Cash -= Cost;
     SupplySpending += Cost;
@@ -56,8 +75,9 @@ bool AShopGameState::TryCompleteSale(AShopTill* Till)
         || Customer->PriceBits <= 0 || Cash > MAX_int64 - Customer->PriceBits || Takings > MAX_int64 - Customer->PriceBits
         || !IsValid(Item) || Item->IsActorBeingDestroyed() || Item->GetWorld() != GetWorld()
         || Item->ProductId != Customer->RequestedProductId
-        || Item->GetCarrier() != Customer->ShopInteraction || Customer->ShopInteraction->GetHeldItem() != Item
-        || Customer->Activity != EShopCustomerActivity::ReadyToPay || Item->GetCurrentSlot())
+        || Item->GetCarrier() || Customer->CounterItem.Get() != Item
+        || Customer->Activity != EShopCustomerActivity::ReadyToPay || !Item->GetCurrentSlot()
+        || Item->GetCurrentSlot()->GetCheckoutTill() != Till)
     {
         return false;
     }

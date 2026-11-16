@@ -7,6 +7,8 @@
 #include "ShopHUD.h"
 #include "ShopGameState.h"
 #include "ShopDayLighting.h"
+#include "ShopDoorSign.h"
+#include "EngineUtils.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Misc/Paths.h"
 
@@ -36,5 +38,7 @@ void AShopGameMode::StartPlay()
     {
         State->InitializeDay(GIsAutomationTesting ? FString() : FPaths::ProjectSavedDir() / TEXT("SaveGames/Morning.sav"));
         GetWorld()->SpawnActor<AShopDayLighting>();
+        if (!TActorIterator<AShopDoorSign>(GetWorld()))
+            GetWorld()->SpawnActor<AShopDoorSign>(FVector(445, -374, 155), FRotator(0, 90, 0));
     }
 }

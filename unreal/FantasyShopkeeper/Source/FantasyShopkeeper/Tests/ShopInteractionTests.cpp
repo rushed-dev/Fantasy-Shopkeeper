@@ -24,6 +24,7 @@
 #include "../ShopShelfSection.h"
 #include "../ShopMorningSave.h"
 #include "../ShopDayLighting.h"
+#include "../ShopDoorSign.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
 #include "Misc/FileHelper.h"
@@ -158,7 +159,7 @@ namespace
             AShopTill* Till = Spawn<AShopTill>(Customer->GetActorLocation() * 0.6);
             Till->Customer = Customer;
             AimAt(Till);
-            if (!Till->BeginCheckout(Interaction) || !Till->SubmitTotal(FString::FromInt(Customer->PriceBits)))
+            if (!Till->BeginCheckout(Interaction))
             {
                 return nullptr;
             }
@@ -512,7 +513,8 @@ bool FShopSaleEligibilityTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Missing shop account rejects sale"), Till->ConfirmSale(Test.Interaction));
     Test.World->SetGameState(State);
     TestEqual(TEXT("Rejected sales preserve cash"), State->GetCash(), int64(0));
-    TestEqual(TEXT("Rejected sales preserve carried stock"), Customer->ShopInteraction->GetHeldItem(), Item);
+    TestEqual(TEXT("Rejected sales preserve unpaid counter stock"), Customer->CounterItem.Get(), Item);
+    TestEqual(TEXT("Rejected stock remains reserved at this till"), Item->GetCurrentSlot()->GetCheckoutTill(), Till);
     TestFalse(TEXT("Rejected sales leave the order pending"), Customer->HasCompletedSale());
     Item->Destroy();
     TestFalse(TEXT("Removed stock cannot be sold"), Till->ConfirmSale(Test.Interaction));
@@ -592,7 +594,8 @@ bool FShopSaleAtomicityTest::RunTest(const FString& Parameters)
     }
     TestFalse(TEXT("Overflowing payment is rejected"), OverflowTill->ConfirmSale(OverflowTest.Interaction));
     TestEqual(TEXT("Overflow rejection preserves money"), FullState->GetCash(), MAX_int64 - 5);
-    TestEqual(TEXT("Overflow rejection preserves stock"), Buyer->ShopInteraction->GetHeldItem(), Item);
+    TestEqual(TEXT("Overflow rejection preserves unpaid counter stock"), Buyer->CounterItem.Get(), Item);
+    TestEqual(TEXT("Overflow leaves goods on their counter"), Item->GetCurrentSlot()->GetCheckoutTill(), OverflowTill);
     return true;
 }
 
@@ -641,7 +644,7 @@ bool FShopCustomerCollectionTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopTillChangeTest, "FantasyShopkeeper.Till.ManualTotalsAndChange",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopTillChangeTest, "FantasyShopkeeper.Till.CounterGoodsAndManualChange",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FShopTillChangeTest::RunTest(const FString& Parameters)
@@ -660,13 +663,12 @@ bool FShopTillChangeTest::RunTest(const FString& Parameters)
     Till->Customer = Buyer;
     Test.AimAt(Till);
     TestTrue(TEXT("Till opens for the waiting buyer"), Till->BeginCheckout(Test.Interaction));
-    TestFalse(TEXT("Change cannot be dispensed before receiving payment"), Till->AddChangeCoin(1));
-    TestFalse(TEXT("Wrong total is rejected"), Till->SubmitTotal(TEXT("11")));
-    TestFalse(TEXT("Fractional text is rejected"), Till->SubmitTotal(TEXT("12.0")));
-    TestFalse(TEXT("Negative total is rejected"), Till->SubmitTotal(TEXT("-12")));
-    TestFalse(TEXT("Overflowing total is rejected"), Till->SubmitTotal(TEXT("999999999999999999999999")));
-    TestEqual(TEXT("Wrong totals leave cash untouched"), State->GetCash(), int64(0));
-    TestTrue(TEXT("Correct total accepts the tender"), Till->SubmitTotal(TEXT("12")));
+    TestEqual(TEXT("Goods and tender start change counting immediately"), Till->GetPhase(), EShopTillPhase::MakingChange);
+    TestEqual(TEXT("The actual bottle is on this counter"), Item->GetCurrentSlot()->GetCheckoutTill(), Till);
+    TestNull(TEXT("The customer releases their hand"), Buyer->ShopInteraction->GetHeldItem());
+    TestFalse(TEXT("Player cannot steal unpaid counter goods"), Item->PickUp(Test.Interaction));
+    TestFalse(TEXT("Other customers cannot collect counter goods"), Buyer->TryCollectItem(Item));
+    TestEqual(TEXT("Presenting payment credits no money"), State->GetCash(), int64(0));
     TestFalse(TEXT("Unsupported coin denominations are rejected"), Till->AddChangeCoin(2));
     TestTrue(TEXT("Add one crown"), Till->AddChangeCoin(100));
     TestTrue(TEXT("Add one mark"), Till->AddChangeCoin(10));
@@ -677,7 +679,7 @@ bool FShopTillChangeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Change tray can be corrected"), Till->RemoveChangeCoin(1));
     TestTrue(TEXT("Reopening preserves the pending transaction"), Till->BeginCheckout(Test.Interaction));
     TestEqual(TEXT("Reopening preserves the counted coins"), Till->GetChangeTotal(), int64(111));
-    TestEqual(TEXT("Reopening preserves the entered total"), Till->EnteredTotalText, FString(TEXT("12")));
+    TestEqual(TEXT("Reopening preserves offered tender"), Till->GetTender(), 123);
     Till->SetActorLocation(FVector(0, 400, 0));
     TestFalse(TEXT("Remote confirmation is rejected"), Till->ConfirmSale(Test.Interaction));
     Till->SetActorLocation(FVector(0, 84, 0));
@@ -710,7 +712,6 @@ bool FShopTillInvalidationTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Insufficient customer tender cannot start checkout"), Till->BeginCheckout(Test.Interaction));
     Buyer->TenderBits = 20;
     TestTrue(TEXT("Valid customer tender starts checkout"), Till->BeginCheckout(Test.Interaction));
-    TestTrue(TEXT("Valid total accepted"), Till->SubmitTotal(TEXT("12")));
     for (int32 Bit = 0; Bit < 8; ++Bit)
     {
         Till->AddChangeCoin(1);
@@ -729,7 +730,6 @@ bool FShopTillInvalidationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Buyer can collect a replacement order"), Test.CollectAndReturn(Buyer, Item));
     Test.AimAt(Till);
     TestTrue(TEXT("Till recovers with the replacement order"), Till->BeginCheckout(Test.Interaction));
-    Till->SubmitTotal(TEXT("12"));
     for (int32 Bit = 0; Bit < 8; ++Bit)
     {
         Till->AddChangeCoin(1);
@@ -737,8 +737,7 @@ bool FShopTillInvalidationTest::RunTest(const FString& Parameters)
     AShopTill* OtherTill = Test.Spawn<AShopTill>(FVector(60, 84, 0));
     OtherTill->Customer = Buyer;
     Test.AimAt(OtherTill);
-    TestTrue(TEXT("Another till can view the same pending order"), OtherTill->BeginCheckout(Test.Interaction));
-    OtherTill->SubmitTotal(TEXT("12"));
+    TestFalse(TEXT("Another till cannot claim goods already on a counter"), OtherTill->BeginCheckout(Test.Interaction));
     for (int32 Bit = 0; Bit < 8; ++Bit)
     {
         OtherTill->AddChangeCoin(1);
@@ -884,7 +883,6 @@ bool FShopCustomerFlowTest::RunTest(const FString& Parameters)
         Test.AimAt(Till);
         TestTrue(TEXT("Each new visitor starts checkout"), Till->BeginCheckout(Test.Interaction));
         TestEqual(TEXT("New checkout starts with an empty tray"), Till->GetChangeTotal(), int64(0));
-        Till->SubmitTotal(FString::FromInt(Buyer->PriceBits));
         for (int32 Bit = 0; Bit < Buyer->TenderBits - Buyer->PriceBits; ++Bit)
         {
             Till->AddChangeCoin(1);
@@ -1243,13 +1241,8 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The aimed physical control is the actual trace target"), Test.Interaction->GetInteractionTarget(), static_cast<AActor*>(Control));
         return Test.Interaction->Interact();
     };
-    TestFalse(TEXT("Coins cannot be counted before the pouch is accepted"), Press(EShopTillControl::AddCoin, 1));
-    TestTrue(TEXT("First key starts checkout and enters its digit"), Press(EShopTillControl::Digit, 1));
-    TestFalse(TEXT("Wrong total rejects the physical pouch"), Press(EShopTillControl::AcceptPayment));
-    TestTrue(TEXT("Clear key clears a mistaken total"), Press(EShopTillControl::Clear));
-    TestTrue(TEXT("Enter tens digit"), Press(EShopTillControl::Digit, 1));
-    TestTrue(TEXT("Enter units digit"), Press(EShopTillControl::Digit, 2));
-    TestTrue(TEXT("Correct total accepts the physical pouch"), Press(EShopTillControl::AcceptPayment));
+    TestTrue(TEXT("Customer puts their goods and payment on the desk"), Till->PresentCustomerGoods());
+    TestEqual(TEXT("No price-entry phase"), Till->GetPhase(), EShopTillPhase::MakingChange);
     TestTrue(TEXT("A physical bit stack supplies a coin"), Press(EShopTillControl::AddCoin, 1));
     TestEqual(TEXT("One tray coin is rendered"), Till->GetVisibleChangeCoins(1), 1);
     TestTrue(TEXT("A tray lane returns its coin"), Press(EShopTillControl::RemoveCoin, 1));
@@ -1264,7 +1257,7 @@ bool FShopPhysicalTillTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Sale credits the price once"), State->GetCash(), int64(12));
     TestFalse(TEXT("Physical confirmation cannot repeat payment"), Press(EShopTillControl::Confirm));
     Test.Camera->SetWorldLocation(FVector(0, -600, 155));
-    AShopTillControl* RemoteKey = Till->FindControl(EShopTillControl::Digit, 1);
+    AShopTillControl* RemoteKey = Till->FindControl(EShopTillControl::AddCoin, 1);
     Test.Camera->SetWorldRotation((RemoteKey->GetActorLocation() - Test.Camera->GetComponentLocation()).Rotation());
     TestNull(TEXT("Distant physical controls are outside the trace"), Test.Interaction->GetInteractionTarget());
     TestFalse(TEXT("Physical controls reject remote input"), IShopInteractable::Execute_Interact(RemoteKey, Test.Interaction));
@@ -1338,7 +1331,6 @@ bool FShopDayTransitionsTest::RunTest(const FString& Parameters)
     AShopTill* Till = Flow->Till;
     Test.AimAt(Till);
     TestTrue(TEXT("Closing checkout starts"), Till->BeginCheckout(Test.Interaction));
-    Till->SubmitTotal(TEXT("12"));
     for (int32 Coin = 0; Coin < 8; ++Coin) Till->AddChangeCoin(1);
     TestTrue(TEXT("Closing sale commits"), Till->ConfirmSale(Test.Interaction));
     TestEqual(TEXT("Takings count net price only"), State->GetTakings(), int64(12));
@@ -1399,7 +1391,6 @@ bool FShopMorningRestoreTest::RunTest(const FString& Parameters)
     AShopTill* Till = Flow->Till;
     Test.AimAt(Till);
     Till->BeginCheckout(Test.Interaction);
-    Till->SubmitTotal(TEXT("12"));
     for (int32 Coin = 0; Coin < 8; ++Coin) Till->AddChangeCoin(1);
     TestTrue(TEXT("Sale before restore"), Till->ConfirmSale(Test.Interaction));
     TestEqual(TEXT("Cash reflects sale before restore"), State->GetCash(), int64(62));
@@ -1449,7 +1440,7 @@ bool FShopInvalidMorningTest::RunTest(const FString& Parameters)
     FInteractionWorld Test;
     AShopGameState* State = Test.ShopState(25);
     AShopBrewingStation* Station = Test.BrewingStation();
-    DayFlow(Test);
+    AShopCustomerFlow* Flow = DayFlow(Test);
     AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
     Test.BrewAndStock(Station, Shelf);
     State->InitializeDay(File.Path);
@@ -1487,6 +1478,16 @@ bool FShopInvalidMorningTest::RunTest(const FString& Parameters)
     Bad->Stock[0].ItemClass = TEXT("/Script/Engine.Actor"); Reject(Bad);
     Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
     Bad->Stock[0].Product = TEXT("UnknownProduct"); Reject(Bad);
+    AShopShelfSlot* ExtraShelf = Test.Spawn<AShopShelfSlot>(FVector(120, -130, 0));
+    AShopPickupItem* CounterGoods = Test.BrewAndStock(Station, ExtraShelf);
+    AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+    TestTrue(TEXT("Prepare live counter goods for invalid destination check"), Test.CollectAndReturn(Buyer, CounterGoods));
+    AShopTill* Counter = Flow->Till;
+    Counter->AssignCustomer(Buyer);
+    if (!TestTrue(TEXT("Pending counter"), Counter->PresentCustomerGoods())) return false;
+    Bad = DuplicateObject<UShopMorningSave>(Valid, GetTransientPackage());
+    Bad->Stock[0].Slot = CounterGoods->GetCurrentSlot()->GetName();
+    Reject(Bad); // Transient checkout positions are never valid morning destinations.
     TArray<uint8> Bytes;
     UShopMorningSave::Encode(Valid, Bytes);
     Bytes.Last() ^= 1;
@@ -1657,6 +1658,95 @@ bool FShopUnservedVisitTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Visitor collects physical stock"), Test.CollectAndReturn(Buyer, Item));
     TestFalse(TEXT("Cannot dismiss a customer carrying unpaid stock"), Flow->EndUnservedVisit());
     TestEqual(TEXT("Checkout obligation retains ownership"), Buyer->ShopInteraction->GetHeldItem(), Item);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopDoorSignTest, "FantasyShopkeeper.Day.DoorSignInteraction",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopDoorSignTest::RunTest(const FString& Parameters)
+{
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState();
+    DayFlow(Test);
+    State->InitializeDay(FString());
+    AShopDoorSign* Sign = Test.Spawn<AShopDoorSign>(FVector(-100, 0, 0));
+    Test.AimAt(Sign);
+    TestTrue(TEXT("E on sign opens shop"), Test.Interaction->Interact());
+    TestEqual(TEXT("Sign starts trading"), State->GetDayPhase(), EShopDayPhase::Trading);
+    Sign->SetActorLocation(FVector(-500, 0, 0));
+    TestFalse(TEXT("Cannot close remotely"), Sign->Interact_Implementation(Test.Interaction));
+    Sign->SetActorLocation(FVector(-100, 0, 0));
+    TestTrue(TEXT("E on sign closes shop"), Test.Interaction->Interact());
+    TestEqual(TEXT("Empty shop reaches evening"), State->GetDayPhase(), EShopDayPhase::Evening);
+    TestFalse(TEXT("Repeated sign interaction cannot reopen evening"), Test.Interaction->Interact());
+    State->ConfirmNoSupplies(); State->AdvanceMorning();
+    AShopPickupItem* Item = Test.Spawn<AShopPickupItem>(FVector(100, -70, 0));
+    Test.AimAt(Item); Test.Interaction->Interact(); Test.AimAt(Sign);
+    TestFalse(TEXT("Full hands cannot turn the sign"), Test.Interaction->Interact());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopMultipleOrdersTest, "FantasyShopkeeper.Supplies.MultipleOrdersThroughDayFour",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FShopMultipleOrdersTest::RunTest(const FString& Parameters)
+{
+    FCheckpointFile File;
+    FInteractionWorld Test;
+    AShopGameState* State = Test.ShopState(50);
+    AShopBrewingStation* Station = Test.BrewingStation(0, 0);
+    DayFlow(Test);
+    AShopShelfSlot* Shelf = Test.Spawn<AShopShelfSlot>(FVector(120, -80, 0));
+    AShopSupplyCrate* Crate = Test.Spawn<AShopSupplyCrate>(FVector(-100, 0, 0));
+    Crate->Station = Station;
+    State->InitializeDay(File.Path);
+    State->OpenShop(); State->CloseShop();
+    for (int32 Morning = 2; Morning <= 4; ++Morning)
+    {
+        Test.AimAt(Crate);
+        // Select the mixed bundle, then a separate water order in the same evening.
+        for (int32 Choice = 0; Crate->Delivery.Num() != 2 && Choice < 3; ++Choice) Crate->CycleOffer(Test.Interaction);
+        const int64 CashBefore = State->GetCash();
+        const int32 Leaves = Station->GetIngredientQuantity(TEXT("Moonleaf"));
+        const int32 Water = Station->GetIngredientQuantity(TEXT("Spring Water"));
+        TestTrue(TEXT("Pay for bundle"), Test.Interaction->Interact());
+        TestFalse(TEXT("Repeated E cannot duplicate this order"), Test.Interaction->Interact());
+        TestTrue(TEXT("Can select another offer after paying"), Crate->CycleOffer(Test.Interaction));
+        TestTrue(TEXT("Select water"), Crate->CycleOffer(Test.Interaction));
+        TestTrue(TEXT("Pay for a second order in this evening"), Test.Interaction->Interact());
+        TestFalse(TEXT("Second order also rejects repeated E"), Test.Interaction->Interact());
+        TestEqual(TEXT("Both orders charged exactly once"), State->GetCash(), CashBefore - 18);
+        TestEqual(TEXT("Orders do not arrive tonight"), Station->GetIngredientQuantity(TEXT("Spring Water")), Water);
+        Station->IngredientCapacity = Water + 5;
+        TestFalse(TEXT("Combined pending quantities must fit"), State->AdvanceMorning());
+        Station->IngredientCapacity = 30;
+        TestTrue(TEXT("Deliver both orders"), State->AdvanceMorning());
+        TestEqual(TEXT("Advance through day four"), State->GetDay(), Morning);
+        TestTrue(TEXT("Restore delivered morning"), State->RestoreMorning());
+        TestTrue(TEXT("Repeated restore cannot redeliver"), State->RestoreMorning());
+        TestEqual(TEXT("Both water orders arrive once"), Station->GetIngredientQuantity(TEXT("Spring Water")), Water + 6);
+        TestEqual(TEXT("Bundle leaves arrive once"), Station->GetIngredientQuantity(TEXT("Moonleaf")), Leaves + 6);
+        TestEqual(TEXT("Reload does not recharge orders"), State->GetCash(), CashBefore - 18);
+        State->OpenShop();
+        for (int32 Visit = 0; Visit < 3; ++Visit)
+        {
+            const bool bInk = Visit == 1;
+            Station->Recipe->ProductId = bInk ? TEXT("MoonlitInk") : TEXT("DawnTonic");
+            Station->Recipe->IngredientCosts = {{TEXT("Moonleaf"), bInk ? 1 : 2}, {TEXT("Spring Water"), bInk ? 2 : 1}};
+            AShopPickupItem* Item = Test.BrewAndStock(Station, Shelf);
+            if (!TestNotNull(TEXT("Enough supplies for every visit"), Item)) return false;
+            AShopCustomer* Buyer = Test.Spawn<AShopCustomer>(FVector(0, 140, 0));
+            Buyer->RequestedProductId = Station->Recipe->ProductId;
+            Buyer->PriceBits = bInk ? 18 : 12;
+            Buyer->TenderBits = bInk ? 50 : 20;
+            TestTrue(TEXT("Customer collects brewed goods"), Test.CollectAndReturn(Buyer, Item));
+            AShopTill* Till = Test.PreparedTill(Buyer);
+            if (!TestNotNull(TEXT("Goods and payment reach checkout"), Till)) return false;
+            TestTrue(TEXT("Sell without a typed total"), Till->ConfirmSale(Test.Interaction));
+            Till->Destroy(); Buyer->Destroy();
+        }
+        TestEqual(TEXT("All three visits fund the following evening"), State->GetCash(), CashBefore - 18 + 42);
+        State->CloseShop();
+    }
     return true;
 }
 

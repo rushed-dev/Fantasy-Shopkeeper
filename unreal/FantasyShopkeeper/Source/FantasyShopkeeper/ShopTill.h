@@ -7,6 +7,7 @@
 #include "ShopTill.generated.h"
 
 class AShopCustomer;
+class AShopShelfSlot;
 class AShopPickupItem;
 class UStaticMeshComponent;
 class USoundBase;
@@ -18,7 +19,6 @@ UENUM(BlueprintType)
 enum class EShopTillPhase : uint8
 {
     Idle,
-    EnteringTotal,
     MakingChange,
     Complete
 };
@@ -36,9 +36,6 @@ public:
     bool BeginCheckout(UShopInteractionComponent* Interactor);
 
     UFUNCTION(BlueprintCallable, Category = "Shop|Till")
-    bool SubmitTotal(const FString& Text);
-
-    UFUNCTION(BlueprintCallable, Category = "Shop|Till")
     bool AddChangeCoin(int32 Denomination);
 
     UFUNCTION(BlueprintCallable, Category = "Shop|Till")
@@ -47,6 +44,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Shop|Till")
     bool ConfirmSale(UShopInteractionComponent* Interactor);
 
+    bool PresentCustomerGoods();
+    AShopPickupItem* GetCounterItem() const { return QuotedItem.Get(); }
     bool AssignCustomer(AShopCustomer* NewCustomer);
     bool UseControl(UShopInteractionComponent* Interactor, EShopTillControl Action, int32 Value = 0);
     AShopTillControl* FindControl(EShopTillControl Action, int32 Value = 0) const;
@@ -91,10 +90,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop|Audio")
     TObjectPtr<USoundBase> SaleSound;
 
-    // Unsubmitted total remains on the physical ticket when the player looks away.
-    UPROPERTY(Transient)
-    FString EnteredTotalText;
-
 private:
     friend class AShopGameState;
     bool IsQuoteValid() const;
@@ -104,6 +99,7 @@ private:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void Tick(float DeltaSeconds) override;
     void BuildControls();
+    UPROPERTY(Transient) TObjectPtr<AShopShelfSlot> CheckoutSlot;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<AShopTillControl>> Controls;

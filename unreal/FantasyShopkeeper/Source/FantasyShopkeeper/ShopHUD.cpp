@@ -11,6 +11,7 @@
 #include "ShopCustomer.h"
 #include "ShopGameState.h"
 #include "ShopTill.h"
+#include "ShopDoorSign.h"
 #include "ShopTillControl.h"
 #include "ShopSupplyCrate.h"
 #include "ShopCustomerFlow.h"
@@ -65,7 +66,11 @@ void AShopHUD::DrawHUD()
     const UShopInteractionComponent* Interaction = Controller->ShopInteraction;
     AActor* Target = Interaction->GetInteractionTarget();
     FString Prompt;
-    if (const AShopShelfSection* Section = Cast<AShopShelfSection>(Target))
+    if (const AShopDoorSign* Sign = Cast<AShopDoorSign>(Target))
+    {
+        Prompt = Interaction->GetHeldItem() ? TEXT("Put down the held item to turn the sign") : Sign->GetInteractionPrompt().ToString();
+    }
+    else if (const AShopShelfSection* Section = Cast<AShopShelfSection>(Target))
     {
         Prompt = Section->GetInteractionPrompt(Controller->ShopInteraction).ToString();
     }

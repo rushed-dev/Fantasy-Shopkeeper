@@ -100,12 +100,6 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
     {
         if (AShopGameState* State = GetWorld()->GetGameState<AShopGameState>())
         {
-            if (Params.Key == EKeys::O)
-            {
-                if (State->GetDayPhase() == EShopDayPhase::Preparation) State->OpenShop();
-                else State->CloseShop();
-                return true;
-            }
             if (Params.Key == EKeys::X)
             {
                 for (TActorIterator<AShopCustomerFlow> It(GetWorld()); It; ++It) It->EndUnservedVisit();
@@ -148,22 +142,8 @@ bool AShopPlayerController::InputKey(const FInputKeyEventArgs& Params)
                     const bool bRemove = IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift);
                     Till->UseControl(ShopInteraction, bRemove ? EShopTillControl::RemoveCoin : EShopTillControl::AddCoin, Denominations[Digit - 1]);
                 }
-                else
-                {
-                    Till->UseControl(ShopInteraction, EShopTillControl::Digit, Digit);
-                }
                 return true;
             }
-        }
-        if (Params.Key == EKeys::Delete || Params.Key == EKeys::BackSpace)
-        {
-            Till->UseControl(ShopInteraction, EShopTillControl::Clear);
-            return true;
-        }
-        if (Params.Key == EKeys::Enter)
-        {
-            Till->UseControl(ShopInteraction, EShopTillControl::AcceptPayment);
-            return true;
         }
     }
     return Super::InputKey(Params);

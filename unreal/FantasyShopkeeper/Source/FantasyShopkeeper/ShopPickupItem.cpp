@@ -57,7 +57,7 @@ bool AShopPickupItem::PickUp(UShopInteractionComponent* Interactor)
     }
 
     AShopShelfSlot* PreviousSlot = GetCurrentSlot();
-    if (PreviousSlot && PreviousSlot->GetOccupyingItem() != this)
+    if (PreviousSlot && (PreviousSlot->GetOccupyingItem() != this || PreviousSlot->GetCheckoutTill()))
     {
         return false;
     }

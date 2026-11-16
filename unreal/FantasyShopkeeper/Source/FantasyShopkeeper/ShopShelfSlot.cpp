@@ -6,6 +6,8 @@
 #include "ShopInteractionComponent.h"
 #include "ShopPickupItem.h"
 #include "ShopShelfSection.h"
+#include "ShopTill.h"
+#include "ShopCustomer.h"
 #include "UObject/ConstructorHelpers.h"
 
 AShopShelfSlot::AShopShelfSlot()
@@ -54,6 +56,7 @@ bool AShopShelfSlot::CanAcceptItem(const AShopPickupItem* Item) const
     {
         return false;
     }
+    if (CheckoutTill.IsValid() && (!Item || !Item->GetCarrier() || Item->GetCarrier()->GetOwner() != CheckoutTill->Customer)) return false;
     const AShopShelfSection* Shelf = GetSection();
     return !Shelf || (Shelf->CanAccept(Item) && Shelf->GetNextFreeSlot() == this);
 }
